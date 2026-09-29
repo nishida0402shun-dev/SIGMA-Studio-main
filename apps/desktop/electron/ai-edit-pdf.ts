@@ -9,6 +9,15 @@ export interface AttachedPdfPages {
   nextPageStart: number | null;
 }
 
+/**
+ * Windows環境対応ヘルパー:
+ * pdfjs-dist の factory URL は Windows のバックスラッシュ(\)ではなく
+ * フォワードスラッシュ(/) かつ末尾スラッシュ(/) を要求するため変換します。
+ */
+function toPdfJsUrl(packageRoot: string, subDir: string): string {
+  return path.join(packageRoot, subDir).replaceAll("\\", "/") + "/";
+}
+
 /** Derived AI input only: the original PDF stays in the run's attachments. */
 export async function renderAttachedPdfPages(
   bytes: Uint8Array,
@@ -21,19 +30,22 @@ export async function renderAttachedPdfPages(
   if (!Number.isSafeInteger(options.pageStart) || options.pageStart < 1) {
     throw new Error(te("electron.pdfAttachment.invalidPageStart"));
   }
+
   // Keep the ESM library external to the Electron/MCP CommonJS bundles.
   const { createCanvas } = await import("@napi-rs/canvas");
   const { getDocument } = await import("pdfjs-dist/legacy/build/pdf.mjs");
   const packageRoot = path.dirname(require.resolve("pdfjs-dist/package.json"));
+
   const loading = getDocument({
     data: Uint8Array.from(bytes),
-    cMapUrl: path.join(packageRoot, "cmaps") + path.sep,
+    cMapUrl: toPdfJsUrl(packageRoot, "cmaps"),
     cMapPacked: true,
-    standardFontDataUrl: path.join(packageRoot, "standard_fonts") + path.sep,
-    wasmUrl: path.join(packageRoot, "wasm") + path.sep,
+    standardFontDataUrl: toPdfJsUrl(packageRoot, "standard_fonts"),
+    wasmUrl: toPdfJsUrl(packageRoot, "wasm"),
     isEvalSupported: false,
     verbosity: 0,
   });
+
   try {
     const pdf = await loading.promise;
     if (options.pageStart > pdf.numPages) {
