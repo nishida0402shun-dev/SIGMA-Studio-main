@@ -2392,7 +2392,7 @@ function cloneDocument(document: SigmaDocument): SigmaDocument {
 }
 
 function getDocumentPath(fileId: string): string {
-  return path.join(DOCUMENTS_DIR_NAME, `${encodeURIComponent(fileId)}${DOCUMENT_FILE_SUFFIX}`);
+  return path.join(DOCUMENTS_DIR_NAME, `${encodeURIComponent(fileId)}${DOCUMENT_FILE_SUFFIX}`).replaceAll("\\", "/");
 }
 
 function decodeDocumentFileName(filename: string): string | null {
