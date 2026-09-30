@@ -264,11 +264,6 @@ const webAiAgentRuntime = createWebAiAgentRuntime({
   geminiRunContextStore: localGeminiRunContextStore,
   aiRenderBridgeStore: localAiRenderBridgeStore,
   resolveMcpServerScriptPath,
-  fallbackWorkspaceDirs: {
-    claude: path.join(SIGMA_STUDIO_DATA_PATH, "claude-agent-workspace"),
-    chatgpt: path.join(SIGMA_STUDIO_DATA_PATH, "codex-agent-workspace"),
-    antigravity: geminiAgentWorkspaceDir,
-  },
 });
 
 function resolveUserDataPath(): string {
