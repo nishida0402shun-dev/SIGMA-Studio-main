@@ -1,5 +1,4 @@
 import crypto from "node:crypto";
-import fs from "node:fs";
 import fsPromises from "node:fs/promises";
 import http from "node:http";
 import path from "node:path";
@@ -8,7 +7,7 @@ import { z } from "zod";
 
 import type { SigmaDocument } from "@/features/document";
 import type { AiEditRunEvent, AiEditRunResult } from "@/lib/ai/ai-edit-runtime";
-import type { AiEditProvider, AiEditController } from "./ipc/ai-edit";
+import type { AiEditController } from "./ipc/ai-edit";
 
 const MAX_REQUEST_BODY_BYTES = 4 * 1024 * 1024;
 const BRIDGE_DIR_NAME = "ai-run-context";
@@ -166,7 +165,7 @@ export function createWebAiBridgeServer(deps: WebAiBridgeDeps): http.Server {
         sendJson(res, 200, {
           ok: true,
           version: 1,
-          providers: ["chatgpt", "claude", "antigravity"] satisfies AiEditProvider[],
+          providers: ["chatgpt", "claude", "antigravity"],
         }, origin, deps.allowedOrigins);
         return;
       }
