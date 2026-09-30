@@ -23,24 +23,26 @@ async function createFixtureArchive(resources, content, name = "app.asar") {
 test("release audit checks archive contents and unpacked resources without exposing matches", async () => {
   const root = await mkdtemp(path.join(os.tmpdir(), "sigma-audit-"));
   try {
-    const resources = path.join(root, "resources");
-    await mkdir(resources);
+    const cleanResources = path.join(root, "clean");
+    const blockedResources = path.join(root, "blocked");
+    const extraResources = path.join(root, "extra");
+    await mkdir(cleanResources);
+    await mkdir(blockedResources);
+    await mkdir(extraResources);
 
-    await createFixtureArchive(resources, "export const value = 1;");
-    await auditReleaseContent(resources, environment);
+    await createFixtureArchive(cleanResources, "export const value = 1;");
+    await auditReleaseContent(cleanResources, environment);
 
-    await rm(path.join(resources, "app.asar"), { force: true });
-    await createFixtureArchive(resources, "blocked-example");
-    await assert.rejects(auditReleaseContent(resources, environment), (error) => {
+    await createFixtureArchive(blockedResources, "blocked-example");
+    await assert.rejects(auditReleaseContent(blockedResources, environment), (error) => {
       assert.match(error.message, /Release content audit failed/);
       assert.doesNotMatch(error.message, /blocked-example|main.js/);
       return true;
     });
 
-    await rm(path.join(resources, "app.asar"), { force: true });
-    await createFixtureArchive(resources, "export const value = 1;");
-    await writeFile(path.join(resources, "extra.txt"), "blocked-example");
-    await assert.rejects(auditReleaseContent(resources, environment), /Release content audit failed/);
+    await createFixtureArchive(extraResources, "export const value = 1;");
+    await writeFile(path.join(extraResources, "extra.txt"), "blocked-example");
+    await assert.rejects(auditReleaseContent(extraResources, environment), /Release content audit failed/);
   } finally {
     await rm(root, { recursive: true, force: true });
   }
