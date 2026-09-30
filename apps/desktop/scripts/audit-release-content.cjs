@@ -38,11 +38,18 @@ async function auditReleaseContent(resources, environment = process.env) {
       if (entry.isDirectory()) {
         await visit(file);
       } else if (entry.isFile() && entry.name.endsWith(".asar")) {
-        for (const archiveEntry of asar.listPackage(file)) {
-          const name = archiveEntry.replace(/^[/\\]+/, "");
-          const info = asar.statFile(file, name, false);
-          if (info.files || info.link || info.unpacked) continue;
-          inspect(name, asar.extractFile(file, name));
+        try {
+          for (const archiveEntry of asar.listPackage(file)) {
+            const name = archiveEntry.replace(/^[/\\]+/, "");
+            const info = asar.statFile(file, name, false);
+            if (info.files || info.link || info.unpacked) continue;
+            inspect(name, asar.extractFile(file, name));
+          }
+        } catch (error) {
+          if (error instanceof Error && error.message.startsWith("Release content audit failed")) {
+            throw error;
+          }
+          throw new Error("Release content audit failed while inspecting packaged resources.");
         }
       } else if (entry.isFile()) {
         inspect(path.relative(resources, file), await fs.readFile(file));
