@@ -59,6 +59,8 @@ import { registerCodexIpc } from "./ipc/codex";
 import { registerAiEditIpc } from "./ipc/ai-edit";
 import { registerAiResourcesIpc } from "./ipc/ai-resources";
 import { registerFileIpc } from "./ipc/file";
+import { KnowledgeDbStore } from "./knowledge-db-store";
+import { registerKnowledgeDbIpc } from "./ipc/knowledge-db";
 import { documentPathsFromArgv, ExternalDocumentOpenQueue } from "./external-document-open";
 import { registerMaterialsIpc } from "./ipc/materials";
 import { registerStorageIpc } from "./ipc/storage";
@@ -138,6 +140,7 @@ let stopAiResourceWatch: (() => void) | null = null;
 let stopAiSettingsWatch: (() => void) | null = null;
 const localSigmaDocStore = new LocalSigmaDocStore(USER_DATA_PATH);
 const localMaterialStore = new LocalMaterialStore(USER_DATA_PATH);
+const knowledgeDbStore = new KnowledgeDbStore(SIGMA_STUDIO_DATA_PATH);
 const localTemplateStore = new LocalTemplateStore(USER_DATA_PATH);
 const localMcpProposalStore = new LocalMcpEditProposalStore(USER_DATA_PATH);
 const localAiEditRunLogStore = new LocalAiEditRunLogStore(USER_DATA_PATH);
@@ -1603,6 +1606,11 @@ function registerIpc() {
   registerFileIpc({
     getMainWindow: () => mainWindow,
     externalDocumentOpenQueue,
+  });
+
+  registerKnowledgeDbIpc({
+    getMainWindow: () => mainWindow,
+    store: knowledgeDbStore,
   });
 
   registerMaterialsIpc({
