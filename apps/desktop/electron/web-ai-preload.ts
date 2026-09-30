@@ -68,7 +68,7 @@ async function waitForRun(runId: string, signal?: AbortSignal): Promise<unknown>
   throw new DOMException("Aborted", "AbortError");
 }
 
-async function registerSigmaWebAiTools(): Promise<void> {
+function asRecord(input: unknown): Record<string, unknown> {\n  if (!input || typeof input !== "object" || Array.isArray(input)) throw new TypeError("tool input must be an object");\n  return input as Record<string, unknown>;\n}\n\nasync function registerSigmaWebAiTools(): Promise<void> {
   if (!ORIGIN_ALLOWLIST.has(window.location.origin)) return;
   if (!bridgeUrl || !bridgeToken) return;
 
@@ -125,7 +125,7 @@ async function registerSigmaWebAiTools(): Promise<void> {
     },
     annotations: { readOnlyHint: false, consequentialHint: false, untrustedContentHint: true },
     execute: async (input, context) => {
-      const created = await callApi("/v1/agent/runs", { method: "POST", body: JSON.stringify(input) });
+      const created = await callApi("/v1/agent/runs", { method: "POST", body: JSON.stringify(asRecord(input)) });
       return waitForRun(String(created.runId), context?.signal);
     },
   }, { signal: controller.signal });
