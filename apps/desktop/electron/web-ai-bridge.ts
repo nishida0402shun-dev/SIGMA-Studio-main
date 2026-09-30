@@ -114,8 +114,8 @@ interface RunRecord extends WebAiRunState {
 }
 
 function isMissingFile(error: unknown): boolean {
-  return Boolean(error) && typeof error === "object" && "code" in error
-    && (error as { code?: string }).code === "ENOENT";
+  if (!error || typeof error !== "object") return false;
+  return "code" in error && (error as { code?: string }).code === "ENOENT";
 }
 
 function tokenEquals(expected: string, actual: string): boolean {
