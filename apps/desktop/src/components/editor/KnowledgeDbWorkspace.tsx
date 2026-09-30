@@ -15,6 +15,21 @@ interface Props {
 
 const TYPES: KnowledgeSemanticType[] = ["problem", "example", "explanation", "column", "definition", "theorem", "answer", "figure"];
 
+function semanticTypeLabel(t: Translate<"chrome">, type: KnowledgeSemanticType): string {
+  switch (type) {
+    case "problem": return t("appMenu.knowledgeDb.types.problem");
+    case "example": return t("appMenu.knowledgeDb.types.example");
+    case "explanation": return t("appMenu.knowledgeDb.types.explanation");
+    case "column": return t("appMenu.knowledgeDb.types.column");
+    case "definition": return t("appMenu.knowledgeDb.types.definition");
+    case "theorem": return t("appMenu.knowledgeDb.types.theorem");
+    case "answer": return t("appMenu.knowledgeDb.types.answer");
+    case "figure": return t("appMenu.knowledgeDb.types.figure");
+    default: return t("appMenu.knowledgeDb.unclassified");
+  }
+}
+
+
 export function KnowledgeDbWorkspace({ open, onClose, onOpenAi, t }: Props) {
   const [sources, setSources] = useState<KnowledgeSource[]>([]);
   const [query, setQuery] = useState("");
@@ -271,7 +286,7 @@ export function KnowledgeDbWorkspace({ open, onClose, onOpenAi, t }: Props) {
           <label className="knowledge-db-search"><Search size={16} /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder={t("appMenu.knowledgeDb.searchPlaceholder")} /></label>
           <select value={typeFilter} onChange={(event) => setTypeFilter(event.target.value as KnowledgeSemanticType | "all")}>
             <option value="all">{t("appMenu.knowledgeDb.allTypes")}</option>
-            {TYPES.map((type) => <option key={type} value={type}>{t(`appMenu.knowledgeDb.types.${type}`)}</option>)}
+            {TYPES.map((type) => <option key={type} value={type}>{semanticTypeLabel(t, type)}</option>)}
           </select>
           <span>{t("appMenu.knowledgeDb.resultCount", { count: visible.length })}</span>
         </div>
@@ -296,7 +311,7 @@ export function KnowledgeDbWorkspace({ open, onClose, onOpenAi, t }: Props) {
                   <FileText size={18} />
                   <span className="knowledge-db-item-main">
                     <strong>{source.name}</strong>
-                    <span>{t("appMenu.knowledgeDb.page", { page: page.pageNumber })} · {TYPES.includes(page.semanticType) ? t(`appMenu.knowledgeDb.types.${page.semanticType}`) : t("appMenu.knowledgeDb.unclassified")}</span>
+                    <span>{t("appMenu.knowledgeDb.page", { page: page.pageNumber })} · {semanticTypeLabel(t, page.semanticType)}</span>
                   </span>
                 </label>
               );
