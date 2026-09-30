@@ -277,9 +277,10 @@ export function createWebAiBridgeServer(deps: CreateWebAiBridgeServerDeps): http
         return;
       }
 
-      const documentMatch = /^\/v1\\/documents\\/([^/]+)$/.exec(pathname);
-      if (req.method === "GET" && documentMatch) {
-        const fileId = decodeURIComponent(documentMatch[1]!);
+      const routeParts = pathname.split("/").filter(Boolean).map((part) => decodeURIComponent(part));
+
+      if (req.method === "GET" && routeParts.length === 3 && routeParts[0] === "v1" && routeParts[1] === "documents") {
+        const fileId = routeParts[2]!;
         const snapshot = await deps.getDocument(fileId);
         if (!snapshot) {
           sendJson(res, 404, { ok: false, error: "document not found" }, origin);
@@ -335,9 +336,8 @@ export function createWebAiBridgeServer(deps: CreateWebAiBridgeServerDeps): http
         return;
       }
 
-      const runMatch = /^\/v1\\/agent\\/runs\\/([^/]+)$/.exec(pathname);
-      if (req.method === "GET" && runMatch) {
-        const run = runs.get(decodeURIComponent(runMatch[1]!));
+      if (req.method === "GET" && routeParts.length === 4 && routeParts[0] === "v1" && routeParts[1] === "agent" && routeParts[2] === "runs") {
+        const run = runs.get(routeParts[3]!);
         if (!run) {
           sendJson(res, 404, { ok: false, error: "run not found" }, origin);
           return;
@@ -346,9 +346,8 @@ export function createWebAiBridgeServer(deps: CreateWebAiBridgeServerDeps): http
         return;
       }
 
-      const eventMatch = /^\/v1\\/agent\\/runs\\/([^/]+)\\/events$/.exec(pathname);
-      if (req.method === "GET" && eventMatch) {
-        const run = runs.get(decodeURIComponent(eventMatch[1]!));
+      if (req.method === "GET" && routeParts.length === 5 && routeParts[0] === "v1" && routeParts[1] === "agent" && routeParts[2] === "runs" && routeParts[4] === "events") {
+        const run = runs.get(routeParts[3]!);
         if (!run) {
           sendJson(res, 404, { ok: false, error: "run not found" }, origin);
           return;
@@ -369,9 +368,8 @@ export function createWebAiBridgeServer(deps: CreateWebAiBridgeServerDeps): http
         return;
       }
 
-      const cancelMatch = /^\/v1\\/agent\\/runs\\/([^/]+)\\/cancel$/.exec(pathname);
-      if (req.method === "POST" && cancelMatch) {
-        const runId = decodeURIComponent(cancelMatch[1]!);
+      if (req.method === "POST" && routeParts.length === 5 && routeParts[0] === "v1" && routeParts[1] === "agent" && routeParts[2] === "runs" && routeParts[4] === "cancel") {
+        const runId = routeParts[3]!;
         const run = runs.get(runId);
         if (!run || run.status !== "running") {
           sendJson(res, 404, { ok: false, error: "running run not found" }, origin);
@@ -382,16 +380,14 @@ export function createWebAiBridgeServer(deps: CreateWebAiBridgeServerDeps): http
         return;
       }
 
-      const approveMatch = /^\/v1\\/proposals\\/([^/]+)\\/approve$/.exec(pathname);
-      if (req.method === "POST" && approveMatch) {
-        const result = await deps.approveProposal(decodeURIComponent(approveMatch[1]!));
+      if (req.method === "POST" && routeParts.length === 5 && routeParts[0] === "v1" && routeParts[1] === "proposals" && routeParts[3] === "approve" && routeParts[4] === "") {
+        const result = await deps.approveProposal(routeParts[2]!);
         sendJson(res, 200, { ok: true, result }, origin);
         return;
       }
 
-      const rejectMatch = /^\/v1\\/proposals\\/([^/]+)\\/reject$/.exec(pathname);
-      if (req.method === "POST" && rejectMatch) {
-        const result = await deps.rejectProposal(decodeURIComponent(rejectMatch[1]!));
+      if (req.method === "POST" && routeParts.length === 5 && routeParts[0] === "v1" && routeParts[1] === "proposals" && routeParts[3] === "reject" && routeParts[4] === "") {
+        const result = await deps.rejectProposal(routeParts[2]!);
         sendJson(res, 200, { ok: true, result }, origin);
         return;
       }
