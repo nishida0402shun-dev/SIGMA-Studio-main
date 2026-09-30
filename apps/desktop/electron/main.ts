@@ -65,7 +65,7 @@ import { registerStorageIpc } from "./ipc/storage";
 import { createProposalApprovalCoordinator } from "./proposal-approval";
 import { registerWorkspacePreviewIpc } from "./ipc/workspace-preview";
 import { createWindowCloseHandshake, type WindowCloseHandshake } from "./window-close-handshake";
-import { LocalWebAiBridgeStore, createWebAiBridgeServer } from "./web-ai-bridge";
+import { LocalWebAiBridgeStore, createWebAiBridgeServer, type WebAiBridgeInfo } from "./web-ai-bridge";
 import { createWebAiAgentRuntime } from "./web-ai-agent-runtime";
 import {
   getPageMetrics,
@@ -248,6 +248,7 @@ void sweepOrphanPerRunContextFiles(USER_DATA_PATH, "antigravity");
 void localAiRenderBridgeStore.clear();
 let aiRenderBridgeServer: http.Server | null = null;
 let webAiBridgeServer: http.Server | null = null;
+let webAiBridgeInfo: WebAiBridgeInfo | null = null;
 const pendingRenderDocuments = new Map<string, SigmaDocument>();
 
 const webAiAgentRuntime = createWebAiAgentRuntime({
@@ -1005,6 +1006,64 @@ async function waitForPrintPreviewReady(win: BrowserWindow): Promise<PrintPrevie
   `, true);
 }
 
+const webAiWindows = new Set<BrowserWindow>();
+
+function openWebAiWindow(provider: "chatgpt" | "claude" | "antigravity", url: string): void {
+  if (!webAiBridgeInfo) {
+    console.warn("Web AI bridge is not ready.");
+    return;
+  }
+  const win = new BrowserWindow({
+    width: 1400,
+    height: 900,
+    minWidth: 900,
+    minHeight: 600,
+    title: provider === "chatgpt" ? "ChatGPT Web — Sigma Studio" : provider === "claude" ? "Claude Web — Sigma Studio" : "Gemini Web — Sigma Studio",
+    webPreferences: {
+      preload: path.join(__dirname, "web-ai-preload.cjs"),
+      nodeIntegration: false,
+      contextIsolation: true,
+      sandbox: true,
+      webSecurity: true,
+      partition: `persist:sigma-web-ai-${provider}`,
+      additionalArguments: [
+        `--sigma-web-ai-url=${webAiBridgeInfo.url}`,
+        `--sigma-web-ai-token=${webAiBridgeInfo.token}`,
+      ],
+    },
+  });
+  webAiWindows.add(win);
+  win.on("closed", () => webAiWindows.delete(win));
+  win.webContents.setWindowOpenHandler(({ url: targetUrl }) => {
+    try {
+      const parsed = new URL(targetUrl);
+      if (parsed.protocol === "https:" && !targetUrl.startsWith("javascript:")) {
+        return {
+          action: "allow",
+          overrideBrowserWindowOptions: {
+            webPreferences: {
+              preload: path.join(__dirname, "web-ai-preload.cjs"),
+              nodeIntegration: false,
+              contextIsolation: true,
+              sandbox: true,
+              webSecurity: true,
+              partition: `persist:sigma-web-ai-${provider}`,
+              additionalArguments: [
+                `--sigma-web-ai-url=${webAiBridgeInfo!.url}`,
+                `--sigma-web-ai-token=${webAiBridgeInfo!.token}`,
+              ],
+            },
+          },
+        };
+      }
+    } catch {
+      // deny malformed or non-HTTPS popup targets
+    }
+    return { action: "deny" };
+  });
+  void win.loadURL(url);
+}
+
 function buildMenu() {
   const isMac = process.platform === "darwin";
   const sendMenuAction = (action: string) => () => {
@@ -1123,6 +1182,14 @@ function buildMenu() {
           { type: "separator" as const },
           { role: "quit" as const },
         ]),
+      ],
+    },
+    {
+      label: "Web AI",
+      submenu: [
+        { label: "ChatGPT Web", click: () => openWebAiWindow("chatgpt", "https://chatgpt.com/") },
+        { label: "Claude Web", click: () => openWebAiWindow("claude", "https://claude.ai/") },
+        { label: "Gemini Web", click: () => openWebAiWindow("antigravity", "https://gemini.google.com/") },
       ],
     },
     {
@@ -1678,6 +1745,7 @@ async function startWebAiBridgeServer(): Promise<void> {
       const loaded = await localSigmaDocStore.loadDocumentWithRecovery(fileId);
       return loaded.ok ? { fileId, revision: loaded.revision, document: loaded.document } : null;
     },
+    listDocuments: async () => localSigmaDocStore.listFiles(),
     listProposals: async (fileId) => localMcpProposalStore.listProposals({ fileId }),
     approveProposal: async (proposalId) => approveSingleProposal(proposalId),
     rejectProposal: async (proposalId) => localMcpProposalStore.rejectProposals([proposalId], "Web AI rejected"),
@@ -1696,19 +1764,21 @@ async function startWebAiBridgeServer(): Promise<void> {
   if (!address || typeof address === "string") {
     throw new Error(te("electron.preview.bridgePortMissing"));
   }
-  await localWebAiBridgeStore.write({
+  webAiBridgeInfo = {
     version: 1,
     apiVersion: "1",
     url: `http://127.0.0.1:${address.port}`,
     token,
     pid: process.pid,
     createdAt: new Date().toISOString(),
-  });
+  };
+  await localWebAiBridgeStore.write(webAiBridgeInfo);
 }
 
 function stopWebAiBridgeServer(): void {
   webAiBridgeServer?.close();
   webAiBridgeServer = null;
+  webAiBridgeInfo = null;
   void localWebAiBridgeStore.clear();
 }
 
