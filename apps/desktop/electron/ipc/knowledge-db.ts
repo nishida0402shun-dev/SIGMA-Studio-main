@@ -1,4 +1,4 @@
-import { app, dialog, ipcMain, type BrowserWindow } from "electron";
+import { dialog, ipcMain, type BrowserWindow } from "electron";
 import fs from "node:fs/promises";
 import path from "node:path";
 import { KnowledgeDbStore, type KnowledgeSemanticType } from "../knowledge-db-store";
@@ -32,7 +32,7 @@ export function registerKnowledgeDbIpc(deps: RegisterKnowledgeDbIpcDeps): void {
     const mainWindow = getMainWindow();
     if (!mainWindow) return null;
     const result = await dialog.showOpenDialog(mainWindow, {
-      title: "DBに追加",
+      title: "Add to DB",
       filters: [{ name: "PDF", extensions: ["pdf"] }],
       properties: ["openFile", "openDirectory", "multiSelections"],
     });
@@ -66,7 +66,7 @@ export function registerKnowledgeDbIpc(deps: RegisterKnowledgeDbIpcDeps): void {
     const mainWindow = getMainWindow();
     if (!mainWindow) return null;
     const save = await dialog.showSaveDialog(mainWindow, {
-      title: "選択ページをPDFとして抽出",
+      title: "Extract selected pages as PDF",
       defaultPath: "sigma-db-extract.pdf",
       filters: [{ name: "PDF", extensions: ["pdf"] }],
     });
