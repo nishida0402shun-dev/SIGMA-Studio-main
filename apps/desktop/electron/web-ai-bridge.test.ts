@@ -1,13 +1,12 @@
-import assert from "node:assert/strict";
-import http from "node:http";
-import test from "node:test";
+import { afterEach, describe, expect, it } from "vitest";
+import type http from "node:http";
 
 import { createWebAiBridgeServer } from "./web-ai-bridge";
 
 async function listen(server: http.Server): Promise<string> {
   await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
   const address = server.address();
-  assert.ok(address && typeof address !== "string");
+  if (!address || typeof address === "string") throw new Error("server did not bind");
   return `http://127.0.0.1:${address.port}`;
 }
 
@@ -15,7 +14,7 @@ async function close(server: http.Server): Promise<void> {
   await new Promise<void>((resolve, reject) => server.close((error) => error ? reject(error) : resolve()));
 }
 
-test("Web AI bridge requires bearer auth and allowlisted origins", async () => {
+describe("Web AI bridge", () => {\n  let servers: http.Server[] = [];\n\n  afterEach(async () => {\n    await Promise.all(servers.splice(0).map(close));\n  });\n\n  it("requires bearer auth and allowlisted origins", async () => {
   const server = createWebAiBridgeServer({
     token: "test-token",
     getDocument: async () => null,
@@ -29,12 +28,12 @@ test("Web AI bridge requires bearer auth and allowlisted origins", async () => {
   const base = await listen(server);
   try {
     const unauthorized = await fetch(`${base}/v1/health`);
-    assert.equal(unauthorized.status, 401);
+    expect(unauthorized.status).toBe(401);
 
     const forbidden = await fetch(`${base}/v1/health`, {
       headers: { Authorization: "Bearer test-token", Origin: "https://evil.example" },
     });
-    assert.equal(forbidden.status, 403);
+    expect(forbidden.status).toBe(403);
 
     const ok = await fetch(`${base}/v1/health`, {
       headers: { Authorization: "Bearer test-token", Origin: "https://chatgpt.com" },
@@ -83,9 +82,9 @@ test("Web AI bridge starts runs and exposes completion state", async () => {
         instruction: "test",
       }),
     });
-    assert.equal(created.status, 202);
+    expect(created.status).toBe(202);
     const createdBody = await created.json();
-    assert.match(createdBody.runId, /^webai_/);
+    expect(createdBody.runId).toMatch(/^webai_/);
 
     let status: any = null;
     for (let attempt = 0; attempt < 20; attempt += 1) {
@@ -96,14 +95,14 @@ test("Web AI bridge starts runs and exposes completion state", async () => {
       if (status.run.status !== "running") break;
       await new Promise((resolve) => setTimeout(resolve, 10));
     }
-    assert.equal(status.run.status, "completed");
-    assert.equal(status.run.result.status, "answer");
-    assert.equal(status.events.length, 1);
+    expect(status.run.status).toBe("completed");
+    expect(status.run.result.status).toBe("answer");
+    expect(status.events).toHaveLength(1);
 
     const documents = await fetch(`${base}/v1/documents`, {
       headers: { Authorization: "Bearer test-token" },
     });
-    assert.deepEqual((await documents.json()).documents, [{ fileId: "file_test", revision: 7 }]);
+    expect((await documents.json()).documents).toEqual([{ fileId: "file_test", revision: 7 }]);
   } finally {
     await close(server);
   }
