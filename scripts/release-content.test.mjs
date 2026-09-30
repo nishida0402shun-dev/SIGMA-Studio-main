@@ -38,7 +38,7 @@ test("release audit checks archive contents and unpacked resources without expos
     });
 
     await rm(path.join(resources, "app.asar"), { force: true });
-    await createFixtureArchive(resources, "safe");
+    await createFixtureArchive(resources, "export const value = 1;");
     await writeFile(path.join(resources, "extra.txt"), "blocked-example");
     await assert.rejects(auditReleaseContent(resources, environment), /Release content audit failed/);
   } finally {
