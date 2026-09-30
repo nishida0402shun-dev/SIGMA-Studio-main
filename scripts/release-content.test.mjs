@@ -15,14 +15,16 @@ test("release audit checks archive contents and unpacked resources without expos
   try {
     const source = path.join(root, "source");
     const resources = path.join(root, "resources");
+    const archive = path.join(resources, "app.asar");
     await mkdir(source);
     await mkdir(resources);
     await writeFile(path.join(source, "main.js"), "export const value = 1;");
-    await createPackage(source, path.join(resources, "app.asar"));
+    await createPackage(source, archive);
     await auditReleaseContent(resources, environment);
 
     await writeFile(path.join(source, "main.js"), "blocked-example");
-    await createPackage(source, path.join(resources, "app.asar"));
+    await rm(archive, { force: true });
+    await createPackage(source, archive);
     await assert.rejects(auditReleaseContent(resources, environment), (error) => {
       assert.match(error.message, /Release content audit failed/);
       assert.doesNotMatch(error.message, /blocked-example|main.js/);
@@ -30,7 +32,8 @@ test("release audit checks archive contents and unpacked resources without expos
     });
 
     await writeFile(path.join(source, "main.js"), "safe");
-    await createPackage(source, path.join(resources, "app.asar"));
+    await rm(archive, { force: true });
+    await createPackage(source, archive);
     await writeFile(path.join(resources, "extra.txt"), "blocked-example");
     await assert.rejects(auditReleaseContent(resources, environment), /Release content audit failed/);
   } finally {
