@@ -175,8 +175,17 @@ function sendSseEvent(res: http.ServerResponse, event: unknown): void {
 }
 
 function publicRunState(run: RunRecord): WebAiRunState {
-  const { events: _events, listeners: _listeners, ...state } = run;
-  return state;
+  return {
+    runId: run.runId,
+    provider: run.provider,
+    fileId: run.fileId,
+    baseRevision: run.baseRevision,
+    status: run.status,
+    startedAt: run.startedAt,
+    ...(run.completedAt ? { completedAt: run.completedAt } : {}),
+    ...(run.error ? { error: run.error } : {}),
+    ...(run.result !== undefined ? { result: run.result } : {}),
+  };
 }
 
 function pruneRuns(runs: Map<string, RunRecord>): void {
