@@ -277,7 +277,7 @@ export function createWebAiBridgeServer(deps: CreateWebAiBridgeServerDeps): http
         return;
       }
 
-      const documentMatch = /^\\/v1\\/documents\\/([^/]+)$/.exec(pathname);
+      const documentMatch = /^\/v1\\/documents\\/([^/]+)$/.exec(pathname);
       if (req.method === "GET" && documentMatch) {
         const fileId = decodeURIComponent(documentMatch[1]!);
         const snapshot = await deps.getDocument(fileId);
@@ -335,7 +335,7 @@ export function createWebAiBridgeServer(deps: CreateWebAiBridgeServerDeps): http
         return;
       }
 
-      const runMatch = /^\\/v1\\/agent\\/runs\\/([^/]+)$/.exec(pathname);
+      const runMatch = /^\/v1\\/agent\\/runs\\/([^/]+)$/.exec(pathname);
       if (req.method === "GET" && runMatch) {
         const run = runs.get(decodeURIComponent(runMatch[1]!));
         if (!run) {
@@ -346,7 +346,7 @@ export function createWebAiBridgeServer(deps: CreateWebAiBridgeServerDeps): http
         return;
       }
 
-      const eventMatch = /^\\/v1\\/agent\\/runs\\/([^/]+)\\/events$/.exec(pathname);
+      const eventMatch = /^\/v1\\/agent\\/runs\\/([^/]+)\\/events$/.exec(pathname);
       if (req.method === "GET" && eventMatch) {
         const run = runs.get(decodeURIComponent(eventMatch[1]!));
         if (!run) {
@@ -369,7 +369,7 @@ export function createWebAiBridgeServer(deps: CreateWebAiBridgeServerDeps): http
         return;
       }
 
-      const cancelMatch = /^\\/v1\\/agent\\/runs\\/([^/]+)\\/cancel$/.exec(pathname);
+      const cancelMatch = /^\/v1\\/agent\\/runs\\/([^/]+)\\/cancel$/.exec(pathname);
       if (req.method === "POST" && cancelMatch) {
         const runId = decodeURIComponent(cancelMatch[1]!);
         const run = runs.get(runId);
@@ -382,14 +382,14 @@ export function createWebAiBridgeServer(deps: CreateWebAiBridgeServerDeps): http
         return;
       }
 
-      const approveMatch = /^\\/v1\\/proposals\\/([^/]+)\\/approve$/.exec(pathname);
+      const approveMatch = /^\/v1\\/proposals\\/([^/]+)\\/approve$/.exec(pathname);
       if (req.method === "POST" && approveMatch) {
         const result = await deps.approveProposal(decodeURIComponent(approveMatch[1]!));
         sendJson(res, 200, { ok: true, result }, origin);
         return;
       }
 
-      const rejectMatch = /^\\/v1\\/proposals\\/([^/]+)\\/reject$/.exec(pathname);
+      const rejectMatch = /^\/v1\\/proposals\\/([^/]+)\\/reject$/.exec(pathname);
       if (req.method === "POST" && rejectMatch) {
         const result = await deps.rejectProposal(decodeURIComponent(rejectMatch[1]!));
         sendJson(res, 200, { ok: true, result }, origin);
