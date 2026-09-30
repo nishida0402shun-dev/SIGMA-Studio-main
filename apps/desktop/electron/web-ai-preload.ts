@@ -5,7 +5,7 @@ interface WebMcpModelContext {
       description: string;
       inputSchema: Record<string, unknown>;
       annotations?: Record<string, unknown>;
-      execute: (input: unknown, context?: { signal?: AbortSignal }) => Promise<unknown> | unknown;
+      execute: (input: Record<string, unknown>, context?: { signal?: AbortSignal }) => Promise<unknown> | unknown;
     },
     options?: { signal?: AbortSignal },
   ): Promise<void>;
@@ -68,7 +68,12 @@ async function waitForRun(runId: string, signal?: AbortSignal): Promise<unknown>
   throw new DOMException("Aborted", "AbortError");
 }
 
-function asRecord(input: unknown): Record<string, unknown> {\n  if (!input || typeof input !== "object" || Array.isArray(input)) throw new TypeError("tool input must be an object");\n  return input as Record<string, unknown>;\n}\n\nasync function registerSigmaWebAiTools(): Promise<void> {
+function asRecord(input: unknown): Record<string, unknown> {
+  if (!input || typeof input !== "object" || Array.isArray(input)) throw new TypeError("tool input must be an object");
+  return input as Record<string, unknown>;
+}
+
+async function registerSigmaWebAiTools(): Promise<void> {
   if (!ORIGIN_ALLOWLIST.has(window.location.origin)) return;
   if (!bridgeUrl || !bridgeToken) return;
 
