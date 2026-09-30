@@ -86,9 +86,6 @@ export function createWebAiAgentRuntime(deps: WebAiAgentRuntimeDeps) {
           payload: {
             fileId: input.fileId,
             document: input.document,
-            instruction: input.instruction,
-            model: input.model,
-            reasoningEffort: input.reasoningEffort,
             roomId: input.roomId,
           },
         });
