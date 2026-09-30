@@ -52,7 +52,7 @@ export class LocalWebAiBridgeStore implements WebAiBridgeStore {
       await fsPromises.unlink(this.bridgeFilePath);
     } catch (error) {
       if (!error || typeof error !== "object" || (error as { code?: string }).code !== "ENOENT") {
-        console.warn("Web AI bridge情報の削除に失敗しました。", error);
+        console.warn("Failed to clear Web AI bridge metadata.", error);
       }
     }
   }
