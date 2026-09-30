@@ -320,6 +320,24 @@ const desktopAPI = {
     },
   },
 
+  knowledgeDb: {
+    chooseSources(): Promise<{ paths: string[] } | null> {
+      return ipcRenderer.invoke("knowledge-db:choose-sources");
+    },
+    list(): Promise<unknown[]> {
+      return ipcRenderer.invoke("knowledge-db:list");
+    },
+    importSources(paths: string[]): Promise<unknown[]> {
+      return ipcRenderer.invoke("knowledge-db:import", paths);
+    },
+    extractPages(payload: { sourceId: string; pageNumbers: number[] }): Promise<{ filePath: string; pageCount: number } | null> {
+      return ipcRenderer.invoke("knowledge-db:extract-pages", payload);
+    },
+    setPageType(payload: { sourceId: string; pageNumber: number; semanticType: string; title?: string }): Promise<unknown> {
+      return ipcRenderer.invoke("knowledge-db:set-page-type", payload);
+    },
+  },
+
   aiRender: {
     getRenderDocument(renderId: string): Promise<unknown> {
       return ipcRenderer.invoke("ai-render:get-document", renderId);
