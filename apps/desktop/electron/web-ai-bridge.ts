@@ -64,6 +64,7 @@ export interface WebAiRunState {
 export interface CreateWebAiBridgeServerDeps {
   token: string;
   getDocument: (fileId: string) => Promise<WebAiDocumentSnapshot | null>;
+  listDocuments: () => Promise<unknown[]>;
   listProposals: (fileId: string) => Promise<unknown[]>;
   approveProposal: (proposalId: string) => Promise<unknown>;
   rejectProposal: (proposalId: string) => Promise<unknown>;
@@ -268,6 +269,11 @@ export function createWebAiBridgeServer(deps: CreateWebAiBridgeServerDeps): http
             directDesktopIpc: false,
           },
         }, origin);
+        return;
+      }
+
+      if (req.method === "GET" && pathname === "/v1/documents") {
+        sendJson(res, 200, { ok: true, documents: await deps.listDocuments() }, origin);
         return;
       }
 
