@@ -4,25 +4,18 @@ import { useEffect, useMemo, useState } from "react";
 import { Database, Download, FilePlus2, FileText, MessageSquare, Search, X } from "lucide-react";
 import { getDesktopBridge } from "@/lib/desktop-bridge";
 import type { KnowledgeSemanticType, KnowledgeSource } from "@/types/knowledge-db";
+import type { Translate } from "@/lib/i18n";
 
 interface Props {
   open: boolean;
   onClose: () => void;
   onOpenAi: () => void;
+  t: Translate<"chrome">;
 }
 
-const TYPES: Array<{ value: KnowledgeSemanticType; label: string }> = [
-  { value: "problem", label: "問題" },
-  { value: "example", label: "例題" },
-  { value: "explanation", label: "解説" },
-  { value: "column", label: "コラム" },
-  { value: "definition", label: "定義" },
-  { value: "theorem", label: "定理" },
-  { value: "answer", label: "解答" },
-  { value: "figure", label: "図・表" },
-];
+const TYPES: KnowledgeSemanticType[] = ["problem", "example", "explanation", "column", "definition", "theorem", "answer", "figure"];
 
-export function KnowledgeDbWorkspace({ open, onClose, onOpenAi }: Props) {
+export function KnowledgeDbWorkspace({ open, onClose, onOpenAi, t }: Props) {
   const [sources, setSources] = useState<KnowledgeSource[]>([]);
   const [query, setQuery] = useState("");
   const [selected, setSelected] = useState<Record<string, Set<number>>>({});
@@ -263,24 +256,24 @@ export function KnowledgeDbWorkspace({ open, onClose, onOpenAi }: Props) {
   }
 }
 `}</style>
-      <div className="knowledge-db-backdrop" role="dialog" aria-modal="true" aria-label="DB">
+      <div className="knowledge-db-backdrop" role="dialog" aria-modal="true" aria-label={t("knowledgeDb.title")}>
       <section className="knowledge-db-workspace">
         <header className="knowledge-db-header">
-          <div className="knowledge-db-title"><Database size={20} /><strong>DB</strong></div>
+          <div className="knowledge-db-title"><Database size={20} /><strong>{t("knowledgeDb.title")}</strong></div>
           <div className="knowledge-db-actions">
-            <button type="button" onClick={() => void addSources()}><FilePlus2 size={16} />追加</button>
-            <button type="button" onClick={() => void extractPdf()} disabled={selectedPages.length === 0}><Download size={16} />PDF抽出</button>
-            <button type="button" onClick={() => void handoffAi()}><MessageSquare size={16} />AIに渡す</button>
-            <button type="button" className="knowledge-db-close" onClick={onClose} aria-label="DBを閉じる"><X size={18} /></button>
+            <button type="button" onClick={() => void addSources()}><FilePlus2 size={16} />{t("knowledgeDb.add")}</button>
+            <button type="button" onClick={() => void extractPdf()} disabled={selectedPages.length === 0}><Download size={16} />{t("knowledgeDb.extractPdf")}</button>
+            <button type="button" onClick={() => void handoffAi()}><MessageSquare size={16} />{t("knowledgeDb.handoffAi")}</button>
+            <button type="button" className="knowledge-db-close" onClick={onClose} aria-label={t("knowledgeDb.close")}><X size={18} /></button>
           </div>
         </header>
         <div className="knowledge-db-toolbar">
-          <label className="knowledge-db-search"><Search size={16} /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="教材・ページ・タイトルを検索" /></label>
+          <label className="knowledge-db-search"><Search size={16} /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder={t("knowledgeDb.searchPlaceholder")} /></label>
           <select value={typeFilter} onChange={(event) => setTypeFilter(event.target.value as KnowledgeSemanticType | "all")}>
-            <option value="all">すべて</option>
-            {TYPES.map((type) => <option key={type.value} value={type.value}>{type.label}</option>)}
+            <option value="all">{t("knowledgeDb.allTypes")}</option>
+            {TYPES.map((type) => <option key={type} value={type}>{t(`knowledgeDb.types.${type}`)}</option>)}
           </select>
-          <span>{visible.length}件</span>
+          <span>{t("knowledgeDb.resultCount", { count: visible.length })}</span>
         </div>
         <div className="knowledge-db-content">
           <div className="knowledge-db-results">
@@ -303,17 +296,17 @@ export function KnowledgeDbWorkspace({ open, onClose, onOpenAi }: Props) {
                   <FileText size={18} />
                   <span className="knowledge-db-item-main">
                     <strong>{source.name}</strong>
-                    <span>p.{page.pageNumber} · {TYPES.find((type) => type.value === page.semanticType)?.label ?? "未分類"}</span>
+                    <span>{t("knowledgeDb.page", { page: page.pageNumber })} · {TYPES.includes(page.semanticType) ? t(`knowledgeDb.types.${page.semanticType}`) : t("knowledgeDb.unclassified")}</span>
                   </span>
                 </label>
               );
             })}
-            {visible.length === 0 && <div className="knowledge-db-empty">DBにPDFを追加してください。</div>}
+            {visible.length === 0 && <div className="knowledge-db-empty">{t("knowledgeDb.empty")}</div>}
           </div>
           <aside className="knowledge-db-detail">
-            <strong>選択中</strong>
-            <span>{selectedPages.length}ページ</span>
-            <p>ページを選択すると、元PDFのページをそのまま抽出できます。意味分類は解析器を接続すると自動更新されます。</p>
+            <strong>{t("knowledgeDb.selected")}</strong>
+            <span>{t("knowledgeDb.selectedPages", { count: selectedPages.length })}</span>
+            <p>{t("knowledgeDb.help")}</p>
           </aside>
         </div>
       </section>
