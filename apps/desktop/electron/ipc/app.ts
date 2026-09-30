@@ -16,10 +16,6 @@ import {
 } from "../desktop-settings";
 import { restorePreviousInputSource, switchToAsciiInputSource } from "../input-source";
 
-// 🌟 AI機能・問題バンク用サービスのインポート
-import { SkillLoader } from "../services/SkillLoader";
-import { QuestionBankService } from "../services/QuestionBankService";
-
 const te = createCurrentLocaleTranslator("error");
 
 const FONT_FILE_EXTENSIONS = new Set([".ttf", ".otf", ".woff", ".woff2", ".ttc"]);
@@ -38,11 +34,6 @@ export interface RegisterAppIpcDeps {
 
 export function registerAppIpc(deps: RegisterAppIpcDeps): void {
   const { getMainWindow, releaseUrl, dataDir, appUpdateController, quitAndInstall } = deps;
-
-  // 🌟 AI機能サービス（スキル自動読み込み ＆ 問題バンクSQLite）の初期化
-  const skillLoader = new SkillLoader();
-  const dbPath = path.join(dataDir, "question_bank.db");
-  const questionBankService = new QuestionBankService(dbPath);
 
   function customFontsDir(): string {
     return path.join(dataDir, "fonts");
@@ -74,7 +65,7 @@ export function registerAppIpc(deps: RegisterAppIpcDeps): void {
 
   async function uniqueCustomFontFileName(id: string, sourcePath: string): Promise<string> {
     const ext = path.extname(sourcePath).toLowerCase();
-    const safeBase = path.basename(sourcePath, path.extname(sourcePath)).replace(/[^a-zA-Z0-9._-]+/gu, "-").replace(/^-+|-+\$/gu, "") || "font";
+    const safeBase = path.basename(sourcePath, path.extname(sourcePath)).replace(/[^a-zA-Z0-9._-]+/gu, "-").replace(/^-+|-+$/gu, "") || "font";
     let candidate = `${id}-${safeBase}${ext}`;
     let counter = 2;
     while (existsSync(path.join(customFontsDir(), candidate))) {
@@ -133,30 +124,6 @@ export function registerAppIpc(deps: RegisterAppIpcDeps): void {
     }
     return normalizeEditorFontFamily((payload as { fontFamily?: unknown }).fontFamily) ?? "";
   }
-
-  // ---------------------------------------------------------
-  // 🌟 追加: AI機能 ＆ スキル連携 IPC ハンドラー群
-  // ---------------------------------------------------------
-
-  // ① ドロップインされたスキルの全件取得
-  ipcMain.handle("skills:get-all", () => {
-    return skillLoader.getSkills();
-  });
-
-  // ② webview-preload.js の絶対パス（file:// URL）を返却
-  ipcMain.handle("ai:get-preload-path", () => {
-    const preloadFilePath = path.join(__dirname, "../preload/webview-preload.js");
-    return `file://${preloadFilePath}`;
-  });
-
-  // ③ 問題バンク（SQLite FTS5）の全文検索
-  ipcMain.handle("question-bank:search", async (_, { query, limit }) => {
-    return questionBankService.search(query, limit);
-  });
-
-  // ---------------------------------------------------------
-  // 既存の IPC ハンドラー群
-  // ---------------------------------------------------------
 
   ipcMain.handle("app:get-info", () => ({
     version: app.getVersion(),

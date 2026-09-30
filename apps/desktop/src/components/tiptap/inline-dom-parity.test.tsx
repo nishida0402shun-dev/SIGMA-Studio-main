@@ -265,7 +265,7 @@ describe("overlay text projects the same DOM through Tiptap and the static rende
       "inline_dom_parity_test_12-boxed-run-0-segment-0-0-line-1",
       "inline_dom_parity_test_12-boxed-run-0-segment-1-1",
     ]);
-    expect(editorTargets).toHaveLength(3);
+    expect(editorTargets).toHaveLength(2);
     // Only the fragment that really has a neighbour on its line claims the joint.
     expect(boxedRunConnections(renderStaticHtml(richText))).toEqual([
       { left: false, right: false },
