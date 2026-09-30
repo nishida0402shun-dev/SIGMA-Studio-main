@@ -386,7 +386,7 @@ export function registerAiEditIpc(deps: RegisterAiEditIpcDeps): AiEditController
       activeAiEditRuns.delete(runId);
       cancelRequestedAiEditRuns.delete(runId);
     }
-  });
+  };
 
   const controller: AiEditController = {
     run: runAiEditRequest,
