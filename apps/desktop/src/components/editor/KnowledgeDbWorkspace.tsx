@@ -28,15 +28,16 @@ export function KnowledgeDbWorkspace({ open, onClose, onOpenAi }: Props) {
   const [selected, setSelected] = useState<Record<string, Set<number>>>({});
   const [typeFilter, setTypeFilter] = useState<KnowledgeSemanticType | "all">("all");
   const desktop = getDesktopBridge();
+  const knowledgeDb = desktop?.knowledgeDb;
 
   useEffect(() => {
-    if (!open || !desktop) return;
+    if (!open || !knowledgeDb) return;
     let cancelled = false;
-    void desktop.knowledgeDb.list().then((value) => {
+    void knowledgeDb.list().then((value) => {
       if (!cancelled && Array.isArray(value)) setSources(value as KnowledgeSource[]);
     });
     return () => { cancelled = true; };
-  }, [desktop, open]);
+  }, [knowledgeDb, open]);
 
   const visible = useMemo(() => {
     const normalized = query.trim().toLocaleLowerCase();
@@ -57,20 +58,20 @@ export function KnowledgeDbWorkspace({ open, onClose, onOpenAi }: Props) {
   if (!open) return null;
 
   async function addSources(): Promise<void> {
-    if (!desktop) return;
-    const picked = await desktop.knowledgeDb.chooseSources();
+    if (!knowledgeDb) return;
+    const picked = await knowledgeDb.chooseSources();
     if (!picked?.paths?.length) return;
-    const added = await desktop.knowledgeDb.importSources(picked.paths);
+    const added = await knowledgeDb.importSources(picked.paths);
     setSources((current) => [...(added as KnowledgeSource[]), ...current]);
   }
 
   async function extractPdf(): Promise<void> {
-    if (!desktop || selectedPages.length === 0) return;
+    if (!knowledgeDb || selectedPages.length === 0) return;
     const grouped = new Map<string, number[]>();
     for (const item of selectedPages) grouped.set(item.sourceId, [...(grouped.get(item.sourceId) ?? []), item.pageNumber]);
     if (grouped.size !== 1) return;
     const [sourceId, pageNumbers] = [...grouped.entries()][0]!;
-    await desktop.knowledgeDb.extractPages({ sourceId, pageNumbers });
+    await knowledgeDb.extractPages({ sourceId, pageNumbers });
   }
 
   async function handoffAi(): Promise<void> {
