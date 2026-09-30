@@ -99,7 +99,7 @@ describe("Web AI bridge", () => {
         headers: { Authorization: "Bearer test-token" },
       });
       status = await response.json();
-      if (status.run.status !== "running") break;
+      if (status?.run.status !== "running") break;
       await new Promise((resolve) => setTimeout(resolve, 10));
     }
     expect(status?.run.status).toBe("completed");
