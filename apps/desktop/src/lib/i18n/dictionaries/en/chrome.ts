@@ -33,6 +33,14 @@ export const chrome = {
       openChat: "Open AI chat",
       settings: "AI settings",
     },
+    knowledgeDb: {
+      title: "Knowledge DB", add: "Add", extractPdf: "Extract PDF", handoffAi: "Send to AI", close: "Close DB",
+      searchPlaceholder: "Search materials, pages, and titles", allTypes: "All", resultCount: "{{count}} results",
+      selected: "Selected", selectedPages: "{{count}} pages", empty: "Add PDFs to the DB.",
+      help: "Select pages to extract them from the original PDF. Semantic classification will be updated when the analyzer is connected.",
+      page: "p.{{page}}", unclassified: "Unclassified",
+      types: { problem: "Problem", example: "Example", explanation: "Explanation", column: "Column", definition: "Definition", theorem: "Theorem", answer: "Answer", figure: "Figure/Table" },
+    },
     settings: {
       label: "Settings",
       comments: "Show comments",

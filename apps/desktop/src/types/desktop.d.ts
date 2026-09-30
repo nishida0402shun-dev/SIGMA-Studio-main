@@ -861,6 +861,14 @@ export interface DesktopWorkspacePreviewAPI {
   put(fileId: string, revision: number, dataUrl: string): Promise<{ ok: boolean }>;
 }
 
+export interface DesktopKnowledgeDbAPI {
+  chooseSources(): Promise<{ paths: string[] } | null>;
+  list(): Promise<unknown[]>;
+  importSources(paths: string[]): Promise<unknown[]>;
+  extractPages(payload: { sourceId: string; pageNumbers: number[] }): Promise<{ filePath: string; pageCount: number } | null>;
+  setPageType(payload: { sourceId: string; pageNumber: number; semanticType: string; title?: string }): Promise<unknown>;
+}
+
 export interface DesktopAPI {
   isDesktop: true;
   platform: NodeJS.Platform;
@@ -881,6 +889,7 @@ export interface DesktopAPI {
   materials: DesktopMaterialsAPI;
   templates: DesktopTemplatesAPI;
   storage: DesktopStorageAPI;
+  knowledgeDb?: DesktopKnowledgeDbAPI;
   workspacePreview?: DesktopWorkspacePreviewAPI;
   onMenuAction(handler: (action: string) => void): () => void;
 }
