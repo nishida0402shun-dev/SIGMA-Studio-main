@@ -247,6 +247,7 @@ void localAiRenderBridgeStore.clear();
 let aiRenderBridgeServer: http.Server | null = null;
 let webAiBridgeServer: http.Server | null = null;
 const localWebAiBridgeStore = new LocalWebAiBridgeStore(USER_DATA_PATH);
+let webAiBridgeInfo: { url: string; token: string } | null = null;
 let aiEditController: AiEditController | null = null;
 const pendingRenderDocuments = new Map<string, SigmaDocument>();
 
@@ -1459,6 +1460,23 @@ function registerIpc() {
   ipcMain.handle("app:close-cancel", (event) => {
     return activeWindowCloseHandshake?.cancel(event.sender) ?? false;
   });
+
+  ipcMain.handle("web-ai:get-config", (event) => {
+    const origin = (() => {
+      try {
+        return new URL(event.senderFrame?.url ?? "").origin;
+      } catch {
+        return "";
+      }
+    })();
+    if (!WEB_AI_ALLOWED_ORIGINS.includes(origin as (typeof WEB_AI_ALLOWED_ORIGINS)[number])) {
+      throw new Error("Web AI origin is not allowed");
+    }
+    if (!webAiBridgeInfo) {
+      throw new Error("Web AI bridge is not ready");
+    }
+    return webAiBridgeInfo;
+  });
   registerAppIpc({
     getMainWindow: () => mainWindow,
     releaseUrl: RELEASE_PAGE_URL,
@@ -1694,10 +1712,13 @@ async function startWebAiBridgeServer(): Promise<void> {
     throw new Error("Web AI bridge port is unavailable");
   }
 
-  await localWebAiBridgeStore.write({
-    version: 1,
+  webAiBridgeInfo = {
     url: `http://127.0.0.1:${address.port}`,
     token,
+  };
+  await localWebAiBridgeStore.write({
+    version: 1,
+    ...webAiBridgeInfo,
     pid: process.pid,
     createdAt: new Date().toISOString(),
   });
@@ -1706,6 +1727,7 @@ async function startWebAiBridgeServer(): Promise<void> {
 function stopWebAiBridgeServer(): void {
   webAiBridgeServer?.close();
   webAiBridgeServer = null;
+  webAiBridgeInfo = null;
   void localWebAiBridgeStore.clear();
 }
 
