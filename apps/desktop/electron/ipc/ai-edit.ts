@@ -82,7 +82,12 @@ export interface RegisterAiEditIpcDeps {
   pendingRenderDocuments: Map<string, SigmaDocument>;
 }
 
-export function registerAiEditIpc(deps: RegisterAiEditIpcDeps): void {
+export interface AiEditController {
+  run(runId: string, payload: unknown, onEvent: (event: AiEditRunEvent) => void): Promise<import("@/lib/ai/ai-edit-runtime").AiEditRunResult>;
+  cancel(runIdArg: unknown): { ok: boolean; cancelled: boolean };
+}
+
+export function registerAiEditIpc(deps: RegisterAiEditIpcDeps): AiEditController {
   const {
     userDataPath,
     dataDir,
@@ -166,12 +171,16 @@ export function registerAiEditIpc(deps: RegisterAiEditIpcDeps): void {
     }
   }
 
-  ipcMain.handle("ai-edit:run", async (event, runId: string, payload: unknown) => {
+  const runAiEditRequest = async (
+    runId: string,
+    payload: unknown,
+    onEvent: (event: AiEditRunEvent) => void,
+  ): Promise<import("@/lib/ai/ai-edit-runtime").AiEditRunResult> => {
     const events: AiEditRunEvent[] = [];
     const startedAt = new Date().toISOString();
     const emitAiEditEvent = (e: AiEditRunEvent) => {
       events.push(e);
-      event.sender.send(`ai-edit:event:${runId}`, e);
+      onEvent(e);
     };
 
     const provider = resolveAiEditProvider(payload);
@@ -379,7 +388,34 @@ export function registerAiEditIpc(deps: RegisterAiEditIpcDeps): void {
     }
   });
 
+  const controller: AiEditController = {
+    run: runAiEditRequest,
+    cancel: (runIdArg: unknown) => {
+      const runId = typeof runIdArg === "string" ? runIdArg.trim() : "";
+      if (!runId) {
+        return { ok: false, cancelled: false };
+      }
+      const entry = activeAiEditRuns.get(runId);
+      if (!entry) {
+        return { ok: true, cancelled: false };
+      }
+      cancelRequestedAiEditRuns.add(runId);
+      const cancelled = entry.cancel();
+      return { ok: true, cancelled };
+    },
+  };
+
+  ipcMain.handle("ai-edit:run", async (event, runId: string, payload: unknown) => {
+    return controller.run(runId, payload, (e) => {
+      event.sender.send(`ai-edit:event:${runId}`, e);
+    });
+  });
+
   ipcMain.handle("ai-edit:cancel", async (_event, runIdArg: unknown) => {
+    return controller.cancel(runIdArg);
+  });
+
+
     const runId = typeof runIdArg === "string" ? runIdArg.trim() : "";
     if (!runId) {
       return { ok: false, cancelled: false };
@@ -408,6 +444,9 @@ export function registerAiEditIpc(deps: RegisterAiEditIpcDeps): void {
   ipcMain.handle("ai-edit:delete-chat-room", async (_event, roomId: unknown) => {
     return localAiEditChatRoomStore.deleteRoom(typeof roomId === "string" ? roomId : "");
   });
+
+  return controller;
+}
 
   ipcMain.handle("ai-render:get-document", async (_event, renderId: unknown) => {
     if (typeof renderId !== "string") {
