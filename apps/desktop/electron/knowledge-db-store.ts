@@ -53,7 +53,7 @@ export class KnowledgeDbStore {
   }
 
   async listSources(): Promise<KnowledgeSource[]> {
-    return (await this.readLibrary()).sources;
+    return this.ensureIndexed();
   }
 
   async addFiles(filePaths: string[]): Promise<KnowledgeSource[]> {
@@ -110,7 +110,40 @@ export class KnowledgeDbStore {
   }
 
   async search(query: string, limit = 12) {
+    await this.ensureIndexed();
     return this.vectorIndex.search(query, limit);
+  }
+
+  private async ensureIndexed(): Promise<KnowledgeSource[]> {
+    const library = await this.readLibrary();
+    let changed = false;
+    for (const source of library.sources) {
+      const needsText = source.pages.some((page) => page.text === undefined);
+      if (!needsText) continue;
+      try {
+        const bytes = await fs.readFile(source.storedPath);
+        const pageTexts = await extractPdfPageTexts(bytes, source.pageCount);
+        source.pages = source.pages.map((page, index) => ({
+          ...page,
+          text: pageTexts[index] || undefined,
+        }));
+        await this.vectorIndex.upsertMany(
+          source.pages
+            .filter((page) => Boolean(page.text?.trim()))
+            .map((page) => ({
+              id: page.id,
+              sourceId: source.id,
+              pageNumber: page.pageNumber,
+              text: page.text ?? "",
+            })),
+        );
+        changed = true;
+      } catch {
+        // Keep the source visible even if a legacy PDF can no longer be read.
+      }
+    }
+    if (changed) await this.writeLibrary(library);
+    return library.sources;
   }
 
   async extractPages(sourceId: string, pageNumbers: number[]): Promise<Uint8Array> {
