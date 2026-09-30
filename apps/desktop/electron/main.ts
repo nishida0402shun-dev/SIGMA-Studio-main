@@ -140,13 +140,13 @@ let stopAiResourceWatch: (() => void) | null = null;
 let stopAiSettingsWatch: (() => void) | null = null;
 const localSigmaDocStore = new LocalSigmaDocStore(USER_DATA_PATH);
 const localMaterialStore = new LocalMaterialStore(USER_DATA_PATH);
-const knowledgeDbStore = new KnowledgeDbStore(SIGMA_STUDIO_DATA_PATH);
 const localTemplateStore = new LocalTemplateStore(USER_DATA_PATH);
 const localMcpProposalStore = new LocalMcpEditProposalStore(USER_DATA_PATH);
 const localAiEditRunLogStore = new LocalAiEditRunLogStore(USER_DATA_PATH);
 const localAiEditChatRoomStore = new LocalAiEditChatRoomStore(USER_DATA_PATH);
 const localAiResourceStore = new LocalAiResourceStore(USER_DATA_PATH);
 const SIGMA_STUDIO_DATA_PATH = localSigmaDocStore.getDataDir();
+const knowledgeDbStore = new KnowledgeDbStore(SIGMA_STUDIO_DATA_PATH);
 const appUpdateController = new AppUpdateController({ releaseUrl: RELEASE_PAGE_URL });
 const desktopSettings = readDesktopSettingsSync(SIGMA_STUDIO_DATA_PATH);
 /**
