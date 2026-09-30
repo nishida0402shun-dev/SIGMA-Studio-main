@@ -10,30 +10,35 @@ const { createPackage } = require("@electron/asar");
 const { auditReleaseContent } = require("../apps/desktop/scripts/audit-release-content.cjs");
 const environment = { RELEASE_CONTENT_RULES: JSON.stringify(["blocked-example"]), SIGMA_STUDIO_REQUIRE_RELEASE_AUDIT: "true" };
 
+async function createFixtureArchive(resources, content, name = "app.asar") {
+  const source = await mkdtemp(path.join(os.tmpdir(), "sigma-audit-source-"));
+  try {
+    await writeFile(path.join(source, "main.js"), content);
+    await createPackage(source, path.join(resources, name));
+  } finally {
+    await rm(source, { recursive: true, force: true });
+  }
+}
+
 test("release audit checks archive contents and unpacked resources without exposing matches", async () => {
   const root = await mkdtemp(path.join(os.tmpdir(), "sigma-audit-"));
   try {
-    const source = path.join(root, "source");
     const resources = path.join(root, "resources");
-    const archive = path.join(resources, "app.asar");
-    await mkdir(source);
     await mkdir(resources);
-    await writeFile(path.join(source, "main.js"), "export const value = 1;");
-    await createPackage(source, archive);
+
+    await createFixtureArchive(resources, "export const value = 1;");
     await auditReleaseContent(resources, environment);
 
-    await writeFile(path.join(source, "main.js"), "blocked-example");
-    await rm(archive, { force: true });
-    await createPackage(source, archive);
+    await rm(path.join(resources, "app.asar"), { force: true });
+    await createFixtureArchive(resources, "blocked-example");
     await assert.rejects(auditReleaseContent(resources, environment), (error) => {
       assert.match(error.message, /Release content audit failed/);
       assert.doesNotMatch(error.message, /blocked-example|main.js/);
       return true;
     });
 
-    await writeFile(path.join(source, "main.js"), "safe");
-    await rm(archive, { force: true });
-    await createPackage(source, archive);
+    await rm(path.join(resources, "app.asar"), { force: true });
+    await createFixtureArchive(resources, "safe");
     await writeFile(path.join(resources, "extra.txt"), "blocked-example");
     await assert.rejects(auditReleaseContent(resources, environment), /Release content audit failed/);
   } finally {
