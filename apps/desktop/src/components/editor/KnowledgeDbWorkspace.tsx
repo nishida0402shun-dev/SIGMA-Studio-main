@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Database, Download, FilePlus2, FileText, MessageSquare, Search, X } from "lucide-react";
 import { getDesktopBridge } from "@/lib/desktop-bridge";
-import type { KnowledgeSemanticType, KnowledgeSource } from "@/types/knowledge-db";
+import type { KnowledgeSearchResult, KnowledgeSemanticType, KnowledgeSource } from "@/types/knowledge-db";
 import type { Translate } from "@/lib/i18n";
 
 interface Props {
@@ -35,6 +35,7 @@ export function KnowledgeDbWorkspace({ open, onClose, onOpenAi, t }: Props) {
   const [query, setQuery] = useState("");
   const [selected, setSelected] = useState<Record<string, Set<number>>>({});
   const [typeFilter, setTypeFilter] = useState<KnowledgeSemanticType | "all">("all");
+  const [searchResults, setSearchResults] = useState<KnowledgeSearchResult[]>([]);
   const desktop = getDesktopBridge();
   const knowledgeDb = desktop?.knowledgeDb;
 
@@ -47,17 +48,35 @@ export function KnowledgeDbWorkspace({ open, onClose, onOpenAi, t }: Props) {
     return () => { cancelled = true; };
   }, [knowledgeDb, open]);
 
+  useEffect(() => {
+    if (!knowledgeDb || !query.trim()) {
+      setSearchResults([]);
+      return;
+    }
+    let cancelled = false;
+    const timer = window.setTimeout(() => {
+      void knowledgeDb.search({ query, limit: 30 }).then((value) => {
+        if (!cancelled) setSearchResults((Array.isArray(value) ? value : []) as KnowledgeSearchResult[]);
+      });
+    }, 120);
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+    };
+  }, [knowledgeDb, query]);
+
   const visible = useMemo(() => {
     const normalized = query.trim().toLocaleLowerCase();
-    return sources.flatMap((source) => source.pages.map((page) => ({ source, page }))).filter(({ source, page }) => {
-      if (typeFilter !== "all" && page.semanticType !== typeFilter) return false;
-      if (!normalized) return true;
-      return source.name.toLocaleLowerCase().includes(normalized)
-        || String(page.pageNumber).includes(normalized)
-        || (page.title ?? "").toLocaleLowerCase().includes(normalized)
-        || (page.text ?? "").toLocaleLowerCase().includes(normalized);
-    });
-  }, [query, sources, typeFilter]);
+    if (!normalized) {
+      return sources.flatMap((source) => source.pages.map((page) => ({ source, page, score: undefined as number | undefined })))
+        .filter(({ page }) => typeFilter === "all" || page.semanticType === typeFilter);
+    }
+    return searchResults.flatMap((result) => {
+      const source = sources.find((item) => item.id === result.sourceId);
+      const page = source?.pages.find((item) => item.pageNumber === result.pageNumber);
+      return source && page ? [{ source, page, score: result.score }] : [];
+    }).filter(({ page }) => typeFilter === "all" || page.semanticType === typeFilter);
+  }, [query, searchResults, sources, typeFilter]);
 
   const selectedPages = Object.entries(selected).flatMap(([sourceId, pages]) =>
     [...pages].map((pageNumber) => ({ sourceId, pageNumber })),
@@ -292,7 +311,7 @@ export function KnowledgeDbWorkspace({ open, onClose, onOpenAi, t }: Props) {
         </div>
         <div className="knowledge-db-content">
           <div className="knowledge-db-results">
-            {visible.map(({ source, page }) => {
+            {visible.map(({ source, page, score }) => {
               const checked = selected[source.id]?.has(page.pageNumber) ?? false;
               return (
                 <label key={page.id} className={`knowledge-db-item ${checked ? "selected" : ""}`}>
@@ -311,7 +330,7 @@ export function KnowledgeDbWorkspace({ open, onClose, onOpenAi, t }: Props) {
                   <FileText size={18} />
                   <span className="knowledge-db-item-main">
                     <strong>{source.name}</strong>
-                    <span>{t("appMenu.knowledgeDb.page", { page: page.pageNumber })} · {semanticTypeLabel(t, page.semanticType)}</span>
+                    <span>{t("appMenu.knowledgeDb.page", { page: page.pageNumber })} · {semanticTypeLabel(t, page.semanticType)}{score !== undefined ? ` · ${score.toFixed(2)}` : ""}</span>
                   </span>
                 </label>
               );
