@@ -993,9 +993,29 @@ export function collectBoxedRunDocTargetsForTextBlock(node: ProseMirrorNode, pos
       return;
     }
 
+    const styleKey = getBoxedInlineStyleKey(boxedMark.attrs);
+    if (child.isText && child.text?.includes("\n")) {
+      const text = child.text;
+      let segmentStart = 0;
+      for (let index = 0; index <= text.length; index += 1) {
+        if (index !== text.length && text[index] !== "\n") {
+          continue;
+        }
+        if (index > segmentStart) {
+          targets.push({
+            from: pos + 1 + offset + segmentStart,
+            styleKey,
+            to: pos + 1 + offset + index,
+          });
+        }
+        segmentStart = index + 1;
+      }
+      return;
+    }
+
     targets.push({
       from: pos + 1 + offset,
-      styleKey: getBoxedInlineStyleKey(boxedMark.attrs),
+      styleKey,
       to: pos + 1 + offset + child.nodeSize,
     });
   });
