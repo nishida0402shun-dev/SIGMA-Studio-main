@@ -93,7 +93,7 @@ describe("Web AI bridge", () => {
     const createdBody = await created.json();
     expect(createdBody.runId).toMatch(/^webai_/);
 
-    let status: any = null;
+    let status: { run: { status: string; result?: { status?: string } }; events: unknown[] } | null = null;
     for (let attempt = 0; attempt < 20; attempt += 1) {
       const response = await fetch(`${base}/v1/agent/runs/${encodeURIComponent(createdBody.runId)}`, {
         headers: { Authorization: "Bearer test-token" },
@@ -102,9 +102,9 @@ describe("Web AI bridge", () => {
       if (status.run.status !== "running") break;
       await new Promise((resolve) => setTimeout(resolve, 10));
     }
-    expect(status.run.status).toBe("completed");
-    expect(status.run.result.status).toBe("answer");
-    expect(status.events).toHaveLength(1);
+    expect(status?.run.status).toBe("completed");
+    expect(status?.run.result?.status).toBe("answer");
+    expect(status?.events).toHaveLength(1);
 
     const documents = await fetch(`${base}/v1/documents`, {
       headers: { Authorization: "Bearer test-token" },
