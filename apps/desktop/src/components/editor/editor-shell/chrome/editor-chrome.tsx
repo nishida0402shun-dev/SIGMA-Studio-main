@@ -317,7 +317,7 @@ export function renderEditorChrome(chrome: EditorChromeValue) {
         type="button"
         className="app-menu-button"
         aria-label="DB"
-        title={t("knowledgeDb.title")}
+        title={t("appMenu.knowledgeDb.title")}
         onClick={() => {
           setActiveMenu(null);
           openKnowledgeDb();
