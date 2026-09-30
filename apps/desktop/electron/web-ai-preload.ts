@@ -55,7 +55,7 @@ async function callApi(path: string, init: RequestInit = {}): Promise<WebAiApiRe
   if (!body || typeof body !== "object" || Array.isArray(body)) {
     throw new Error("Web AI API returned an invalid response");
   }
-  const payload = body as WebAiApiResponse;
+
   if (!response.ok) {
     throw new Error(typeof body?.error === "string" ? body.error : `Web AI API error: ${response.status}`);
   }
