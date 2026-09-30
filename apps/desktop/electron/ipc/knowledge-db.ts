@@ -76,6 +76,18 @@ export function registerKnowledgeDbIpc(deps: RegisterKnowledgeDbIpcDeps): void {
     return { filePath: output, pageCount: pages.length };
   });
 
+  ipcMain.handle("knowledge-db:search", async (event, payload: unknown) => {
+    if (event.sender !== getMainWindow()?.webContents) return [];
+    const query = payload && typeof payload === "object" && "query" in payload && typeof payload.query === "string"
+      ? payload.query
+      : "";
+    const limit = payload && typeof payload === "object" && "limit" in payload && typeof payload.limit === "number"
+      ? payload.limit
+      : 12;
+    if (!query.trim()) return [];
+    return store.search(query, limit);
+  });
+
   ipcMain.handle("knowledge-db:set-page-type", async (event, payload: unknown) => {
     if (event.sender !== getMainWindow()?.webContents) return null;
     if (!payload || typeof payload !== "object") throw new Error("invalid page metadata");
