@@ -14,6 +14,7 @@
 @import "./styles/page-and-selection.css";
 @import "./styles/graph-and-text-editing.css";
 @import "./styles/ai-chat.css";
+@import "./styles/knowledge-db.css";
 @import "./styles/math-and-comments.css";
 @import "./styles/task-and-command-overlays.css";
 
