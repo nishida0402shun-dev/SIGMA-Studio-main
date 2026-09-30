@@ -42,11 +42,6 @@ export interface WebAiAgentRuntimeDeps {
   geminiRunContextStore: LocalAiEditRunContextStore;
   aiRenderBridgeStore: LocalAiRenderBridgeStore;
   resolveMcpServerScriptPath: () => string;
-  fallbackWorkspaceDirs: {
-    claude: string;
-    chatgpt: string;
-    antigravity: string;
-  };
 }
 
 export function createWebAiAgentRuntime(deps: WebAiAgentRuntimeDeps) {
