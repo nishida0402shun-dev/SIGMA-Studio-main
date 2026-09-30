@@ -29,7 +29,9 @@ export function registerKnowledgeDbIpc(deps: RegisterKnowledgeDbIpcDeps): void {
 
   ipcMain.handle("knowledge-db:choose-sources", async (event) => {
     if (event.sender !== getMainWindow()?.webContents) return null;
-    const result = await dialog.showOpenDialog(getMainWindow() ?? undefined, {
+    const mainWindow = getMainWindow();
+    if (!mainWindow) return null;
+    const result = await dialog.showOpenDialog(mainWindow, {
       title: "DBに追加",
       filters: [{ name: "PDF", extensions: ["pdf"] }],
       properties: ["openFile", "openDirectory", "multiSelections"],
@@ -61,7 +63,9 @@ export function registerKnowledgeDbIpc(deps: RegisterKnowledgeDbIpcDeps): void {
       : [];
     if (!sourceId || pages.length === 0) throw new Error("no pages selected");
     const bytes = await store.extractPages(sourceId, pages);
-    const save = await dialog.showSaveDialog(getMainWindow() ?? undefined, {
+    const mainWindow = getMainWindow();
+    if (!mainWindow) return null;
+    const save = await dialog.showSaveDialog(mainWindow, {
       title: "選択ページをPDFとして抽出",
       defaultPath: "sigma-db-extract.pdf",
       filters: [{ name: "PDF", extensions: ["pdf"] }],
