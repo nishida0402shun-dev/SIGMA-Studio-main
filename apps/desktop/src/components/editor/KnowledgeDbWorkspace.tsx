@@ -256,24 +256,24 @@ export function KnowledgeDbWorkspace({ open, onClose, onOpenAi, t }: Props) {
   }
 }
 `}</style>
-      <div className="knowledge-db-backdrop" role="dialog" aria-modal="true" aria-label={t("knowledgeDb.title")}>
+      <div className="knowledge-db-backdrop" role="dialog" aria-modal="true" aria-label={t("appMenu.knowledgeDb.title")}>
       <section className="knowledge-db-workspace">
         <header className="knowledge-db-header">
-          <div className="knowledge-db-title"><Database size={20} /><strong>{t("knowledgeDb.title")}</strong></div>
+          <div className="knowledge-db-title"><Database size={20} /><strong>{t("appMenu.knowledgeDb.title")}</strong></div>
           <div className="knowledge-db-actions">
-            <button type="button" onClick={() => void addSources()}><FilePlus2 size={16} />{t("knowledgeDb.add")}</button>
-            <button type="button" onClick={() => void extractPdf()} disabled={selectedPages.length === 0}><Download size={16} />{t("knowledgeDb.extractPdf")}</button>
-            <button type="button" onClick={() => void handoffAi()}><MessageSquare size={16} />{t("knowledgeDb.handoffAi")}</button>
-            <button type="button" className="knowledge-db-close" onClick={onClose} aria-label={t("knowledgeDb.close")}><X size={18} /></button>
+            <button type="button" onClick={() => void addSources()}><FilePlus2 size={16} />{t("appMenu.knowledgeDb.add")}</button>
+            <button type="button" onClick={() => void extractPdf()} disabled={selectedPages.length === 0}><Download size={16} />{t("appMenu.knowledgeDb.extractPdf")}</button>
+            <button type="button" onClick={() => void handoffAi()}><MessageSquare size={16} />{t("appMenu.knowledgeDb.handoffAi")}</button>
+            <button type="button" className="knowledge-db-close" onClick={onClose} aria-label={t("appMenu.knowledgeDb.close")}><X size={18} /></button>
           </div>
         </header>
         <div className="knowledge-db-toolbar">
-          <label className="knowledge-db-search"><Search size={16} /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder={t("knowledgeDb.searchPlaceholder")} /></label>
+          <label className="knowledge-db-search"><Search size={16} /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder={t("appMenu.knowledgeDb.searchPlaceholder")} /></label>
           <select value={typeFilter} onChange={(event) => setTypeFilter(event.target.value as KnowledgeSemanticType | "all")}>
-            <option value="all">{t("knowledgeDb.allTypes")}</option>
-            {TYPES.map((type) => <option key={type} value={type}>{t(`knowledgeDb.types.${type}`)}</option>)}
+            <option value="all">{t("appMenu.knowledgeDb.allTypes")}</option>
+            {TYPES.map((type) => <option key={type} value={type}>{t(`appMenu.knowledgeDb.types.${type}`)}</option>)}
           </select>
-          <span>{t("knowledgeDb.resultCount", { count: visible.length })}</span>
+          <span>{t("appMenu.knowledgeDb.resultCount", { count: visible.length })}</span>
         </div>
         <div className="knowledge-db-content">
           <div className="knowledge-db-results">
@@ -296,17 +296,17 @@ export function KnowledgeDbWorkspace({ open, onClose, onOpenAi, t }: Props) {
                   <FileText size={18} />
                   <span className="knowledge-db-item-main">
                     <strong>{source.name}</strong>
-                    <span>{t("knowledgeDb.page", { page: page.pageNumber })} · {TYPES.includes(page.semanticType) ? t(`knowledgeDb.types.${page.semanticType}`) : t("knowledgeDb.unclassified")}</span>
+                    <span>{t("appMenu.knowledgeDb.page", { page: page.pageNumber })} · {TYPES.includes(page.semanticType) ? t(`appMenu.knowledgeDb.types.${page.semanticType}`) : t("appMenu.knowledgeDb.unclassified")}</span>
                   </span>
                 </label>
               );
             })}
-            {visible.length === 0 && <div className="knowledge-db-empty">{t("knowledgeDb.empty")}</div>}
+            {visible.length === 0 && <div className="knowledge-db-empty">{t("appMenu.knowledgeDb.empty")}</div>}
           </div>
           <aside className="knowledge-db-detail">
-            <strong>{t("knowledgeDb.selected")}</strong>
-            <span>{t("knowledgeDb.selectedPages", { count: selectedPages.length })}</span>
-            <p>{t("knowledgeDb.help")}</p>
+            <strong>{t("appMenu.knowledgeDb.selected")}</strong>
+            <span>{t("appMenu.knowledgeDb.selectedPages", { count: selectedPages.length })}</span>
+            <p>{t("appMenu.knowledgeDb.help")}</p>
           </aside>
         </div>
       </section>
