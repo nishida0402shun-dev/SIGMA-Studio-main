@@ -66,7 +66,7 @@ interface RibbonGroupDefinition {
 }
 
 export function renderEditorChrome(chrome: EditorChromeValue) {
-  const { activeDocumentOpenFailure, activeFileId, addBlock, aiMenuButtonRef, appUpdateState, closeDocumentTab, commentsPanelOpen, commitDocumentTitle, copyDocumentText, createDocumentTab, createWhiteboardDocumentTab, degradedWatcherScopes, deleteActiveDocument, documentMetadatas, documentTitle, duplicateActiveDocument, exportJson, exportMenuOpen, fileMenuButtonRef, handleTitleUpdateAction, importDocumentFile, importInputRef, insertMenuButtonRef, loadingFileId, newDocButtonRef, newDocMenuOpen, openCommandSettings, openDocumentInWorkspace, openDocumentListDialog, openDocumentTabs, openImportDialog, openNewDocMenu, openOtherImportDialog, openPrintPreview, openTextImportDialog, openVersionHistory, openWorkspaceScreen, otherImportInputRef, promoteAiToSidebar, reportIssue, requestOverlayImages, resolvedDocumentTitle, scheduleCloseNewDocMenu, setAiSettingsOpen, setDesktopSettingsOpen, setExportMenuOpen, setNewDocMenuOpen, setOutlineDialogOpen, setOverlayEditing, setPageSettingsOpen, setTemplateGalleryOpen, setTexCommandReferenceOpen, setTexEnvironmentSettingsOpen, setTitleInputFocused, settingsMenuButtonRef, showRichTitle, showTitleUpdateButton, titleInputValue, titleRichNodes, titleUpdateButtonDisabled, toggleCommentsPanel, uiLayoutPreference, updateMetadata, versionHistoryOpen } = chrome.appMenu;
+  const { activeDocumentOpenFailure, activeFileId, addBlock, aiMenuButtonRef, appUpdateState, closeDocumentTab, commentsPanelOpen, commitDocumentTitle, copyDocumentText, createDocumentTab, createWhiteboardDocumentTab, degradedWatcherScopes, deleteActiveDocument, documentMetadatas, documentTitle, duplicateActiveDocument, exportJson, exportMenuOpen, fileMenuButtonRef, handleTitleUpdateAction, importDocumentFile, importInputRef, insertMenuButtonRef, loadingFileId, newDocButtonRef, newDocMenuOpen, openCommandSettings, openDocumentInWorkspace, openDocumentListDialog, openDocumentTabs, openImportDialog, openNewDocMenu, openOtherImportDialog, openPrintPreview, openTextImportDialog, openVersionHistory, openWorkspaceScreen, otherImportInputRef, promoteAiToSidebar, openKnowledgeDb, reportIssue, requestOverlayImages, resolvedDocumentTitle, scheduleCloseNewDocMenu, setAiSettingsOpen, setDesktopSettingsOpen, setExportMenuOpen, setNewDocMenuOpen, setOutlineDialogOpen, setOverlayEditing, setPageSettingsOpen, setTemplateGalleryOpen, setTexCommandReferenceOpen, setTexEnvironmentSettingsOpen, setTitleInputFocused, settingsMenuButtonRef, showRichTitle, showTitleUpdateButton, titleInputValue, titleRichNodes, titleUpdateButtonDisabled, toggleCommentsPanel, uiLayoutPreference, updateMetadata, versionHistoryOpen } = chrome.appMenu;
   const { commandTooltip, renderMenuShortcut } = chrome.commands;
   const { setMaterialLibraryOpen } = chrome.editing;
   const { ActiveTextAlignIcon, activeFontFamilyLabel, activeTextAlignOption, activeTextFontSize, activeTextFontSizeMixed, applyBlockStructure, applyBoxedTextPaddingY, applyInlineFormat, applyLineHeight, applyTextAlign, applyTextStyle, blockStyleState, boldActive, boxedTextActive, boxedTextButtonRef, boxedTextMenuOpen, boxedTextPaddingY, boxedTextVariant, canUseBlockStructure, canUseLineHeight, canUseTextAlign, canUseTextBlockStyle, canUseTextToolbar, fontFamily, fontFamilyButtonRef, fontFamilyIsKnownOption, fontFamilyIsMixed, fontFamilyMenuOpen, fontFamilyQuery, handleLineHeightStepClick, italicActive, lineHeight, lineHeightButtonRef, lineHeightCustomOpen, lineHeightInput, lineHeightInputError, lineHeightMenuOpen, moreBlocksMenuButtonRef, moreBlocksMenuOpen, orderedListMenuButtonRef, orderedListMenuOpen, setMoreBlocksMenuOpen, setOrderedListMenuOpen, saveEditorFontFamilyPreference, selectBoxedTextVariant, selectedTextAlign, selectedTextStyle, setFontFamily, setFontFamilyQuery, setLineHeightCustomOpen, setLineHeightInput, setLineHeightInputError, setTextBackgroundColor, setTextColor, setTextFontSize, startLineHeightStepping, stopLineHeightStepping, textAlignButtonRef, textAlignMenuOpen, textBackgroundColor, textBackgroundColorButtonRef, textColor, textColorButtonRef, toggleBoxedText, underlineActive, visibleCustomFontOptions, visibleFontFamilyGroups, blockStyleButtonRef, blockStyleMenuOpen, fontSizeInputRef, fontSizeInput, setFontSizeInput } = chrome.format;
@@ -309,6 +309,23 @@ export function renderEditorChrome(chrome: EditorChromeValue) {
         </ToolbarPopover>
       </div>
     )
+  );
+
+  const dbMenu = (
+    <div className="app-menu-anchor">
+      <button
+        type="button"
+        className="app-menu-button"
+        aria-label="DB"
+        title="教材DB"
+        onClick={() => {
+          setActiveMenu(null);
+          openKnowledgeDb();
+        }}
+      >
+        DB
+      </button>
+    </div>
   );
 
   const settingsMenu = (
@@ -2833,6 +2850,7 @@ export function renderEditorChrome(chrome: EditorChromeValue) {
     fileMenu,
     insertMenu,
     aiMenu,
+    dbMenu,
     settingsMenu,
     documentTabsRow,
     saveStateBadge,
