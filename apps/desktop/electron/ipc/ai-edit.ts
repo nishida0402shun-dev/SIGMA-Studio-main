@@ -415,22 +415,6 @@ export function registerAiEditIpc(deps: RegisterAiEditIpcDeps): AiEditController
     return controller.cancel(runIdArg);
   });
 
-
-    const runId = typeof runIdArg === "string" ? runIdArg.trim() : "";
-    if (!runId) {
-      return { ok: false, cancelled: false };
-    }
-    const entry = activeAiEditRuns.get(runId);
-    if (!entry) {
-      // Already completed, already cancelled, or unknown runId: not an error,
-      // just nothing to do.
-      return { ok: true, cancelled: false };
-    }
-    cancelRequestedAiEditRuns.add(runId);
-    const cancelled = entry.cancel();
-    return { ok: true, cancelled };
-  });
-
   ipcMain.handle("ai-edit:list-chat-rooms", async (_event, documentIdentityKey?: unknown) => {
     return localAiEditChatRoomStore.listRooms(
       typeof documentIdentityKey === "string" ? documentIdentityKey : null,
@@ -445,15 +429,14 @@ export function registerAiEditIpc(deps: RegisterAiEditIpcDeps): AiEditController
     return localAiEditChatRoomStore.deleteRoom(typeof roomId === "string" ? roomId : "");
   });
 
-  return controller;
-}
-
   ipcMain.handle("ai-render:get-document", async (_event, renderId: unknown) => {
     if (typeof renderId !== "string") {
       return null;
     }
     return pendingRenderDocuments.get(renderId) ?? null;
   });
+
+  return controller;
 }
 
 /**
