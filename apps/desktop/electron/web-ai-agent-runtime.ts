@@ -1,6 +1,6 @@
 import type { SigmaDocument } from "@/features/document";
 import type { AiEditRunEvent, AiEditRunResult } from "@/lib/ai/ai-edit-runtime";
-import { toAiResourceProvider, type AiEditProvider } from "@/lib/ai/ai-providers";
+import { toAiResourceProvider, type AiProvider } from "@/lib/ai/ai-providers";
 import type { AppLocale } from "@/lib/i18n";
 
 import { LocalAiEditRunContextStore, prepareAiEditRunContext } from "./ai-edit-run-context";
@@ -19,7 +19,7 @@ import { ClaudeStreamClient } from "./claude-stream-client";
 
 export interface WebAiAgentRunInput {
   runId: string;
-  provider: AiEditProvider;
+  provider: AiProvider;
   fileId: string;
   instruction: string;
   model?: string;
@@ -50,7 +50,7 @@ export interface WebAiAgentRuntimeDeps {
 }
 
 export function createWebAiAgentRuntime(deps: WebAiAgentRuntimeDeps) {
-  const activeRuns = new Map<string, { provider: AiEditProvider; cancel: () => boolean }>();
+  const activeRuns = new Map<string, { provider: AiProvider; cancel: () => boolean }>();
 
   async function start(
     input: WebAiAgentRunInput,
