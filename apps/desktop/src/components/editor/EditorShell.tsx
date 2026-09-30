@@ -5653,7 +5653,7 @@ function EditorShellBody({ embeddedHost, editorStore }: EditorShellProps & { edi
     if (!isDesktopApp) return;
     setVersionHistoryOpen(false);
     setKnowledgeDbOpen(true);
-  }, [isDesktopApp, setVersionHistoryOpen]);
+  }, [isDesktopApp, setKnowledgeDbOpen, setVersionHistoryOpen]);
 
   const openAiInline = useCallback((anchor: { left: number; top: number } | null) => {
     // Web版にAIチャット面は無い (AI面はキャンバス左上のAiTaskDock一本)。⌘Kや
@@ -6537,6 +6537,7 @@ function EditorShellBody({ embeddedHost, editorStore }: EditorShellProps & { edi
         open={knowledgeDbOpen}
         onClose={() => setKnowledgeDbOpen(false)}
         onOpenAi={promoteAiToSidebar}
+        t={t}
       />
 
       <main
