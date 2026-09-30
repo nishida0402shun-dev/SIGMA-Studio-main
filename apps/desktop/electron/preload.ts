@@ -327,6 +327,9 @@ const desktopAPI = {
     list(): Promise<unknown[]> {
       return ipcRenderer.invoke("knowledge-db:list");
     },
+    search(payload: { query: string; limit?: number }): Promise<unknown[]> {
+      return ipcRenderer.invoke("knowledge-db:search", payload);
+    },
     importSources(paths: string[]): Promise<unknown[]> {
       return ipcRenderer.invoke("knowledge-db:import", paths);
     },
