@@ -983,22 +983,36 @@ export function collectBoxedRunDocTargetsForTextBlock(node: ProseMirrorNode, pos
   }
 
   const targets: BoxedRunDomTarget[] = [];
+  let carriedBoxedStyleKey: string | null = null;
+
   node.forEach((child, offset) => {
     if (!child.isInline) {
+      carriedBoxedStyleKey = null;
       return;
     }
 
     const boxedMark = child.marks.find((mark) => mark.type.name === "boxed");
-    if (!boxedMark) {
+    const styleKey = boxedMark
+      ? getBoxedInlineStyleKey(boxedMark.attrs)
+      : carriedBoxedStyleKey;
+
+    if (boxedMark) {
+      carriedBoxedStyleKey = styleKey;
+    } else if (child.type.name === "hardBreak" && carriedBoxedStyleKey) {
+      return;
+    } else if (!styleKey) {
+      carriedBoxedStyleKey = null;
       return;
     }
 
-    const styleKey = getBoxedInlineStyleKey(boxedMark.attrs);
+    if (child.type.name === "hardBreak") {
+      return;
+    }
+
     if (child.isText && child.text?.includes("\n")) {
-      const text = child.text;
       let segmentStart = 0;
-      for (let index = 0; index <= text.length; index += 1) {
-        if (index !== text.length && text[index] !== "\n") {
+      for (let index = 0; index <= child.text.length; index += 1) {
+        if (index !== child.text.length && child.text[index] !== "\n") {
           continue;
         }
         if (index > segmentStart) {
@@ -1018,6 +1032,10 @@ export function collectBoxedRunDocTargetsForTextBlock(node: ProseMirrorNode, pos
       styleKey,
       to: pos + 1 + offset + child.nodeSize,
     });
+
+    if (!boxedMark) {
+      carriedBoxedStyleKey = null;
+    }
   });
 
   return targets;
