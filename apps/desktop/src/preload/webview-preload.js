@@ -1,5 +1,47 @@
-// apps/desktop/src/preload/webview-preload.js
-const { ipcRenderer } = require('electron');
+/* eslint-disable @typescript-eslint/no-require-imports */
+const { contextBridge, ipcRenderer } = require('electron');
+
+let bridgeConfigPromise = null;
+
+async function getBridgeConfig() {
+  if (!bridgeConfigPromise) {
+    bridgeConfigPromise = ipcRenderer.invoke('web-ai:get-config');
+  }
+  return bridgeConfigPromise;
+}
+
+async function request(path, options = {}) {
+  const config = await getBridgeConfig();
+  const response = await fetch(`${config.url}${path}`, {
+    ...options,
+    headers: {
+      Authorization: `Bearer ${config.token}`,
+      'Content-Type': 'application/json',
+      ...(options.headers || {}),
+    },
+  });
+  const payload = await response.json();
+  if (!response.ok) {
+    throw new Error(payload?.error || `Web AI request failed: ${response.status}`);
+  }
+  return payload;
+}
+
+contextBridge.exposeInMainWorld('sigmaWebAi', Object.freeze({
+  health: () => request('/v1/health'),
+  files: () => request('/v1/files'),
+  proposals: (fileId) => request(`/v1/proposals?${new URLSearchParams({ fileId }).toString()}`),
+  run: (input) => request('/v1/runs', {
+    method: 'POST',
+    body: JSON.stringify(input),
+  }),
+  cancel: (runId) => request(`/v1/runs/${encodeURIComponent(runId)}/cancel`, {
+    method: 'POST',
+  }),
+  approveProposal: (proposalId) => request(`/v1/proposals/${encodeURIComponent(proposalId)}/approve`, {
+    method: 'POST',
+  }),
+}));
 
 // 回答ブロックへの [SIGMAへ挿入] ボタン動的注入
 function injectSigmaButtons() {
@@ -57,8 +99,6 @@ ipcRenderer.on('inject-prompt-with-context', (_event, { editorContext, userPromp
     inputElement.dispatchEvent(new Event('input', { bubbles: true }));
   }
 
-  // 送信ボタンの自動クリックは各サイトのUI変更で壊れやすいため、
-  // 一定時間内に見つからない場合は諦めてユーザーの手動送信に委ねる
   const trySend = (attemptsLeft) => {
     const sendButton = document.querySelector(
       'button[aria-label*="送信"], button[aria-label*="Send"], button[data-testid="send-button"]'
