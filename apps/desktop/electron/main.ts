@@ -56,7 +56,8 @@ import { registerShellIpc } from "./ipc/shell";
 import { registerSettingsIpc } from "./ipc/settings";
 import { assertUsableCliBinPath } from "./cli-spawn";
 import { registerCodexIpc } from "./ipc/codex";
-import { registerAiEditIpc } from "./ipc/ai-edit";
+import { registerAiEditIpc, type AiEditController } from "./ipc/ai-edit";
+import { LocalWebAiBridgeStore, createWebAiBridgeServer } from "./web-ai-bridge";
 import { registerAiResourcesIpc } from "./ipc/ai-resources";
 import { registerFileIpc } from "./ipc/file";
 import { documentPathsFromArgv, ExternalDocumentOpenQueue } from "./external-document-open";
@@ -244,6 +245,9 @@ void sweepOrphanPerRunContextFiles(USER_DATA_PATH, "chatgpt");
 void sweepOrphanPerRunContextFiles(USER_DATA_PATH, "antigravity");
 void localAiRenderBridgeStore.clear();
 let aiRenderBridgeServer: http.Server | null = null;
+let webAiBridgeServer: http.Server | null = null;
+const localWebAiBridgeStore = new LocalWebAiBridgeStore(USER_DATA_PATH);
+let aiEditController: AiEditController | null = null;
 const pendingRenderDocuments = new Map<string, SigmaDocument>();
 
 function resolveUserDataPath(): string {
@@ -1489,7 +1493,7 @@ function registerIpc() {
     openExternalUrl,
   });
 
-  registerAiEditIpc({
+  aiEditController = registerAiEditIpc({
     userDataPath: USER_DATA_PATH,
     dataDir: SIGMA_STUDIO_DATA_PATH,
     localSigmaDocStore,
@@ -1559,6 +1563,12 @@ app.whenReady().then(async () => {
     console.warn("AI render bridge serverを起動できませんでした。MCPはresvgフォールバックを使用します。", error);
   }
 
+  try {
+    await startWebAiBridgeServer();
+  } catch (error) {
+    console.warn("Web AI bridge serverを起動できませんでした。", error);
+  }
+
   // Prewarm the Codex app-server subprocess shortly after the window is ready so
   // the first user edit doesn't pay spawn+initialize latency. getStatus()
   // triggers ensureStarted() when codex is available. Fire-and-forget; never throw.
@@ -1601,6 +1611,7 @@ app.on("before-quit", (event) => {
   void sweepOrphanPerRunContextFiles(USER_DATA_PATH, "claude");
   void sweepOrphanPerRunContextFiles(USER_DATA_PATH, "chatgpt");
   void sweepOrphanPerRunContextFiles(USER_DATA_PATH, "antigravity");
+  stopWebAiBridgeServer();
   stopAiRenderBridgeServer();
 });
 
@@ -1644,6 +1655,58 @@ function stopAiRenderBridgeServer(): void {
   aiRenderBridgeServer?.close();
   aiRenderBridgeServer = null;
   void localAiRenderBridgeStore.clear();
+}
+
+const WEB_AI_ALLOWED_ORIGINS = [
+  "https://chatgpt.com",
+  "https://claude.ai",
+  "https://gemini.google.com",
+] as const;
+
+async function startWebAiBridgeServer(): Promise<void> {
+  if (!aiEditController) {
+    throw new Error("AI edit controller is not initialized");
+  }
+
+  const token = crypto.randomBytes(32).toString("hex");
+  const server = createWebAiBridgeServer({
+    token,
+    allowedOrigins: WEB_AI_ALLOWED_ORIGINS,
+    aiEditController,
+    loadDocument: (fileId) => localSigmaDocStore.loadDocument(fileId),
+    listFiles: () => localSigmaDocStore.listFiles(),
+    listProposals: (fileId) => localMcpProposalStore.listProposals({ fileId }),
+    approveProposal: (proposalId) => approveSingleProposal(proposalId),
+  });
+  webAiBridgeServer = server;
+
+  server.on("error", (error) => {
+    console.warn("Web AI bridge serverでエラーが発生しました。", error);
+  });
+
+  await new Promise<void>((resolve, reject) => {
+    server.once("error", reject);
+    server.listen(0, "127.0.0.1", () => resolve());
+  });
+
+  const address = server.address();
+  if (!address || typeof address === "string") {
+    throw new Error("Web AI bridge port is unavailable");
+  }
+
+  await localWebAiBridgeStore.write({
+    version: 1,
+    url: `http://127.0.0.1:${address.port}`,
+    token,
+    pid: process.pid,
+    createdAt: new Date().toISOString(),
+  });
+}
+
+function stopWebAiBridgeServer(): void {
+  webAiBridgeServer?.close();
+  webAiBridgeServer = null;
+  void localWebAiBridgeStore.clear();
 }
 
 app.on("window-all-closed", () => {
