@@ -300,6 +300,7 @@ export interface EditorChromeAppMenu {
   openVersionHistory: () => void;
   versionHistoryOpen: boolean;
   promoteAiToSidebar: () => void;
+  openKnowledgeDb: () => void;
   reportIssue: () => void;
   requestOverlayImages: (files: ArrayLike<File> | Iterable<File>, point?: OverlayPoint) => void;
   resolvedDocumentTitle: string;
