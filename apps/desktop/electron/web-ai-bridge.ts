@@ -394,11 +394,11 @@ export function createWebAiBridgeServer(deps: CreateWebAiBridgeServerDeps): http
 
       sendJson(res, 404, { ok: false, error: "not found" }, origin);
     })().catch((error) => {
-      const status = error instanceof z.ZodError ? 400 : 500;
+      const isZodError = Boolean(error) && error instanceof z.ZodError;\n      const status = isZodError ? 400 : 500;
       sendJson(res, status, {
         ok: false,
         error: error instanceof Error ? error.message : "request failed",
-        ...(error instanceof z.ZodError ? { details: error.issues } : {}),
+        ...(isZodError && error instanceof z.ZodError ? { details: error.issues } : {}),
       }, typeof req.headers.origin === "string" ? req.headers.origin : undefined);
     });
   });
