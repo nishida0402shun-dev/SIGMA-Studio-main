@@ -28,6 +28,7 @@ const CHROME_SOURCES = [
   "src/components/editor/editor-shell/use-document-save-boundary.ts",
   "src/features/ai-edit/application/use-ai-proposal-actions.ts",
   "src/components/editor/VersionHistoryPanel.tsx",
+  "src/components/editor/KnowledgeDbWorkspace.tsx",
   // クロームと語彙を共有する面。線種・文字揃えの語は `chrome.format.*` が唯一の出典なので、
   // ここを入れておかないと「使っているのに辞書に無い」も「誰も使っていない」も見逃す。
   "src/components/editor/EditorSettings.tsx",
