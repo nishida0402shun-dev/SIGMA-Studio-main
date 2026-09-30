@@ -1,6 +1,10 @@
 // apps/desktop/src/components/AIWebviewPanel.tsx
 import React, { useRef, useEffect, forwardRef, useImperativeHandle } from 'react';
 
+type SigmaWebviewElement = HTMLElement & {
+  send: (channel: string, payload: unknown) => void;
+};
+
 interface AIWebviewPanelProps {
   currentServiceUrl: string;
   getActiveEditorText: () => string; // アクティブな教材テキスト/選択箇所の取得関数
@@ -20,16 +24,20 @@ export interface AIWebviewPanelHandle {
 
 export const AIWebviewPanel = forwardRef<AIWebviewPanelHandle, AIWebviewPanelProps>(
   ({ currentServiceUrl, getActiveEditorText, onInsertToEditor, preloadPath }, ref) => {
-    const webviewRef = useRef<any>(null);
+    const webviewRef = useRef<SigmaWebviewElement | null>(null);
 
     useEffect(() => {
       const webview = webviewRef.current;
       if (!webview) return;
 
-      const handleIpcMessage = (event: any) => {
-        if (event.channel === 'insert-to-sigma') {
-          onInsertToEditor(event.args[0]?.text ?? '');
-        }
+      const handleIpcMessage: EventListener = (event) => {
+        const ipcEvent = event as Event & { channel?: string; args?: unknown[] };
+        if (ipcEvent.channel !== 'insert-to-sigma') return;
+        const firstArg = ipcEvent.args?.[0];
+        const text = typeof firstArg === 'object' && firstArg !== null && 'text' in firstArg
+          ? String((firstArg as { text?: unknown }).text ?? '')
+          : '';
+        onInsertToEditor(text);
       };
 
       webview.addEventListener('ipc-message', handleIpcMessage);
@@ -42,7 +50,7 @@ export const AIWebviewPanel = forwardRef<AIWebviewPanelHandle, AIWebviewPanelPro
         const webview = webviewRef.current;
         if (webview) {
           webview.send('inject-prompt-with-context', {
-            editorContext: editorContext || '(未選択/白紙)',
+            editorContext: editorContext || '(no selection)',
             userPrompt: skillPrompt,
           });
         }
@@ -51,7 +59,6 @@ export const AIWebviewPanel = forwardRef<AIWebviewPanelHandle, AIWebviewPanelPro
 
     return (
       <div className="w-full h-full flex flex-col">
-        {/* eslint-disable-next-line react/no-unknown-property */}
         <webview
           ref={webviewRef}
           src={currentServiceUrl}
