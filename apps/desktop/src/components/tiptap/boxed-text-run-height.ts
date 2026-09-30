@@ -983,11 +983,11 @@ export function collectBoxedRunDocTargetsForTextBlock(node: ProseMirrorNode, pos
   }
 
   const targets: BoxedRunDomTarget[] = [];
-  let carriedBoxedStyleKey: string | null = null;
+  let carriedBoxedStyleKey: string | undefined;
 
   node.forEach((child, offset) => {
     if (!child.isInline) {
-      carriedBoxedStyleKey = null;
+      carriedBoxedStyleKey = undefined;
       return;
     }
 
