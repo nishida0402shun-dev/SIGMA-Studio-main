@@ -65,6 +65,8 @@ import { registerStorageIpc } from "./ipc/storage";
 import { createProposalApprovalCoordinator } from "./proposal-approval";
 import { registerWorkspacePreviewIpc } from "./ipc/workspace-preview";
 import { createWindowCloseHandshake, type WindowCloseHandshake } from "./window-close-handshake";
+import { LocalWebAiBridgeStore, createWebAiBridgeServer } from "./web-ai-bridge";
+import { createWebAiAgentRuntime } from "./web-ai-agent-runtime";
 import {
   getPageMetrics,
   PAGE_GAP_PX,
@@ -160,6 +162,7 @@ const localAiEditRunContextStore = new LocalAiEditRunContextStore(USER_DATA_PATH
 const localChatgptRunContextStore = new LocalAiEditRunContextStore(USER_DATA_PATH, "chatgpt");
 const localGeminiRunContextStore = new LocalAiEditRunContextStore(USER_DATA_PATH, "antigravity");
 const localAiRenderBridgeStore = new LocalAiRenderBridgeStore(USER_DATA_PATH);
+const localWebAiBridgeStore = new LocalWebAiBridgeStore(USER_DATA_PATH);
 // webSearchEnabled 以外は起動後不変の Codex config 入力。設定変更時に
 // codexAppServerClient.setWebSearchEnabled() が buildConfigToml 経由で config.toml を
 // 再生成できるよう、構築時の入力を1か所にまとめておく。
@@ -244,7 +247,28 @@ void sweepOrphanPerRunContextFiles(USER_DATA_PATH, "chatgpt");
 void sweepOrphanPerRunContextFiles(USER_DATA_PATH, "antigravity");
 void localAiRenderBridgeStore.clear();
 let aiRenderBridgeServer: http.Server | null = null;
+let webAiBridgeServer: http.Server | null = null;
 const pendingRenderDocuments = new Map<string, SigmaDocument>();
+
+const webAiAgentRuntime = createWebAiAgentRuntime({
+  userDataPath: USER_DATA_PATH,
+  dataDir: SIGMA_STUDIO_DATA_PATH,
+  sigmaDocStore: localSigmaDocStore,
+  aiResourceStore: localAiResourceStore,
+  claudeStreamClient,
+  codexAppServerClient,
+  geminiHeadlessClient,
+  claudeRunContextStore: localAiEditRunContextStore,
+  codexRunContextStore: localChatgptRunContextStore,
+  geminiRunContextStore: localGeminiRunContextStore,
+  aiRenderBridgeStore: localAiRenderBridgeStore,
+  resolveMcpServerScriptPath,
+  fallbackWorkspaceDirs: {
+    claude: path.join(SIGMA_STUDIO_DATA_PATH, "claude-agent-workspace"),
+    chatgpt: path.join(SIGMA_STUDIO_DATA_PATH, "codex-agent-workspace"),
+    antigravity: geminiAgentWorkspaceDir,
+  },
+});
 
 function resolveUserDataPath(): string {
   const explicit = process.env.SIGMA_STUDIO_USER_DATA_DIR?.trim();
@@ -1558,6 +1582,11 @@ app.whenReady().then(async () => {
   } catch (error) {
     console.warn("AI render bridge serverを起動できませんでした。MCPはresvgフォールバックを使用します。", error);
   }
+  try {
+    await startWebAiBridgeServer();
+  } catch (error) {
+    console.warn("Web AI bridge serverを起動できませんでした。", error);
+  }
 
   // Prewarm the Codex app-server subprocess shortly after the window is ready so
   // the first user edit doesn't pay spawn+initialize latency. getStatus()
@@ -1602,6 +1631,7 @@ app.on("before-quit", (event) => {
   void sweepOrphanPerRunContextFiles(USER_DATA_PATH, "chatgpt");
   void sweepOrphanPerRunContextFiles(USER_DATA_PATH, "antigravity");
   stopAiRenderBridgeServer();
+  stopWebAiBridgeServer();
 });
 
 async function startAiRenderBridgeServer(): Promise<void> {
@@ -1638,6 +1668,48 @@ async function startAiRenderBridgeServer(): Promise<void> {
     pid: process.pid,
     createdAt: new Date().toISOString(),
   });
+}
+
+async function startWebAiBridgeServer(): Promise<void> {
+  const token = crypto.randomBytes(32).toString("hex");
+  const server = createWebAiBridgeServer({
+    token,
+    getDocument: async (fileId) => {
+      const loaded = await localSigmaDocStore.loadDocumentWithRecovery(fileId);
+      return loaded.ok ? { fileId, revision: loaded.revision, document: loaded.document } : null;
+    },
+    listProposals: async (fileId) => localMcpProposalStore.listProposals({ fileId }),
+    approveProposal: async (proposalId) => approveSingleProposal(proposalId),
+    rejectProposal: async (proposalId) => localMcpProposalStore.rejectProposals([proposalId], "Web AI rejected"),
+    startRun: async (input, onEvent) => webAiAgentRuntime.start(input, onEvent),
+    cancelRun: (runId) => webAiAgentRuntime.cancel(runId),
+  });
+  webAiBridgeServer = server;
+  server.on("error", (error) => {
+    console.warn("Web AI bridge serverでエラーが発生しました。", error);
+  });
+  await new Promise<void>((resolve, reject) => {
+    server.once("error", reject);
+    server.listen(0, "127.0.0.1", () => resolve());
+  });
+  const address = server.address();
+  if (!address || typeof address === "string") {
+    throw new Error(te("electron.preview.bridgePortMissing"));
+  }
+  await localWebAiBridgeStore.write({
+    version: 1,
+    apiVersion: "1",
+    url: `http://127.0.0.1:${address.port}`,
+    token,
+    pid: process.pid,
+    createdAt: new Date().toISOString(),
+  });
+}
+
+function stopWebAiBridgeServer(): void {
+  webAiBridgeServer?.close();
+  webAiBridgeServer = null;
+  void localWebAiBridgeStore.clear();
 }
 
 function stopAiRenderBridgeServer(): void {
