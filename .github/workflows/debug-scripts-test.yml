@@ -1,0 +1,35 @@
+name: Debug scripts tests
+
+on:
+  push:
+    branches:
+      - test/chatgpt-github-write
+
+permissions:
+  contents: write
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: test/chatgpt-github-write
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - run: npm ci --ignore-scripts
+      - name: Run scripts tests and capture output
+        run: |
+          set +e
+          npm run test:scripts > scripts-test.log 2>&1
+          code=$?
+          echo "exit_code=$code" >> scripts-test.log
+          exit 0
+      - name: Commit test output
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add scripts-test.log
+          git commit -m "chore: capture scripts test output [skip ci]" || true
+          git push origin HEAD:test/chatgpt-github-write || true
