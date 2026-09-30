@@ -19,7 +19,7 @@ jobs:
           cache: npm
       - name: Regenerate lockfile from package manifests
         run: npm install --package-lock-only --ignore-scripts
-      - name: Commit generated lockfile
+      - name: Verify clean install\n        run: npm ci --ignore-scripts\n      - name: Commit generated lockfile
         run: |
           if git diff --quiet -- package-lock.json; then
             echo "Lockfile already synchronized."
