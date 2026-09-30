@@ -1,5 +1,6 @@
-import { afterEach, describe, expect, it } from "vitest";
 import type http from "node:http";
+
+import { afterEach, describe, expect, it } from "vitest";
 
 import { createWebAiBridgeServer } from "./web-ai-bridge";
 
@@ -14,19 +15,27 @@ async function close(server: http.Server): Promise<void> {
   await new Promise<void>((resolve, reject) => server.close((error) => error ? reject(error) : resolve()));
 }
 
-describe("Web AI bridge", () => {\n  let servers: http.Server[] = [];\n\n  afterEach(async () => {\n    await Promise.all(servers.splice(0).map(close));\n  });\n\n  it("requires bearer auth and allowlisted origins", async () => {
-  const server = createWebAiBridgeServer({
-    token: "test-token",
-    getDocument: async () => null,
-    listDocuments: async () => [],
-    listProposals: async () => [],
-    approveProposal: async () => null,
-    rejectProposal: async () => null,
-    startRun: async () => ({ status: "answer" }),
-    cancelRun: () => false,
+describe("Web AI bridge", () => {
+  const servers: http.Server[] = [];
+
+  afterEach(async () => {
+    await Promise.all(servers.splice(0).map(close));
   });
-  const base = await listen(server);
-  try {
+
+  it("requires bearer auth and allowlisted origins", async () => {
+    const server = createWebAiBridgeServer({
+      token: "test-token",
+      getDocument: async () => null,
+      listDocuments: async () => [],
+      listProposals: async () => [],
+      approveProposal: async () => null,
+      rejectProposal: async () => null,
+      startRun: async () => ({ status: "answer" }),
+      cancelRun: () => false,
+    });
+    servers.push(server);
+    const base = await listen(server);
+
     const unauthorized = await fetch(`${base}/v1/health`);
     expect(unauthorized.status).toBe(401);
 
@@ -38,38 +47,36 @@ describe("Web AI bridge", () => {\n  let servers: http.Server[] = [];\n\n  after
     const ok = await fetch(`${base}/v1/health`, {
       headers: { Authorization: "Bearer test-token", Origin: "https://chatgpt.com" },
     });
-    assert.equal(ok.status, 200);
-    assert.equal((await ok.json()).ok, true);
-  } finally {
-    await close(server);
-  }
-});
-
-test("Web AI bridge starts runs and exposes completion state", async () => {
-  const server = createWebAiBridgeServer({
-    token: "test-token",
-    getDocument: async (fileId) => ({
-      fileId,
-      revision: 7,
-      document: { docId: "doc_test" } as never,
-    }),
-    listDocuments: async () => [{ fileId: "file_test", revision: 7 }],
-    listProposals: async () => [{ proposalId: "proposal_test", status: "pending" }],
-    approveProposal: async (proposalId) => ({ ok: true, proposalId }),
-    rejectProposal: async (proposalId) => ({ ok: true, proposalId }),
-    startRun: async (input, onEvent) => {
-      onEvent({
-        kind: "phase",
-        phase: "complete",
-        message: "done",
-        timestamp: Date.now(),
-      });
-      return { status: "answer", changedIds: [input.fileId] };
-    },
-    cancelRun: () => false,
+    expect(ok.status).toBe(200);
+    expect((await ok.json()).ok).toBe(true);
   });
-  const base = await listen(server);
-  try {
+
+  it("starts runs and exposes completion state", async () => {
+    const server = createWebAiBridgeServer({
+      token: "test-token",
+      getDocument: async (fileId) => ({
+        fileId,
+        revision: 7,
+        document: { docId: "doc_test" } as never,
+      }),
+      listDocuments: async () => [{ fileId: "file_test", revision: 7 }],
+      listProposals: async () => [{ proposalId: "proposal_test", status: "pending" }],
+      approveProposal: async (proposalId) => ({ ok: true, proposalId }),
+      rejectProposal: async (proposalId) => ({ ok: true, proposalId }),
+      startRun: async (input, onEvent) => {
+        onEvent({
+          kind: "phase",
+          phase: "complete",
+          message: "done",
+          timestamp: Date.now(),
+        });
+        return { status: "answer", changedIds: [input.fileId] };
+      },
+      cancelRun: () => false,
+    });
+    servers.push(server);
+    const base = await listen(server);
+
     const created = await fetch(`${base}/v1/agent/runs`, {
       method: "POST",
       headers: {
@@ -103,7 +110,5 @@ test("Web AI bridge starts runs and exposes completion state", async () => {
       headers: { Authorization: "Bearer test-token" },
     });
     expect((await documents.json()).documents).toEqual([{ fileId: "file_test", revision: 7 }]);
-  } finally {
-    await close(server);
-  }
+  });
 });
