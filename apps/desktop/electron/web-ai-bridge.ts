@@ -169,7 +169,9 @@ async function readBody(req: http.IncomingMessage): Promise<unknown> {
 }
 
 function sendSseEvent(res: http.ServerResponse, event: unknown): void {
-  res.write(`data: ${JSON.stringify(event)}\\n\\n`);
+  res.write(`data: ${JSON.stringify(event)}\
+\
+`);
 }
 
 function publicRunState(run: RunRecord): WebAiRunState {
@@ -394,7 +396,8 @@ export function createWebAiBridgeServer(deps: CreateWebAiBridgeServerDeps): http
 
       sendJson(res, 404, { ok: false, error: "not found" }, origin);
     })().catch((error) => {
-      const isZodError = Boolean(error) && error instanceof z.ZodError;\n      const status = isZodError ? 400 : 500;
+      const isZodError = Boolean(error) && error instanceof z.ZodError;
+      const status = isZodError ? 400 : 500;
       sendJson(res, status, {
         ok: false,
         error: error instanceof Error ? error.message : "request failed",
