@@ -34,7 +34,7 @@ function apiUrl(path: string): string {
   return `${bridgeUrl}${path}`;
 }
 
-async function callApi(path: string, init: RequestInit = {}): Promise<any> {
+interface WebAiApiResponse {\n  ok?: boolean;\n  error?: unknown;\n  runId?: string;\n  run?: { status?: string };\n  [key: string]: unknown;\n}\n\nasync function callApi(path: string, init: RequestInit = {}): Promise<WebAiApiResponse> {
   const response = await fetch(apiUrl(path), {
     ...init,
     headers: {
@@ -43,7 +43,7 @@ async function callApi(path: string, init: RequestInit = {}): Promise<any> {
       ...(init.headers ?? {}),
     },
   });
-  const body = await response.json().catch(() => ({}));
+  const body = await response.json().catch(() => ({}));\n  if (!body || typeof body !== "object" || Array.isArray(body)) {\n    throw new Error("Web AI API returned an invalid response");\n  }\n  const payload = body as WebAiApiResponse;
   if (!response.ok) {
     throw new Error(typeof body?.error === "string" ? body.error : `Web AI API error: ${response.status}`);
   }
