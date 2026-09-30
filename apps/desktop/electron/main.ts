@@ -1647,7 +1647,7 @@ app.whenReady().then(async () => {
   try {
     await startWebAiBridgeServer();
   } catch (error) {
-    console.warn("Web AI bridge serverを起動できませんでした。", error);
+    console.warn("Failed to start the Web AI bridge server.", error);
   }
 
   // Prewarm the Codex app-server subprocess shortly after the window is ready so
@@ -1749,7 +1749,7 @@ async function startWebAiBridgeServer(): Promise<void> {
   });
   webAiBridgeServer = server;
   server.on("error", (error) => {
-    console.warn("Web AI bridge serverでエラーが発生しました。", error);
+    console.warn("Web AI bridge server error.", error);
   });
   await new Promise<void>((resolve, reject) => {
     server.once("error", reject);
