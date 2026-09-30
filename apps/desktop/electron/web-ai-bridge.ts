@@ -380,13 +380,13 @@ export function createWebAiBridgeServer(deps: CreateWebAiBridgeServerDeps): http
         return;
       }
 
-      if (req.method === "POST" && routeParts.length === 5 && routeParts[0] === "v1" && routeParts[1] === "proposals" && routeParts[3] === "approve" && routeParts[4] === "") {
+      if (req.method === "POST" && routeParts.length === 4 && routeParts[0] === "v1" && routeParts[1] === "proposals" && routeParts[3] === "approve") {
         const result = await deps.approveProposal(routeParts[2]!);
         sendJson(res, 200, { ok: true, result }, origin);
         return;
       }
 
-      if (req.method === "POST" && routeParts.length === 5 && routeParts[0] === "v1" && routeParts[1] === "proposals" && routeParts[3] === "reject" && routeParts[4] === "") {
+      if (req.method === "POST" && routeParts.length === 4 && routeParts[0] === "v1" && routeParts[1] === "proposals" && routeParts[3] === "reject") {
         const result = await deps.rejectProposal(routeParts[2]!);
         sendJson(res, 200, { ok: true, result }, origin);
         return;
