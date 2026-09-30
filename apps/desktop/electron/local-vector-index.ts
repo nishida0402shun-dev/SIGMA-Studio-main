@@ -30,12 +30,15 @@ export class LocalVectorIndex {
   }
 
   async upsert(record: Omit<VectorRecord, "vector">): Promise<void> {
+    await this.upsertMany([record]);
+  }
+
+  async upsertMany(records: Array<Omit<VectorRecord, "vector">>): Promise<void> {
+    if (records.length === 0) return;
     const index = await this.read();
-    const vector = embed(record.text);
-    const next = index.records.filter(
-      (item) => !(item.sourceId === record.sourceId && item.pageNumber === record.pageNumber),
-    );
-    next.push({ ...record, vector });
+    const keys = new Set(records.map((record) => record.sourceId + ":" + record.pageNumber));
+    const next = index.records.filter((item) => !keys.has(item.sourceId + ":" + item.pageNumber));
+    next.push(...records.map((record) => ({ ...record, vector: embed(record.text) })));
     await this.write({ version: 1, dimensions: DIMENSIONS, records: next });
   }
 
