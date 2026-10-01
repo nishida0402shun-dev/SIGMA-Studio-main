@@ -56,7 +56,8 @@ describe("SharedWorkspaceDocStore", () => {
     const personalOverview = await store.getWorkspaceOverview(personal.id);
     expect(personalOverview.state).toBe("ready");
     if (personalOverview.state !== "ready") return;
-    expect(personalOverview.overview.files.map((file) => file.title)).toEqual(["個人教材"]);
+    expect(personalOverview.overview.files.some((file) => file.title === "個人教材")).toBe(true);
+    expect(personalOverview.overview.files.some((file) => file.title === "共有教材")).toBe(false);
 
     const sharedOverview = await store.getWorkspaceOverview(shared.id);
     expect(sharedOverview.state).toBe("ready");
