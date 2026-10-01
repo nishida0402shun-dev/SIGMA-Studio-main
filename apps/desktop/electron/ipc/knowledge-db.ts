@@ -61,8 +61,24 @@ export function registerKnowledgeDbIpc(deps: RegisterKnowledgeDbIpcDeps): void {
     const pages = "pageNumbers" in payload && Array.isArray(payload.pageNumbers)
       ? payload.pageNumbers.filter((value): value is number => Number.isInteger(value))
       : [];
-    if (!sourceId || pages.length === 0) throw new Error("no pages selected");
-    const bytes = await store.extractPages(sourceId, pages);
+    const selections = "selections" in payload && Array.isArray(payload.selections)
+      ? payload.selections.flatMap((selection) => {
+          if (!selection || typeof selection !== "object") return [];
+          const id = "sourceId" in selection && typeof selection.sourceId === "string" ? selection.sourceId : "";
+          const pageNumbers = "pageNumbers" in selection && Array.isArray(selection.pageNumbers)
+            ? selection.pageNumbers.filter((value): value is number => Number.isInteger(value))
+            : [];
+          return id && pageNumbers.length > 0 ? [{ sourceId: id, pageNumbers }] : [];
+        })
+      : [];
+
+    const requestedSelections = selections.length > 0
+      ? selections
+      : sourceId && pages.length > 0
+        ? [{ sourceId, pageNumbers: pages }]
+        : [];
+    if (requestedSelections.length === 0) throw new Error("no pages selected");
+    const bytes = await store.extractSelectedPages(requestedSelections);
     const mainWindow = getMainWindow();
     if (!mainWindow) return null;
     const save = await dialog.showSaveDialog(mainWindow, {
