@@ -80,6 +80,7 @@ import { createCurrentLocaleTranslator, setAppLocale } from "@/lib/i18n";
 
 const te = createCurrentLocaleTranslator("error");
 
+// eslint-disable-next-line @typescript-eslint/no-require-imports -- Electron main loads package metadata through CommonJS at runtime.
 const IS_BETA_BUILD = /-beta\./.test(require("../package.json").version);
 const APP_NAME = IS_BETA_BUILD ? "Sigma Studio Beta" : "Sigma Studio";
 const DIST_RENDERER_DIR = path.join(__dirname, "..", "out");
