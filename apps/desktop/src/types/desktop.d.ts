@@ -875,6 +875,8 @@ export interface DesktopKnowledgeDbAPI {
   setPageType(payload: { sourceId: string; pageNumber: number; semanticType: string; title?: string }): Promise<unknown>;
   deleteSource(sourceId: string): Promise<{ ok: boolean }>;
   openPage(payload: { sourceId: string; pageNumber: number }): Promise<{ ok: boolean; error?: string; filePath?: string }>;
+  getPagePdf(payload: { sourceId: string; pageNumber: number }): Promise<{ dataBase64: string; width: number; height: number } | null>;
+  extractRegion(payload: { sourceId: string; pageNumber: number; rect: { x: number; y: number; width: number; height: number } }): Promise<{ ok: boolean; error?: string; filePath?: string }>;
 }
 
 export interface DesktopAPI {
