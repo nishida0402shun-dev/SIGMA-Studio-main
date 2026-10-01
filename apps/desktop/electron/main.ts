@@ -96,6 +96,7 @@ if (DEV_SERVER_URL) {
   });
 }
 const USER_DATA_PATH = resolveUserDataPath();
+const SHARED_WORKSPACE_PATH = resolveSharedWorkspacePath();
 const startupDocumentPaths = documentPathsFromArgv(process.argv, process.cwd(), Boolean(process.defaultApp));
 // A secondary launch only forwards files. It must not clear active AI contexts or start stores.
 const hasSingleInstanceLock = app.requestSingleInstanceLock({ documentPaths: startupDocumentPaths });
@@ -141,14 +142,16 @@ let stopLocalStoreWatch: (() => void) | null = null;
 let stopLocalProposalWatch: (() => void) | null = null;
 let stopAiResourceWatch: (() => void) | null = null;
 let stopAiSettingsWatch: (() => void) | null = null;
-const localSigmaDocStore = new LocalSigmaDocStore(USER_DATA_PATH);
+const localSigmaDocStore = new LocalSigmaDocStore(USER_DATA_PATH, {
+  workspaceRoot: SHARED_WORKSPACE_PATH,
+});
 const localMaterialStore = new LocalMaterialStore(USER_DATA_PATH);
 const localTemplateStore = new LocalTemplateStore(USER_DATA_PATH);
 const localMcpProposalStore = new LocalMcpEditProposalStore(USER_DATA_PATH);
 const localAiEditRunLogStore = new LocalAiEditRunLogStore(USER_DATA_PATH);
 const localAiEditChatRoomStore = new LocalAiEditChatRoomStore(USER_DATA_PATH);
 const localAiResourceStore = new LocalAiResourceStore(USER_DATA_PATH);
-const SIGMA_STUDIO_DATA_PATH = localSigmaDocStore.getDataDir();
+const SIGMA_STUDIO_DATA_PATH = path.join(USER_DATA_PATH, "data");
 const knowledgeDbStore = new KnowledgeDbStore(SIGMA_STUDIO_DATA_PATH);
 const appUpdateController = new AppUpdateController({ releaseUrl: RELEASE_PAGE_URL });
 const desktopSettings = readDesktopSettingsSync(SIGMA_STUDIO_DATA_PATH);
@@ -271,6 +274,13 @@ const webAiAgentRuntime = createWebAiAgentRuntime({
   aiRenderBridgeStore: localAiRenderBridgeStore,
   resolveMcpServerScriptPath,
 });
+
+function resolveSharedWorkspacePath(): string {
+  const explicit = process.env.SIGMA_STUDIO_SHARED_WORKSPACE_DIR?.trim();
+  return explicit
+    ? path.resolve(explicit)
+    : path.join(app.getPath("appData"), "Sigma Studio", "Workspace");
+}
 
 function resolveUserDataPath(): string {
   const explicit = process.env.SIGMA_STUDIO_USER_DATA_DIR?.trim();
