@@ -1132,11 +1132,14 @@ export function AiEditPanel({
       return "";
     }
     try {
-      const sources = desktop.knowledgeDb.listSources
-        ? await desktop.knowledgeDb.listSources()
-        : [];
+      const sources = await desktop.knowledgeDb.list() as Array<{
+        id?: string;
+        name?: string;
+      }>;
       const sourceNames = new Map(
-        sources.map((source) => [source.id, source.name]),
+        sources
+          .filter((source) => typeof source.id === "string" && typeof source.name === "string")
+          .map((source) => [source.id as string, source.name as string]),
       );
 
       // A vague request such as 「この単元について」 is usually meaningful only
