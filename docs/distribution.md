@@ -27,7 +27,7 @@ OSごとの検証、ビルド成功、署名・インストール後の動作確
 
 ## リリース運用
 
-`v*` タグでReleaseワークフローが起動し、macOS/Windowsの配布物を下書きReleaseへアップロードします。手動実行も対象タグを選択してください。
+`v*` タグでReleaseワークフローが起動します。通常版はStable Release、`-beta.N` を含むタグはBeta Pre-releaseとしてmacOS/Windowsの配布物と自動更新メタデータを公開します。手動実行では `stable` / `beta` を選択できます。
 リリース運用を有効にする際は、署名、npmの公開元設定、バージョン、タグ、既存配布処理との重複を確認します。
 
 インストーラと自動更新メタデータは同じバージョンのビルドから作成します。
@@ -38,8 +38,8 @@ OSごとの検証、ビルド成功、署名・インストール後の動作確
 
 署名用の `MAC_CSC_LINK`・`MAC_CSC_KEY_PASSWORD`、公証用の `APPLE_ID`・`APPLE_APP_SPECIFIC_PASSWORD`・`APPLE_TEAM_ID` をリポジトリSecretsに設定します。
 配布物の混入検査には `RELEASE_CONTENT_RULES` を設定します。値は正規表現文字列のJSON配列で、ソースへ含めません。Releaseビルドでは設定がない場合も検査に失敗します。
-同じリポジトリの下書きReleaseへのアップロードには、workflowの `contents: write` と `GITHUB_TOKEN` を使います。
-署名と混入検査はインストーラのアップロード前に実行されます。全OSのビルドと配布物を確認した後、下書きを公開します。
+同じリポジトリのReleaseへのアップロードには、workflowの `contents: write` と `GITHUB_TOKEN` を使います。Stableは公開Release、BetaはPre-releaseとして作成されます。
+署名と混入検査はインストーラのアップロード前に実行されます。全OSのビルドと配布物を確認した後、Releaseの公開状態を確認します。
 
 ## npmパッケージの公開準備
 
