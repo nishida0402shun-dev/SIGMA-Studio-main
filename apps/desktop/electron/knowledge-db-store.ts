@@ -102,7 +102,17 @@ export class KnowledgeDbStore {
 
   async search(query: string, limit = 12) {
     await this.ensureIndexed();
-    return this.vectorIndex.search(query, limit);
+    const chunkLimit = Math.min(Math.max(limit * 4, limit), 50);
+    const matches = await this.vectorIndex.search(query, chunkLimit);
+    const bestByPage = new Map<string, (typeof matches)[number]>();
+    for (const match of matches) {
+      const key = `${match.sourceId}:${match.pageNumber}`;
+      const current = bestByPage.get(key);
+      if (!current || match.score > current.score) bestByPage.set(key, match);
+    }
+    return [...bestByPage.values()]
+      .sort((a, b) => b.score - a.score)
+      .slice(0, Math.max(1, Math.min(limit, 50)));
   }
 
   private async ensureIndexed(): Promise<KnowledgeSource[]> {
