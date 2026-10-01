@@ -20,6 +20,7 @@ const signMac = Boolean((process.env.CSC_LINK || "").trim());
 const hasMacCertPassword = Boolean((process.env.CSC_KEY_PASSWORD || "").trim());
 const requireMacSigning = process.env.SIGMA_STUDIO_REQUIRE_MAC_SIGNING === "true";
 const buildWindowsStorePackage = process.env.SIGMA_STUDIO_WINDOWS_STORE === "true";
+// eslint-disable-next-line @typescript-eslint/no-require-imports -- electron-builder config is intentionally CommonJS.
 const packageVersion = require("./package.json").version;
 const isBetaBuild = /-beta\./.test(packageVersion);
 
