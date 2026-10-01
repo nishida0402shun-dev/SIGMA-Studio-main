@@ -1,4 +1,4 @@
-/* eslint-disable no-restricted-syntax, no-alert, react-hooks/set-state-in-effect -- Knowledge DB UI uses native confirmation and async state synchronization. */
+/* eslint-disable no-restricted-syntax, no-alert -- Knowledge DB UI uses native confirmation and intentionally localized literals. */
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
@@ -53,10 +53,7 @@ export function KnowledgeDbWorkspace({ open, onClose, onOpenAi, t }: Props) {
   }, [knowledgeDb, open]);
 
   useEffect(() => {
-    if (!knowledgeDb || !query.trim()) {
-      setSearchResults([]);
-      return;
-    }
+    if (!knowledgeDb || !query.trim()) return;
     let cancelled = false;
     const timer = window.setTimeout(() => {
       void knowledgeDb.search({ query, limit: 30 }).then((value) => {
