@@ -1125,6 +1125,34 @@ export function AiEditPanel({
   // immediate run and a later queued-follow-up dispatch (R3) go through this
   // same snapshot shape so a follow-up replays exactly what the user composed,
   // even if the live composer state has since moved on to something else.
+  const retrieveKnowledgeDbContext = useCallback(async (query: string): Promise<string> => {
+    const desktop = getDesktopBridge();
+    if (!desktop?.knowledgeDb?.search || !query.trim()) {
+      return "";
+    }
+    try {
+      const matches = await desktop.knowledgeDb.search({ query: query.trim(), limit: 4 }) as Array<{
+        sourceId?: string;
+        pageNumber?: number;
+        text?: string;
+        score?: number;
+      }>;
+      const usable = matches.filter((match) =>
+        typeof match.sourceId === "string"
+        && typeof match.pageNumber === "number"
+        && typeof match.text === "string"
+        && match.text.trim().length > 0,
+      );
+      if (usable.length === 0) return "";
+      return usable.map((match) =>
+        `[Knowledge DB / source ${match.sourceId} / p.${match.pageNumber} / score ${typeof match.score === "number" ? match.score.toFixed(3) : "n/a"}]\n${match.text!.trim()}`,
+      ).join("\n\n");
+    } catch (error) {
+      console.warn("Knowledge DB retrieval failed; continuing without retrieved context.", error);
+      return "";
+    }
+  }, []);
+
   const buildRunParams = useCallback(async (): Promise<RunParams> => {
     const turnAttachments = await createAttachmentsWithSelectedOverlayPreview({
       attachments,
@@ -1132,6 +1160,10 @@ export function AiEditPanel({
       overlaySelection,
       activeReferenceKey,
     });
+    const retrievedKnowledge = await retrieveKnowledgeDbContext(instruction);
+    const knowledgeInstruction = retrievedKnowledge
+      ? `\n\n以下はKnowledge DBから質問内容に関連して自動検索した参考資料です。回答では必要な範囲で利用し、資料にない内容は推測せず明示してください。\n\n${retrievedKnowledge}`
+      : "";
     // A room bound to a provider always runs on it, even if the composer's
     // `provider` state hasn't caught up to a just-selected room yet.
     const runProvider = lockedProvider ?? provider;
@@ -1149,7 +1181,7 @@ export function AiEditPanel({
       turnMentionedDocuments: mentionedDocuments,
       turnProvider: runProvider,
       turnAiResourceIds,
-      turnInstruction: instruction.trim() || getAttachmentDefaultInstruction(turnAttachments),
+      turnInstruction: (instruction.trim() || getAttachmentDefaultInstruction(turnAttachments)) + knowledgeInstruction,
       turnModel: runProvider === "claude" ? claudeModel : runProvider === "antigravity" ? geminiModel : model,
       turnReasoningEffort: reasoningEffort,
       aiTargetId,
@@ -1164,9 +1196,9 @@ export function AiEditPanel({
       }),
     };
   }, [
-    activeReferenceKey, aiResources, aiTargetId, attachments, claudeModel, document, documentIdentityKey, geminiModel,
+    activeReferenceKey, aiResources, aiTargetId, attachments, claudeModel, document, documentIdentityKey, geminiModel, knowledgeInstruction,
     inlineAnchor, instruction, lockedProvider, mentionedDocuments, model, overlayComposerPreviews, overlaySelection, overlaySelectionContext, provider, reasoningEffort,
-    scopedAgentThreadId, selectedAiResourceIds, turnReferences, variant,
+    scopedAgentThreadId, selectedAiResourceIds, turnReferences, variant, retrieveKnowledgeDbContext,
   ]);
 
   const clearComposerAfterSubmit = useCallback(() => {
