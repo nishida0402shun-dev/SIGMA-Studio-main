@@ -41,7 +41,7 @@ export class LocalVectorIndex {
     const keys = new Set(records.map((record) => record.sourceId + ":" + record.pageNumber + ":" + record.chunkIndex));
     const next = index.records.filter((item) => !keys.has(item.sourceId + ":" + item.pageNumber + ":" + item.chunkIndex));
     next.push(...records.map((record) => ({ ...record, vector: embed(record.text) })));
-    await this.write({ version: 1, dimensions: DIMENSIONS, records: next });
+    await this.write({ version: 2, dimensions: DIMENSIONS, records: next });
   }
 
   async hasSource(sourceId: string): Promise<boolean> {
