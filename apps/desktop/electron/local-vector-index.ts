@@ -22,7 +22,7 @@ export interface VectorSearchResult extends Omit<VectorRecord, "vector"> {
 }
 
 const DIMENSIONS = 384;
-const TOKEN_RE = /[\p{L}\p{N}][\p{p}\p{L}\p{N}_-]*/gu;
+const TOKEN_RE = /[\p{L}\p{N}][\p{P}\p{L}\p{N}_-]*/gu;
 
 export class LocalVectorIndex {
   private readonly indexPath: string;

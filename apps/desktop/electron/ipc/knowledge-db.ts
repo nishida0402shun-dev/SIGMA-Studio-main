@@ -62,7 +62,7 @@ export function registerKnowledgeDbIpc(deps: RegisterKnowledgeDbIpcDeps): void {
       ? payload.pageNumbers.filter((value): value is number => Number.isInteger(value))
       : [];
     const selections = "selections" in payload && Array.isArray(payload.selections)
-      ? payload.selections.flatMap((selection) => {
+      ? payload.selections.flatMap((selection: unknown) => {
           if (!selection || typeof selection !== "object") return [];
           const id = "sourceId" in selection && typeof selection.sourceId === "string" ? selection.sourceId : "";
           const pageNumbers = "pageNumbers" in selection && Array.isArray(selection.pageNumbers)
