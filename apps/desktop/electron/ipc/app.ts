@@ -7,7 +7,6 @@ import { pathToFileURL } from "node:url";
 import { createCurrentLocaleTranslator } from "@/lib/i18n";
 
 import type { AppUpdateController } from "../app-updater";
-import { backupCurrentData, defaultMigrationFileName, exportMigrationArchive, importMigrationArchive } from "../app-data-migration";
 import {
   normalizeEditorFontFamily,
   readDesktopEditorPreferences,
@@ -31,12 +30,10 @@ export interface RegisterAppIpcDeps {
   dataDir: string;
   appUpdateController: AppUpdateController;
   quitAndInstall?: () => ReturnType<AppUpdateController["quitAndInstall"]>;
-  isBetaBuild?: boolean;
-  userDataPath?: string;
 }
 
 export function registerAppIpc(deps: RegisterAppIpcDeps): void {
-  const { getMainWindow, releaseUrl, dataDir, appUpdateController, quitAndInstall, isBetaBuild = false, userDataPath = dataDir } = deps;
+  const { getMainWindow, releaseUrl, dataDir, appUpdateController, quitAndInstall } = deps;
 
   function customFontsDir(): string {
     return path.join(dataDir, "fonts");
@@ -132,52 +129,6 @@ export function registerAppIpc(deps: RegisterAppIpcDeps): void {
     version: app.getVersion(),
     releaseUrl,
   }));
-
-  ipcMain.handle("app:export-beta-migration", async () => {
-    if (!isBetaBuild) return { ok: false, error: "この機能はBeta版でのみ利用できます。" };
-    const result = await dialog.showSaveDialog(getMainWindow() ?? undefined, {
-      title: "正式版へ移行するデータを書き出す",
-      defaultPath: defaultMigrationFileName(app.getVersion()),
-      filters: [{ name: "Sigma Studio migration", extensions: ["zip"] }],
-    });
-    if (result.canceled || !result.filePath) return { ok: true, canceled: true };
-    try {
-      await exportMigrationArchive(userDataPath, result.filePath, app.getVersion());
-      return { ok: true, filePath: result.filePath };
-    } catch (error) {
-      return { ok: false, error: error instanceof Error ? error.message : "移行データの書き出しに失敗しました。" };
-    }
-  });
-
-  ipcMain.handle("app:import-beta-migration", async () => {
-    if (isBetaBuild) return { ok: false, error: "Beta版からBeta版への移行はできません。" };
-    const result = await dialog.showOpenDialog(getMainWindow() ?? undefined, {
-      title: "Beta版のデータを正式版へ取り込む",
-      properties: ["openFile"],
-      filters: [{ name: "Sigma Studio migration", extensions: ["zip"] }],
-    });
-    if (result.canceled || !result.filePaths[0]) return { ok: true, canceled: true };
-    const confirm = await dialog.showMessageBox(getMainWindow() ?? undefined, {
-      type: "warning",
-      buttons: ["取り込んで再起動", "キャンセル"],
-      defaultId: 1,
-      cancelId: 1,
-      title: "Betaデータを正式版へ移行",
-      message: "現在の正式版データはバックアップしてから、Beta版のデータで置き換えます。",
-      detail: "未保存の変更がある場合は先に保存してください。移行後は正式版を再起動します。",
-    });
-    if (confirm.response !== 0) return { ok: true, canceled: true };
-    try {
-      const backupPath = path.join(app.getPath("temp"), "sigma-studio-stable-backup-" + Date.now() + ".zip");
-      await backupCurrentData(userDataPath, backupPath);
-      await importMigrationArchive(userDataPath, result.filePaths[0]);
-      app.relaunch();
-      app.exit(0);
-      return { ok: true, backupPath };
-    } catch (error) {
-      return { ok: false, error: error instanceof Error ? error.message : "Betaデータの取り込みに失敗しました。" };
-    }
-  });
 
   ipcMain.handle("app:open-latest-release-page", async () => {
     try {
