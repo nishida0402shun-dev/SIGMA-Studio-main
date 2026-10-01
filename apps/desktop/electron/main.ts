@@ -79,10 +79,13 @@ import { createCurrentLocaleTranslator, setAppLocale } from "@/lib/i18n";
 
 const te = createCurrentLocaleTranslator("error");
 
-const APP_NAME = "Sigma Studio";
+const IS_BETA_BUILD = /-beta\./.test(require("../package.json").version);
+const APP_NAME = IS_BETA_BUILD ? "Sigma Studio Beta" : "Sigma Studio";
 const DIST_RENDERER_DIR = path.join(__dirname, "..", "out");
 const APP_ICON_PATH = path.join(__dirname, "..", "build", "icon.png");
-const RELEASE_PAGE_URL = "https://github.com/Atsu-Taiyo/SIGMA-Studio/releases/latest";
+const RELEASE_PAGE_URL = IS_BETA_BUILD
+  ? "https://github.com/Atsu-Taiyo/SIGMA-Studio/releases"
+  : "https://github.com/Atsu-Taiyo/SIGMA-Studio/releases/latest";
 const UPDATE_CHECK_INTERVAL_MS = 60 * 60 * 1000;
 app.setName(APP_NAME);
 loadElectronEnvFiles();
@@ -271,7 +274,8 @@ const webAiAgentRuntime = createWebAiAgentRuntime({
 
 function resolveUserDataPath(): string {
   const explicit = process.env.SIGMA_STUDIO_USER_DATA_DIR?.trim();
-  const userDataPath = explicit ? path.resolve(explicit) : path.join(app.getPath("appData"), APP_NAME);
+  const defaultUserDataName = IS_BETA_BUILD ? "Sigma Studio Beta" : APP_NAME;
+  const userDataPath = explicit ? path.resolve(explicit) : path.join(app.getPath("appData"), defaultUserDataName);
   app.setPath("userData", userDataPath);
   return userDataPath;
 }
