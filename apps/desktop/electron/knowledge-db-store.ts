@@ -44,12 +44,14 @@ export class KnowledgeDbStore {
   private readonly sourcesDir: string;
   private readonly libraryPath: string;
   private readonly vectorIndex: LocalVectorIndex;
+  private readonly openedPagesDir: string;
 
   constructor(dataDir: string) {
     this.root = path.join(dataDir, "knowledge-db");
     this.sourcesDir = path.join(this.root, "sources");
     this.libraryPath = path.join(this.root, "library.json");
     this.vectorIndex = new LocalVectorIndex(this.root);
+    this.openedPagesDir = path.join(this.root, "opened-pages");
   }
 
   async listSources(): Promise<KnowledgeSource[]> {
@@ -153,6 +155,38 @@ export class KnowledgeDbStore {
       })),
     );
     await this.vectorIndex.upsertMany(records);
+  }
+
+  async deleteSource(sourceId: string): Promise<boolean> {
+    const library = await this.readLibrary();
+    const source = library.sources.find((item) => item.id === sourceId);
+    if (!source) return false;
+    await fs.rm(source.storedPath, { force: true });
+    await this.vectorIndex.removeSource(source.id);
+    library.sources = library.sources.filter((item) => item.id !== sourceId);
+    await this.writeLibrary(library);
+    return true;
+  }
+
+  async openPage(sourceId: string, pageNumber: number): Promise<string> {
+    const library = await this.readLibrary();
+    const source = library.sources.find((item) => item.id === sourceId);
+    if (!source) throw new Error("knowledge source not found");
+    if (!Number.isInteger(pageNumber) || pageNumber < 1 || pageNumber > source.pageCount) {
+      throw new Error("knowledge page not found");
+    }
+    const bytes = await fs.readFile(source.storedPath);
+    const input = await PDFDocument.load(bytes);
+    const output = await PDFDocument.create();
+    const copied = await output.copyPages(input, [pageNumber - 1]);
+    const page = copied[0];
+    if (!page) throw new Error("knowledge page not found");
+    output.addPage(page);
+    await fs.mkdir(this.openedPagesDir, { recursive: true });
+    const safeSource = source.id.replace(/[^a-zA-Z0-9_-]/g, "_");
+    const outputPath = path.join(this.openedPagesDir, safeSource + "-p" + pageNumber + ".pdf");
+    await fs.writeFile(outputPath, await output.save());
+    return outputPath;
   }
 
   async extractPages(sourceId: string, pageNumbers: number[]): Promise<Uint8Array> {
