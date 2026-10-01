@@ -343,6 +343,12 @@ const desktopAPI = {
     setPageType(payload: { sourceId: string; pageNumber: number; semanticType: string; title?: string }): Promise<unknown> {
       return ipcRenderer.invoke("knowledge-db:set-page-type", payload);
     },
+    deleteSource(sourceId: string): Promise<{ ok: boolean }> {
+      return ipcRenderer.invoke("knowledge-db:delete-source", sourceId);
+    },
+    openPage(payload: { sourceId: string; pageNumber: number }): Promise<{ ok: boolean; error?: string; filePath?: string }> {
+      return ipcRenderer.invoke("knowledge-db:open-page", payload);
+    },
   },
 
   aiRender: {
