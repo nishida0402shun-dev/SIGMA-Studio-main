@@ -39,6 +39,10 @@ export const MCP_TOOL_CATEGORY_MAP = {
     "search_document",
     "search_library",
     "validate_local_document",
+    "knowledge_db_get_page",
+    "knowledge_db_get_region",
+    "knowledge_db_list_sources",
+    "knowledge_db_search",
   ],
   "教材管理": [
     "create_local_document",
