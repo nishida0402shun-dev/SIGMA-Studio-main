@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-require-imports */
 // electron-builder configuration.
 //
 // Migrated out of package.json "build" so signing/notarization can be toggled
