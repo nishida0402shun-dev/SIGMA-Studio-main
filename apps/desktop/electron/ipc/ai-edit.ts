@@ -337,7 +337,9 @@ export function registerAiEditIpc(deps: RegisterAiEditIpcDeps): void {
           localMcpProposalStore.completeProposalRunSnapshot(proposalSnapshotId);
         }
       }
-      await appendKnowledgeDbSourceReferences(localMcpProposalStore, runId, payload);
+      if (result.status !== "cancelled") {
+        await appendKnowledgeDbSourceReferences(localMcpProposalStore, runId, payload);
+      }
       // Web検索はMCPツールではないためMCPサーバー側の参照台帳に載らない。run のイベント列
       // だけが「何を検索したか」を知っているので、ここで提案へ後付けする (URLはCodexから
       // 取得できないため検索語のまま出典にする)。
