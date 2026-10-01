@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { Database, Download, ExternalLink, FilePlus2, FileText, MessageSquare, Search, Trash2, X } from "lucide-react";
+import { KnowledgePdfPageViewer, type KnowledgeRegion } from "./KnowledgePdfPageViewer";
 import { getDesktopBridge } from "@/lib/desktop-bridge";
 import type { KnowledgeDbAiContext, KnowledgeSearchResult, KnowledgeSemanticType, KnowledgeSource } from "@/types/knowledge-db";
 import type { Translate } from "@/lib/i18n";
@@ -36,6 +37,8 @@ export function KnowledgeDbWorkspace({ open, onClose, onOpenAi, t }: Props) {
   const [selected, setSelected] = useState<Record<string, Set<number>>>({});
   const [typeFilter, setTypeFilter] = useState<KnowledgeSemanticType | "all">("all");
   const [searchResults, setSearchResults] = useState<KnowledgeSearchResult[]>([]);
+  const [region, setRegion] = useState<KnowledgeRegion | null>(null);
+  const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null);
   const desktop = getDesktopBridge();
   const knowledgeDb = desktop?.knowledgeDb;
 
@@ -147,7 +150,7 @@ export function KnowledgeDbWorkspace({ open, onClose, onOpenAi, t }: Props) {
     setSearchResults((current) => current.filter((item) => item.sourceId !== sourceId));
   }
 
-  async function handoffAi(): Promise<void> {
+  async function handoffAi(action?: string): Promise<void> {
     const context = selectedPages.flatMap(({ sourceId, pageNumber }) => {
       const source = sources.find((item) => item.id === sourceId);
       const page = source?.pages.find((item) => item.pageNumber === pageNumber);
@@ -156,10 +159,19 @@ export function KnowledgeDbWorkspace({ open, onClose, onOpenAi, t }: Props) {
         sourceName: source.name,
         pageNumber: page.pageNumber,
         semanticType: page.semanticType,
-        text: page.text.trim(),
+        text: [action ? `【AI操作: ${action}】` : "", page.text.trim()].filter(Boolean).join("\\n"),
       } satisfies KnowledgeDbAiContext];
     });
     onOpenAi(context);
+    setContextMenu(null);
+  }
+
+  async function extractRegionPdf(): Promise<void> {
+    if (!knowledgeDb || selectedPages.length === 0 || !region) return;
+    const target = selectedPages[0];
+    const result = await knowledgeDb.extractRegion({ sourceId: target.sourceId, pageNumber: target.pageNumber, rect: region });
+    if (!result.ok) console.warn("Knowledge DB region extraction failed:", result.error);
+    setContextMenu(null);
   }
 
   return (
@@ -401,6 +413,45 @@ export function KnowledgeDbWorkspace({ open, onClose, onOpenAi, t }: Props) {
   background: rgb(248 113 113 / 0.14);
 }
 
+.knowledge-db-page-preview {
+  min-height: 180px;
+  max-height: 520px;
+  overflow: auto;
+  padding: 8px;
+  border: 1px solid rgb(148 163 184 / 0.28);
+  border-radius: 10px;
+  background: rgb(248 250 252);
+}
+
+.knowledge-db-region-status {
+  font-size: 11px;
+  color: rgb(71 85 105);
+}
+
+.knowledge-db-context-menu {
+  position: fixed;
+  z-index: 100;
+  min-width: 190px;
+  padding: 6px;
+  border: 1px solid rgb(148 163 184 / 0.35);
+  border-radius: 10px;
+  background: white;
+  box-shadow: 0 16px 36px rgb(15 23 42 / 0.2);
+}
+
+.knowledge-db-context-menu button {
+  display: block;
+  width: 100%;
+  padding: 8px 10px;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+}
+
+.knowledge-db-context-menu button:hover { background: rgb(241 245 249); }
+
 .knowledge-db-detail p,
 .knowledge-db-empty {
   color: rgb(71 85 105);
@@ -473,6 +524,23 @@ export function KnowledgeDbWorkspace({ open, onClose, onOpenAi, t }: Props) {
             <span>{t("appMenu.knowledgeDb.selectedPages", { count: selectedPages.length })}</span>
             {selectedPages.length > 0 && (
               <>
+                <div
+                  className="knowledge-db-page-preview"
+                  onContextMenu={(event) => {
+                    event.preventDefault();
+                    setContextMenu({ x: event.clientX, y: event.clientY });
+                  }}
+                >
+                  <KnowledgePdfPageViewer
+                    sourceId={selectedPages[0]!.sourceId}
+                    pageNumber={selectedPages[0]!.pageNumber}
+                    pageWidth={612}
+                    pageHeight={792}
+                    getPagePdf={(payload) => knowledgeDb?.getPagePdf(payload) ?? Promise.resolve(null)}
+                    onRegionSelected={(nextRegion) => setRegion(nextRegion)}
+                  />
+                </div>
+                {region && <span className="knowledge-db-region-status">範囲選択済み · {Math.round(region.width)} × {Math.round(region.height)}</span>}
                 <button type="button" className="knowledge-db-detail-button" onClick={() => void openSelectedPage()}>
                   <ExternalLink size={15} />選択ページを開く
                 </button>
@@ -503,6 +571,16 @@ export function KnowledgeDbWorkspace({ open, onClose, onOpenAi, t }: Props) {
           </aside>
         </div>
       </section>
+      {contextMenu && selectedPages.length > 0 && (
+        <div className="knowledge-db-context-menu" style={{ left: contextMenu.x, top: contextMenu.y }} onMouseLeave={() => setContextMenu(null)}>
+          <button type="button" onClick={() => void handoffAi()}>AIに送る</button>
+          {region && <button type="button" onClick={() => void extractRegionPdf()}>選択範囲をPDF抽出</button>}
+          <button type="button" onClick={() => void handoffAi("内容を解説する")}>解説する</button>
+          <button type="button" onClick={() => void handoffAi("数値や条件を変更した類似問題を作る")}>数値を変える</button>
+          <button type="button" onClick={() => void handoffAi("この問題の類題を3問作る")}>類題を作る</button>
+          <button type="button" onClick={() => void handoffAi("この内容から練習問題を作る")}>問題を作る</button>
+        </div>
+      )}
       </div>
     </>
   );
