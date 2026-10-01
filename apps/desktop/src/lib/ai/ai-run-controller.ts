@@ -127,7 +127,7 @@ export interface RunParams {
   turnProvider: AiProvider;
   turnAiResourceIds: string[];
   turnInstruction: string;
-  knowledgeDbSourceReferences: Array<{ sourceId: string; sourceName: string; pageNumber: number }>;
+  knowledgeDbSourceReferences?: Array<{ sourceId: string; sourceName: string; pageNumber: number }>;
   turnModel: string;
   turnReasoningEffort: AiEditReasoningEffort;
   aiTargetId: string | null;
