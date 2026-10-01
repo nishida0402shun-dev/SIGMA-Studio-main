@@ -105,6 +105,26 @@ export function KnowledgeDbWorkspace({ open, onClose, onOpenAi, t }: Props) {
     await knowledgeDb.extractPages({ selections });
   }
 
+  async function updateSelectedPageType(semanticType: KnowledgeSemanticType): Promise<void> {
+    if (!knowledgeDb || selectedPages.length === 0) return;
+    const target = selectedPages[0];
+    const result = await knowledgeDb.setPageType({
+      sourceId: target.sourceId,
+      pageNumber: target.pageNumber,
+      semanticType,
+    });
+    if (!result) return;
+    setSources((current) => current.map((source) => {
+      if (source.id !== target.sourceId) return source;
+      return {
+        ...source,
+        pages: source.pages.map((page) =>
+          page.pageNumber === target.pageNumber ? { ...page, semanticType } : page,
+        ),
+      };
+    }));
+  }
+
   async function openSelectedPage(): Promise<void> {
     if (!knowledgeDb || selectedPages.length === 0) return;
     const target = selectedPages[0];
@@ -320,6 +340,22 @@ export function KnowledgeDbWorkspace({ open, onClose, onOpenAi, t }: Props) {
   cursor: pointer;
 }
 
+.knowledge-db-type-editor {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.knowledge-db-type-editor select {
+  min-height: 32px;
+  padding: 5px 8px;
+  border: 1px solid rgb(100 116 139 / 0.28);
+  border-radius: 8px;
+  background: white;
+}
+
 .knowledge-db-source-list {
   display: flex;
   flex-direction: column;
@@ -436,9 +472,21 @@ export function KnowledgeDbWorkspace({ open, onClose, onOpenAi, t }: Props) {
             <strong>{t("appMenu.knowledgeDb.selected")}</strong>
             <span>{t("appMenu.knowledgeDb.selectedPages", { count: selectedPages.length })}</span>
             {selectedPages.length > 0 && (
-              <button type="button" className="knowledge-db-detail-button" onClick={() => void openSelectedPage()}>
-                <ExternalLink size={15} />選択ページを開く
-              </button>
+              <>
+                <button type="button" className="knowledge-db-detail-button" onClick={() => void openSelectedPage()}>
+                  <ExternalLink size={15} />選択ページを開く
+                </button>
+                <label className="knowledge-db-type-editor">
+                  <span>ページ分類</span>
+                  <select
+                    value={sources.find((source) => source.id === selectedPages[0]!.sourceId)?.pages.find((page) => page.pageNumber === selectedPages[0]!.pageNumber)?.semanticType ?? "unknown"}
+                    onChange={(event) => void updateSelectedPageType(event.target.value as KnowledgeSemanticType)}
+                  >
+                    <option value="unknown">未分類</option>
+                    {TYPES.map((type) => <option key={type} value={type}>{semanticTypeLabel(t, type)}</option>)}
+                  </select>
+                </label>
+              </>
             )}
             <p>{t("appMenu.knowledgeDb.help")}</p>
             <div className="knowledge-db-source-list">
