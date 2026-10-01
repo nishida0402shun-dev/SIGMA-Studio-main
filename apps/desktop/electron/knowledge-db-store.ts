@@ -104,6 +104,7 @@ export class KnowledgeDbStore {
 
   async search(query: string, limit = 12) {
     await this.ensureIndexed();
+    const library = await this.readLibrary();
     const chunkLimit = Math.min(Math.max(limit * 4, limit), 50);
     const matches = await this.vectorIndex.search(query, chunkLimit);
     const bestByPage = new Map<string, (typeof matches)[number]>();
@@ -112,7 +113,7 @@ export class KnowledgeDbStore {
       const current = bestByPage.get(key);
       if (!current || match.score > current.score) bestByPage.set(key, match);
     }
-    const sourceNames = new Map((await this.readLibrary()).sources.map((source) => [source.id, source.name]));
+    const sourceNames = new Map(library.sources.map((source) => [source.id, source.name]));
     return [...bestByPage.values()]
       .sort((a, b) => b.score - a.score)
       .slice(0, Math.max(1, Math.min(limit, 50)))
