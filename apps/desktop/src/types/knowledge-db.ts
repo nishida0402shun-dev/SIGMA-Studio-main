@@ -38,3 +38,11 @@ export interface KnowledgeSearchResult {
   text: string;
   score: number;
 }
+
+
+export interface KnowledgeDbAiContext {
+  sourceName: string;
+  pageNumber: number;
+  semanticType: KnowledgeSemanticType;
+  text: string;
+}

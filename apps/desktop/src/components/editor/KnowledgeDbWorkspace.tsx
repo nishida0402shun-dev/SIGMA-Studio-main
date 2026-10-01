@@ -3,13 +3,13 @@
 import { useEffect, useMemo, useState } from "react";
 import { Database, Download, FilePlus2, FileText, MessageSquare, Search, X } from "lucide-react";
 import { getDesktopBridge } from "@/lib/desktop-bridge";
-import type { KnowledgeSearchResult, KnowledgeSemanticType, KnowledgeSource } from "@/types/knowledge-db";
+import type { KnowledgeDbAiContext, KnowledgeSearchResult, KnowledgeSemanticType, KnowledgeSource } from "@/types/knowledge-db";
 import type { Translate } from "@/lib/i18n";
 
 interface Props {
   open: boolean;
   onClose: () => void;
-  onOpenAi: () => void;
+  onOpenAi: (context?: KnowledgeDbAiContext[]) => void;
   t: Translate<"chrome">;
 }
 
@@ -106,7 +106,18 @@ export function KnowledgeDbWorkspace({ open, onClose, onOpenAi, t }: Props) {
   }
 
   async function handoffAi(): Promise<void> {
-    onOpenAi();
+    const context = selectedPages.flatMap(({ sourceId, pageNumber }) => {
+      const source = sources.find((item) => item.id === sourceId);
+      const page = source?.pages.find((item) => item.pageNumber === pageNumber);
+      if (!source || !page?.text?.trim()) return [];
+      return [{
+        sourceName: source.name,
+        pageNumber: page.pageNumber,
+        semanticType: page.semanticType,
+        text: page.text.trim(),
+      } satisfies KnowledgeDbAiContext];
+    });
+    onOpenAi(context);
   }
 
   return (

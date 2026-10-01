@@ -160,6 +160,7 @@ import type  {
   DesktopAiSourceReference,
   DesktopDocumentMetadata,
 } from "@/types/desktop";
+import type { KnowledgeDbAiContext } from "@/types/knowledge-db";
 
 /**
  * **呼び出し時点**の表示言語で解決する `t`。
@@ -259,6 +260,8 @@ interface AiEditPanelProps {
   /** Bumped by the in-body run-anchor widget (R2) when the user clicks a
    * background room's widget: selects that room so its log becomes visible. */
   focusRoomRequest?: { roomId: string; seq: number } | null;
+  initialKnowledgeDbContext?: KnowledgeDbAiContext[] | null;
+  onKnowledgeDbContextConsumed?: () => void;
 }
 
 interface OverlayReferencePreview {
@@ -400,6 +403,8 @@ export function AiEditPanel({
   onPromoteToSidebar,
   onInlineRunAnchorChange,
   focusRoomRequest = null,
+  initialKnowledgeDbContext = null,
+  onKnowledgeDbContextConsumed,
 }: AiEditPanelProps) {
   const t = useT("ai");
   const tEditor = useT("editor");
@@ -414,6 +419,16 @@ export function AiEditPanel({
   const [geminiModel, setGeminiModel] = useState<string>(initialModelPreferences.geminiModel);
   const [reasoningEffort, setReasoningEffort] = useState<AiEditReasoningEffort>(initialModelPreferences.reasoningEffort);
   const [instruction, setInstruction] = useState("");
+  useEffect(() => {
+    if (!initialKnowledgeDbContext?.length) return;
+    const contextText = initialKnowledgeDbContext.map((item) =>
+      `[Knowledge DB] ${item.sourceName} — p.${item.pageNumber} — ${item.semanticType}\n${item.text}`,
+    ).join("\n\n");
+    setInstruction((current) => current.trim()
+      ? `${current.trim()}\n\n以下はKnowledge DBから選択した参考資料です。内容を踏まえて回答してください。\n\n${contextText}`
+      : `以下はKnowledge DBから選択した参考資料です。内容を踏まえて回答してください。\n\n${contextText}`);
+    onKnowledgeDbContextConsumed?.();
+  }, [initialKnowledgeDbContext, onKnowledgeDbContextConsumed]);
   // R5: rooms and the active-room selection live in the module-level
   // controller store (ai-run-controller.ts), not component state, so an
   // in-flight run's transcript updates survive this panel being remounted

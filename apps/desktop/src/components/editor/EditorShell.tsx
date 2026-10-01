@@ -37,6 +37,7 @@ import  {
 import { APP_READY_EVENT } from "@/components/StartupSplash";
 import { AiEditPanel } from "@/components/editor/AiEditPanel";
 import { KnowledgeDbWorkspace } from "@/components/editor/KnowledgeDbWorkspace";
+import type { KnowledgeDbAiContext } from "@/types/knowledge-db";
 import { AiSettingsDialog } from "@/components/editor/AiSettingsDialog";
 import { AiTaskDock } from "@/components/editor/AiTaskDock";
 import { ChartSettingsPanel } from "@/components/editor/ChartSettingsPanel";
@@ -910,6 +911,7 @@ function EditorShellBody({ embeddedHost, editorStore }: EditorShellProps & { edi
   } = useAiPinnedReferences();
   const [aiSidebarOpen, setAiSidebarOpen] = useState(false);
   const [knowledgeDbOpen, setKnowledgeDbOpen] = useState(false);
+  const [pendingKnowledgeDbContext, setPendingKnowledgeDbContext] = useState<KnowledgeDbAiContext[] | null>(null);
   const [versionHistoryOpen, setVersionHistoryOpen] = useState(false);
   const [versionHistoryPreviewState, setVersionHistoryPreviewState] = useState<{
     fileId: string;
@@ -5671,10 +5673,11 @@ function EditorShellBody({ embeddedHost, editorStore }: EditorShellProps & { edi
     applyAiSurface(openInline());
   }, [applyAiSurface, isDesktopApp, setVersionHistoryOpen]);
 
-  const promoteAiToSidebar = useCallback(() => {
+  const promoteAiToSidebar = useCallback((knowledgeContext?: KnowledgeDbAiContext[]) => {
     if (!isDesktopApp) {
       return;
     }
+    setPendingKnowledgeDbContext(knowledgeContext?.length ? knowledgeContext : null);
     setVersionHistoryOpen(false);
     setAiInlineRunAnchor(null);
     setAiInlineRunAnchorCanvas(null);
@@ -6854,6 +6857,8 @@ function EditorShellBody({ embeddedHost, editorStore }: EditorShellProps & { edi
             onPromoteToSidebar={promoteAiToSidebar}
             onInlineRunAnchorChange={handleInlineRunAnchorChange}
             focusRoomRequest={aiFocusRoomRequest}
+            initialKnowledgeDbContext={pendingKnowledgeDbContext}
+            onKnowledgeDbContextConsumed={() => setPendingKnowledgeDbContext(null)}
           />
         </AiEditorHost>
         {versionHistoryOpen && (
