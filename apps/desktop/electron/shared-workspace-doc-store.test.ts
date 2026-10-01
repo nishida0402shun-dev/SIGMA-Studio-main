@@ -65,6 +65,6 @@ describe("SharedWorkspaceDocStore", () => {
     expect(sharedOverview.overview.files.map((file) => file.title)).toEqual(["共有教材"]);
 
     const allFiles = await store.listFiles();
-    expect(allFiles.map((file) => file.title).sort()).toEqual(["共有教材", "個人教材"]);
+    expect(allFiles.map((file) => file.title).sort()).toEqual(["サンプル教材", "共有教材", "個人教材"]);
   });
 });
