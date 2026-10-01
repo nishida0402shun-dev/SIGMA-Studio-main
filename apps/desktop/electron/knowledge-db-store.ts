@@ -112,9 +112,14 @@ export class KnowledgeDbStore {
       const current = bestByPage.get(key);
       if (!current || match.score > current.score) bestByPage.set(key, match);
     }
+    const sourceNames = new Map((await this.readLibrary()).sources.map((source) => [source.id, source.name]));
     return [...bestByPage.values()]
       .sort((a, b) => b.score - a.score)
-      .slice(0, Math.max(1, Math.min(limit, 50)));
+      .slice(0, Math.max(1, Math.min(limit, 50)))
+      .map((match) => ({
+        ...match,
+        sourceName: sourceNames.get(match.sourceId) ?? match.sourceId,
+      }));
   }
 
   private async ensureIndexed(): Promise<KnowledgeSource[]> {
