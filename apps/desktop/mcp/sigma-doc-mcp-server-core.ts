@@ -32,6 +32,7 @@ import {
 } from "../electron/local-sigma-doc-proposal-store";
 import {
   collectUsedSourceReferences,
+  recordKnowledgeDbPageReference,
   recordLibrarySearchHits,
 } from "./sigma-doc-mcp-source-ledger";
 import {
@@ -3049,10 +3050,18 @@ registerTool(
     inputSchema: {
       query: z.string().min(1).max(2000),
       limit: z.number().int().min(1).max(20).optional(),
+      runId: z.string().min(1).max(256).optional(),
     },
   },
-  async ({ query, limit }) => withToolErrorHandling(async () => {
+  async ({ query, limit, runId }) => withToolErrorHandling(async () => {
     const results = await new KnowledgeDbStore(storeContext.dataDir).search(query, limit ?? 8);
+    for (const result of results) {
+      recordKnowledgeDbPageReference(runId, {
+        sourceId: result.sourceId,
+        sourceName: result.sourceName,
+        pageNumber: result.pageNumber,
+      });
+    }
     return { ok: true, results };
   }),
 );
@@ -3065,13 +3074,19 @@ registerTool(
     inputSchema: {
       sourceId: z.string().min(1),
       pageNumber: z.number().int().min(1),
+      runId: z.string().min(1).max(256).optional(),
     },
   },
-  async ({ sourceId, pageNumber }) => withToolErrorHandling(async () => {
+  async ({ sourceId, pageNumber, runId }) => withToolErrorHandling(async () => {
     const sources = await new KnowledgeDbStore(storeContext.dataDir).listSources();
     const source = sources.find((item) => item.id === sourceId);
     const page = source?.pages.find((item) => item.pageNumber === pageNumber);
     if (!source || !page) throw new Error("Knowledge DB page not found");
+    recordKnowledgeDbPageReference(runId, {
+      sourceId: source.id,
+      sourceName: source.name,
+      pageNumber: page.pageNumber,
+    });
     return { ok: true, source: { id: source.id, name: source.name }, page };
   }),
 );
@@ -3088,10 +3103,20 @@ registerTool(
       y: z.number().min(0),
       width: z.number().positive(),
       height: z.number().positive(),
+      runId: z.string().min(1).max(256).optional(),
     },
   },
-  async ({ sourceId, pageNumber, x, y, width, height }) => withToolErrorHandling(async () => {
+  async ({ sourceId, pageNumber, x, y, width, height, runId }) => withToolErrorHandling(async () => {
     const filePath = await new KnowledgeDbStore(storeContext.dataDir).extractRegion(sourceId, pageNumber, { x, y, width, height });
+    const sources = await new KnowledgeDbStore(storeContext.dataDir).listSources();
+    const source = sources.find((item) => item.id === sourceId);
+    if (source) {
+      recordKnowledgeDbPageReference(runId, {
+        sourceId: source.id,
+        sourceName: source.name,
+        pageNumber,
+      });
+    }
     return { ok: true, sourceId, pageNumber, rect: { x, y, width, height }, filePath };
   }),
 );
