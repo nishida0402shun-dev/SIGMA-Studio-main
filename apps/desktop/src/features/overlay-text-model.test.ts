@@ -46,6 +46,10 @@ interface Exemption {
  * offers it, or a local variable that happens to be called "how wide this may be".
  */
 const EXEMPTIONS = new Map<string, Exemption>([
+  ["src/components/editor/KnowledgePdfPageViewer.tsx", {
+    reason: "PDF page sizing and container width, not overlay text sizing",
+    lines: /^(?:const maxWidth = 760;|const scale = Math\.min\(1\.5, maxWidth \/ base\.width\);|style=\{\{ position: "relative", display: "inline-block", maxWidth: "100%", cursor: "crosshair", userSelect: "none" \}\},?)/,
+  }],
   // The existing WebMCP schema still advertises this legacy field. Preserve that public
   // contract during internal refactors; the characterization below verifies that accepting
   // the argument at transport discovery never restores it to the canonical text model.
