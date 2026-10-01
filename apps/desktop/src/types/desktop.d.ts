@@ -409,8 +409,6 @@ export interface DesktopEditorPreferencesSaveResult extends DesktopStorageResult
 export interface DesktopAppAPI {
   getInfo(): Promise<DesktopAppInfo>;
   openLatestReleasePage(): Promise<{ ok: boolean; error?: string }>;
-  exportBetaMigration?(): Promise<{ ok: boolean; canceled?: boolean; filePath?: string; error?: string }>;
-  importBetaMigration?(): Promise<{ ok: boolean; canceled?: boolean; backupPath?: string; error?: string }>;
   getEditorPreferences?(): Promise<DesktopEditorPreferences>;
   saveEditorPreferences?(preferences: { fontFamily?: string | null }): Promise<DesktopEditorPreferencesSaveResult>;
   onCloseRequested?(handler: () => void): () => void;
