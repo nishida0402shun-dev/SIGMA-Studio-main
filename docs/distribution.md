@@ -71,6 +71,6 @@ workspaceのprepackによる再ビルドは行いません。既存版はスキ�
 
 ## ローカル共有Workspace
 
-Beta版とStable版はアプリ設定やAI実行環境を分離したまま、教材の保存先だけをローカルの共有Workspaceにできます。既定ではOSのユーザーアプリデータ領域にある `Sigma Studio/Workspace` を使い、Betaで作成・保存した教材はStableからも同じWorkspaceとして表示されます。
+Beta版とStable版はアプリ設定やAI実行環境を分離したまま、教材ごとに「マイ教材」か「共有Workspace」かを選べます。既定の保存先はマイ教材で、共有Workspaceを選択して作成・移動した教材だけがBeta/Stableの両方から見えるようになります。共有WorkspaceはOSのユーザーアプリデータ領域にある `Sigma Studio/Workspace` を使います。
 
 共有Workspaceの場所は `SIGMA_STUDIO_SHARED_WORKSPACE_DIR` で明示的に変更できます。クラウド同期は行わず、同一PC上のローカルファイルとして扱います。
