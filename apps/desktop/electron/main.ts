@@ -43,7 +43,7 @@ import {
   resolveDesktopPromptLocale,
 } from "./desktop-settings";
 import { AUTO_APPLY_DEFER_MS, shouldDeferAutoApply } from "./auto-apply-defer";
-import { LocalSigmaDocStore, type LocalStoreChangeEvent } from "./local-sigma-doc-store";
+import type { LocalStoreChangeEvent } from "./local-sigma-doc-store";
 import { SharedWorkspaceDocStore } from "./shared-workspace-doc-store";
 import { LocalMaterialStore } from "./local-material-store";
 import { LocalTemplateStore } from "./local-template-store";
