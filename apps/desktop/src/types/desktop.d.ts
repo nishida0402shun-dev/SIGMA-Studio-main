@@ -872,6 +872,8 @@ export interface DesktopKnowledgeDbAPI {
     selections?: Array<{ sourceId: string; pageNumbers: number[] }>;
   }): Promise<{ filePath: string; pageCount: number } | null>;
   setPageType(payload: { sourceId: string; pageNumber: number; semanticType: string; title?: string }): Promise<unknown>;
+  deleteSource(sourceId: string): Promise<{ ok: boolean }>;
+  openPage(payload: { sourceId: string; pageNumber: number }): Promise<{ ok: boolean; error?: string; filePath?: string }>;
 }
 
 export interface DesktopAPI {
