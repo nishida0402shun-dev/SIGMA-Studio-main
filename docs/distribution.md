@@ -67,3 +67,10 @@ node scripts/audit-npm-tarballs.mjs tmp/npm-packages
 公開時はOIDC対応のnpm CLIを確認し、Viewer、Editorの順に検証済みtgzを直接公開します。
 workspaceのprepackによる再ビルドは行いません。既存版はスキップしますが、registryの通信障害を
 「未公開」と扱わず停止します。初回手動公開のためにアプリ配布用タグを打ち直す必要はありません。
+
+
+## Beta → Stable データ移行
+
+Beta版とStable版は安全のためデータ保存先を分離しています。Betaで検証した教材・Knowledge DB・設定などを正式版へ引き継ぐ場合は、Beta版の **Data Migration → Export Beta Data for Stable…** で移行ZIPを書き出し、Stable版の **Data Migration → Import Beta Data into Stable…** で取り込みます。
+
+Stable側は取り込み前に現在のデータを自動バックアップし、取り込み後に再起動します。BetaからStableへの移行ファイル以外は拒否します。移行前に未保存の変更を保存してください。
