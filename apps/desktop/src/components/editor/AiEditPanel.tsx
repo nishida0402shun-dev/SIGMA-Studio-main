@@ -1196,7 +1196,7 @@ export function AiEditPanel({
       }),
     };
   }, [
-    activeReferenceKey, aiResources, aiTargetId, attachments, claudeModel, document, documentIdentityKey, geminiModel, knowledgeInstruction,
+    activeReferenceKey, aiResources, aiTargetId, attachments, claudeModel, document, documentIdentityKey, geminiModel,
     inlineAnchor, instruction, lockedProvider, mentionedDocuments, model, overlayComposerPreviews, overlaySelection, overlaySelectionContext, provider, reasoningEffort,
     scopedAgentThreadId, selectedAiResourceIds, turnReferences, variant, retrieveKnowledgeDbContext,
   ]);
