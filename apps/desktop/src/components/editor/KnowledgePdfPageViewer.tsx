@@ -16,7 +16,7 @@ interface Props {
   onRegionSelected: (region: KnowledgeRegion) => void;
 }
 
-export function KnowledgePdfPageViewer({ sourceId, pageNumber, pageWidth, pageHeight, getPagePdf, onRegionSelected }: Props) {
+export function KnowledgePdfPageViewer({ sourceId, pageNumber, getPagePdf, onRegionSelected }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const stageRef = useRef<HTMLDivElement>(null);
   const [drag, setDrag] = useState<{ x: number; y: number; w: number; h: number } | null>(null);
@@ -29,7 +29,7 @@ export function KnowledgePdfPageViewer({ sourceId, pageNumber, pageWidth, pageHe
       if (!payload || cancelled || !canvasRef.current) return;
       const pdfjs = await import("pdfjs-dist/legacy/build/pdf.mjs");
       const bytes = Uint8Array.from(atob(payload.dataBase64), (char) => char.charCodeAt(0));
-      const pdf = await pdfjs.getDocument({ data: bytes, disableWorker: true }).promise;
+      const pdf = await pdfjs.getDocument({ data: bytes }).promise;
       setPdfSize({ width: payload.width, height: payload.height });
       const page = await pdf.getPage(pageNumber);
       const base = page.getViewport({ scale: 1 });
@@ -41,7 +41,7 @@ export function KnowledgePdfPageViewer({ sourceId, pageNumber, pageWidth, pageHe
       canvas.height = Math.ceil(viewport.height);
       canvas.style.width = `${viewport.width}px`;
       canvas.style.height = `${viewport.height}px`;
-      await page.render({ canvasContext: canvas.getContext("2d")!, viewport }).promise;
+      await page.render({ canvas, viewport }).promise;
     })().catch((error) => console.warn("Knowledge DB PDF preview failed:", error));
     return () => { cancelled = true; };
   }, [getPagePdf, pageNumber, sourceId]);
