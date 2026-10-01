@@ -168,6 +168,46 @@ export class KnowledgeDbStore {
     return true;
   }
 
+  async getPagePdfBase64(sourceId: string, pageNumber: number): Promise<{ dataBase64: string; width: number; height: number }> {
+    const library = await this.readLibrary();
+    const source = library.sources.find((item) => item.id === sourceId);
+    if (!source) throw new Error("knowledge source not found");
+    if (!Number.isInteger(pageNumber) || pageNumber < 1 || pageNumber > source.pageCount) throw new Error("knowledge page not found");
+    const bytes = await fs.readFile(source.storedPath);
+    const input = await PDFDocument.load(bytes);
+    const page = input.getPage(pageNumber - 1);
+    if (!page) throw new Error("knowledge page not found");
+    const { width, height } = page.getSize();
+    return { dataBase64: Buffer.from(bytes).toString("base64"), width, height };
+  }
+
+  async extractRegion(sourceId: string, pageNumber: number, rect: { x: number; y: number; width: number; height: number }): Promise<string> {
+    const library = await this.readLibrary();
+    const source = library.sources.find((item) => item.id === sourceId);
+    if (!source) throw new Error("knowledge source not found");
+    const bytes = await fs.readFile(source.storedPath);
+    const input = await PDFDocument.load(bytes);
+    const sourcePage = input.getPage(pageNumber - 1);
+    if (!sourcePage) throw new Error("knowledge page not found");
+    const pageSize = sourcePage.getSize();
+    const x = Math.max(0, Math.min(rect.x, pageSize.width));
+    const y = Math.max(0, Math.min(rect.y, pageSize.height));
+    const width = Math.max(1, Math.min(rect.width, pageSize.width - x));
+    const height = Math.max(1, Math.min(rect.height, pageSize.height - y));
+    const output = await PDFDocument.create();
+    const copied = await output.copyPages(input, [pageNumber - 1]);
+    const page = copied[0];
+    if (!page) throw new Error("knowledge page not found");
+    page.setCropBox(x, y, width, height);
+    page.setMediaBox(x, y, width, height);
+    output.addPage(page);
+    await fs.mkdir(this.openedPagesDir, { recursive: true });
+    const safeSource = source.id.replace(/[^a-zA-Z0-9_-]/g, "_");
+    const outputPath = path.join(this.openedPagesDir, safeSource + "-p" + pageNumber + "-region.pdf");
+    await fs.writeFile(outputPath, await output.save());
+    return outputPath;
+  }
+
   async openPage(sourceId: string, pageNumber: number): Promise<string> {
     const library = await this.readLibrary();
     const source = library.sources.find((item) => item.id === sourceId);
