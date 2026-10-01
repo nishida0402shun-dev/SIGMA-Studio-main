@@ -89,7 +89,8 @@ export function registerKnowledgeDbIpc(deps: RegisterKnowledgeDbIpcDeps): void {
     if (save.canceled || !save.filePath) return null;
     const output = save.filePath.toLowerCase().endsWith(".pdf") ? save.filePath : `${save.filePath}.pdf`;
     await fs.writeFile(output, bytes);
-    return { filePath: output, pageCount: pages.length };
+    const pageCount = requestedSelections.reduce((sum, selection) => sum + selection.pageNumbers.length, 0);
+    return { filePath: output, pageCount };
   });
 
   ipcMain.handle("knowledge-db:search", async (event, payload: unknown) => {
