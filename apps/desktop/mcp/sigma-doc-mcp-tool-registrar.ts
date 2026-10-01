@@ -17,6 +17,7 @@ const READ_ONLY_TOOL_NAMES = new Set([
   "search_library", "validate_local_document", "list_materials", "get_material", "render_block_context", "render_page",
   "get_selected_block", "get_insertion_candidates", "get_neighbor_blocks", "get_active_reference",
   "get_attached_media", "get_mentioned_sigma_docs", "list_generated_images", "get_image_reference",
+  "knowledge_db_list_sources", "knowledge_db_search", "knowledge_db_get_page", "knowledge_db_get_region",
 ]);
 const DESTRUCTIVE_TOOL_NAMES = new Set([
   "delete_ai_resource", "delete_blocks", "delete_shapes", "visual_remove_shape", "discard_visual_edit_session",
