@@ -100,7 +100,7 @@ module.exports = {
     provider: "github",
     owner: "Atsu-Taiyo",
     repo: "SIGMA-Studio",
-    releaseType: isBetaBuild ? "prerelease" : "draft",
+    releaseType: isBetaBuild ? "prerelease" : "release",
     ...(isBetaBuild ? { channel: "beta" } : {}),
   },
   mac: {
