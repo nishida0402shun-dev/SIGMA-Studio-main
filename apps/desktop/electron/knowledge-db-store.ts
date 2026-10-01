@@ -1,7 +1,7 @@
 import fs from "node:fs/promises";
 import path from "node:path";
 import { PDFDocument } from "pdf-lib";
-import { LocalVectorIndex } from "./local-vector-index";
+import { LocalVectorIndex, type VectorSearchResult } from "./local-vector-index";
 
 export type KnowledgeSemanticType =
   | "problem"
@@ -102,7 +102,7 @@ export class KnowledgeDbStore {
     return added;
   }
 
-  async search(query: string, limit = 12) {
+  async search(query: string, limit = 12): Promise<Array<VectorSearchResult & { sourceName: string }>> {
     await this.ensureIndexed();
     const library = await this.readLibrary();
     const chunkLimit = Math.min(Math.max(limit * 4, limit), 50);
