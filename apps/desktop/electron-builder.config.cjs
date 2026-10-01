@@ -20,6 +20,8 @@ const signMac = Boolean((process.env.CSC_LINK || "").trim());
 const hasMacCertPassword = Boolean((process.env.CSC_KEY_PASSWORD || "").trim());
 const requireMacSigning = process.env.SIGMA_STUDIO_REQUIRE_MAC_SIGNING === "true";
 const buildWindowsStorePackage = process.env.SIGMA_STUDIO_WINDOWS_STORE === "true";
+const packageVersion = require("./package.json").version;
+const isBetaBuild = /-beta\./.test(packageVersion);
 
 const windowsStoreIdentityName = (process.env.WINDOWS_STORE_IDENTITY_NAME || "").trim();
 const windowsStorePublisher = (process.env.WINDOWS_STORE_PUBLISHER || "").trim();
@@ -96,7 +98,8 @@ module.exports = {
     provider: "github",
     owner: "Atsu-Taiyo",
     repo: "SIGMA-Studio",
-    releaseType: "draft",
+    releaseType: isBetaBuild ? "prerelease" : "draft",
+    ...(isBetaBuild ? { channel: "beta" } : {}),
   },
   mac: {
     // Ship separate Intel (x64) and Apple Silicon (arm64) DMGs for manual install,
