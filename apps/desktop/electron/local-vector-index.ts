@@ -104,7 +104,10 @@ export function embed(text: string): number[] {
 }
 
 function tokenize(text: string): string[] {
-  return text.normalize("NFKC").toLocaleLowerCase().match(TOKEN_RE) ?? [];
+  const normalized = text.normalize("NFKC").toLocaleLowerCase();
+  const baseTokens = normalized.match(TOKEN_RE) ?? [];
+  const characterTokens = Array.from(normalized).filter((char) => /[\u3040-\u30ff\u3400-\u9fff]/u.test(char));
+  return [...baseTokens, ...characterTokens];
 }
 
 function fnv1a(value: string): number {
