@@ -5682,7 +5682,7 @@ function EditorShellBody({ embeddedHost, editorStore }: EditorShellProps & { edi
     setAiInlineRunAnchor(null);
     setAiInlineRunAnchorCanvas(null);
     applyAiSurface(promoteToSidebar());
-  }, [applyAiSurface, isDesktopApp, setVersionHistoryOpen]);
+  }, [applyAiSurface, isDesktopApp, setPendingKnowledgeDbContext, setVersionHistoryOpen]);
 
   const openVersionHistory = () => {
     if (versionHistoryRestoring) return;
