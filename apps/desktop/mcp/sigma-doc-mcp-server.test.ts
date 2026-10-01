@@ -603,14 +603,18 @@ describe("sigma-doc-mcp-server integration", () => {
 
   it("categorizes every documented public tool exactly once", () => {
     const categorizedNames = MCP_TOOL_CATEGORIES.flatMap((category) => MCP_TOOL_CATEGORY_MAP[category]);
+    const documentedPublicToolNames = [
+      ...DOCUMENTED_TOOL_NAMES,
+      ...DOCUMENTED_KNOWLEDGE_DB_TOOL_NAMES,
+    ];
 
-    for (const name of DOCUMENTED_TOOL_NAMES) {
+    for (const name of documentedPublicToolNames) {
       expect(
         categorizedNames.filter((categorizedName) => categorizedName === name),
         `expected documented tool ${name} in exactly one MCP category`,
       ).toHaveLength(1);
     }
-    expect([...categorizedNames].sort()).toEqual([...DOCUMENTED_TOOL_NAMES].sort());
+    expect([...categorizedNames].sort()).toEqual([...documentedPublicToolNames].sort());
   });
 
   it("keeps tool-like names in official skills within the public MCP contract", async () => {
