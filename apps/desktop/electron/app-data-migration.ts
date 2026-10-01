@@ -20,6 +20,18 @@ export async function exportMigrationArchive(userDataPath: string, outputPath: s
   await fs.writeFile(outputPath, bytes);
 }
 
+export async function backupCurrentData(userDataPath: string, outputPath: string): Promise<void> {
+  const zip = new JSZip();
+  zip.file("manifest.json", JSON.stringify({
+    formatVersion: FORMAT_VERSION,
+    source: "sigma-studio-stable-backup",
+    createdAt: new Date().toISOString(),
+  }, null, 2));
+  await addDirectory(zip, path.join(userDataPath, "data"), "data");
+  await addDirectory(zip, path.join(userDataPath, "fonts"), "fonts");
+  await fs.writeFile(outputPath, await zip.generateAsync({ type: "nodebuffer", compression: "DEFLATE", compressionOptions: { level: 6 } }));
+}
+
 export async function importMigrationArchive(userDataPath: string, archivePath: string): Promise<void> {
   const raw = await fs.readFile(archivePath);
   const zip = await JSZip.loadAsync(raw);
