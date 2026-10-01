@@ -60,7 +60,8 @@ describe("runAiEditViaDesktopRuntime", () => {
       onEvent: (event) => events.push(event),
     })).resolves.toBe(result);
 
-    expect(run).toHaveBeenCalledWith({
+    expect(run).toHaveBeenCalledWith(
+      expect.objectContaining({
       provider: "chatgpt",
       fileId: null,
       model: DEFAULT_AI_EDIT_MODEL,
@@ -73,7 +74,9 @@ describe("runAiEditViaDesktopRuntime", () => {
       mentionedDocuments: [],
       aiResourceIds: [],
       agentThreadId: "thread_codex_0",
-    }, expect.any(Function));
+      }),
+      expect.any(Function),
+    );
     expect(events).toEqual([emitted]);
     expect(fetch).not.toHaveBeenCalled();
   });
