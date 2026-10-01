@@ -866,7 +866,11 @@ export interface DesktopKnowledgeDbAPI {
   list(): Promise<unknown[]>;
   search(payload: { query: string; limit?: number }): Promise<unknown[]>;
   importSources(paths: string[]): Promise<unknown[]>;
-  extractPages(payload: { sourceId: string; pageNumbers: number[] }): Promise<{ filePath: string; pageCount: number } | null>;
+  extractPages(payload: {
+    sourceId?: string;
+    pageNumbers?: number[];
+    selections?: Array<{ sourceId: string; pageNumbers: number[] }>;
+  }): Promise<{ filePath: string; pageCount: number } | null>;
   setPageType(payload: { sourceId: string; pageNumber: number; semanticType: string; title?: string }): Promise<unknown>;
 }
 
