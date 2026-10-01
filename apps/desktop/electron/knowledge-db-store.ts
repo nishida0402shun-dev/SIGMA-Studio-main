@@ -95,16 +95,7 @@ export class KnowledgeDbStore {
 
     await this.writeLibrary(library);
     for (const source of added) {
-      await this.vectorIndex.upsertMany(
-        source.pages
-          .filter((page) => Boolean(page.text?.trim()))
-          .map((page) => ({
-            id: page.id,
-            sourceId: source.id,
-            pageNumber: page.pageNumber,
-            text: page.text ?? "",
-          })),
-      );
+      await this.indexSource(source);
     }
     return added;
   }
@@ -119,31 +110,39 @@ export class KnowledgeDbStore {
     let changed = false;
     for (const source of library.sources) {
       const needsText = source.pages.some((page) => page.text === undefined);
-      if (!needsText) continue;
+      const needsIndex = !(await this.vectorIndex.hasSource(source.id));
+      if (!needsText && !needsIndex) continue;
       try {
-        const bytes = await fs.readFile(source.storedPath);
-        const pageTexts = await extractPdfPageTexts(bytes, source.pageCount);
-        source.pages = source.pages.map((page, index) => ({
-          ...page,
-          text: pageTexts[index] || undefined,
-        }));
-        await this.vectorIndex.upsertMany(
-          source.pages
-            .filter((page) => Boolean(page.text?.trim()))
-            .map((page) => ({
-              id: page.id,
-              sourceId: source.id,
-              pageNumber: page.pageNumber,
-              text: page.text ?? "",
-            })),
-        );
-        changed = true;
+        if (needsText) {
+          const bytes = await fs.readFile(source.storedPath);
+          const pageTexts = await extractPdfPageTexts(bytes, source.pageCount);
+          source.pages = source.pages.map((page, index) => ({
+            ...page,
+            text: pageTexts[index] || undefined,
+          }));
+          changed = true;
+        }
+        await this.vectorIndex.removeSource(source.id);
+        await this.indexSource(source);
       } catch {
         // Keep the source visible even if a legacy PDF can no longer be read.
       }
     }
     if (changed) await this.writeLibrary(library);
     return library.sources;
+  }
+
+  private async indexSource(source: KnowledgeSource): Promise<void> {
+    const records = source.pages.flatMap((page) =>
+      chunkText(page.text ?? "").map((text, chunkIndex) => ({
+        id: `${page.id}_c${chunkIndex}`,
+        sourceId: source.id,
+        pageNumber: page.pageNumber,
+        chunkIndex,
+        text,
+      })),
+    );
+    await this.vectorIndex.upsertMany(records);
   }
 
   async extractPages(sourceId: string, pageNumbers: number[]): Promise<Uint8Array> {
@@ -225,4 +224,22 @@ async function extractPdfPageTexts(bytes: Uint8Array, pageCount: number): Promis
   } catch {
     return Array.from({ length: pageCount }, () => "");
   }
+}
+
+
+function chunkText(text: string, maxLength = 900, overlap = 140): string[] {
+  const normalized = text.replace(/\s+/g, " ").trim();
+  if (!normalized) return [];
+  if (normalized.length <= maxLength) return [normalized];
+
+  const chunks: string[] = [];
+  let start = 0;
+  while (start < normalized.length) {
+    const end = Math.min(normalized.length, start + maxLength);
+    const chunk = normalized.slice(start, end).trim();
+    if (chunk) chunks.push(chunk);
+    if (end >= normalized.length) break;
+    start = Math.max(start + 1, end - overlap);
+  }
+  return chunks;
 }
