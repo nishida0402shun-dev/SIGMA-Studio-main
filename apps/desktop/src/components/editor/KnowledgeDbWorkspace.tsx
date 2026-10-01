@@ -534,8 +534,6 @@ export function KnowledgeDbWorkspace({ open, onClose, onOpenAi, t }: Props) {
                   <KnowledgePdfPageViewer
                     sourceId={selectedPages[0]!.sourceId}
                     pageNumber={selectedPages[0]!.pageNumber}
-                    pageWidth={612}
-                    pageHeight={792}
                     getPagePdf={(payload) => knowledgeDb?.getPagePdf(payload) ?? Promise.resolve(null)}
                     onRegionSelected={(nextRegion) => setRegion(nextRegion)}
                   />
