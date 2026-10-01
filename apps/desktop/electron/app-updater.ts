@@ -191,7 +191,11 @@ export class AppUpdateController {
 
     autoUpdater.autoDownload = false;
     autoUpdater.autoInstallOnAppQuit = false;
-    autoUpdater.allowPrerelease = false;
+    const isBetaBuild = isBetaVersion(app.getVersion());
+    autoUpdater.allowPrerelease = isBetaBuild;
+    if (isBetaBuild) {
+      autoUpdater.channel = "beta";
+    }
     autoUpdater.disableDifferentialDownload = false;
     autoUpdater.logger = console;
 
@@ -263,6 +267,10 @@ export class AppUpdateController {
       win.webContents.send("app-updater:status-changed", this.state);
     }
   }
+}
+
+function isBetaVersion(version: string): boolean {
+  return version.includes("-beta.");
 }
 
 function isBuiltInUpdaterSupported(): boolean {
