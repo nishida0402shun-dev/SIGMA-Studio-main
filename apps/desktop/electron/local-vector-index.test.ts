@@ -20,17 +20,20 @@ describe("LocalVectorIndex", () => {
         id: "page-a",
         sourceId: "source-a",
         pageNumber: 1,
+        chunkIndex: 0,
         text: "二次関数の頂点と軸を求める問題",
       });
       await index.upsert({
         id: "page-b",
         sourceId: "source-b",
         pageNumber: 2,
+        chunkIndex: 0,
         text: "英語の長文読解と単語",
       });
 
       const results = await index.search("二次関数 頂点");
       expect(results[0]?.id).toBe("page-a");
+      expect(results[0]?.chunkIndex).toBe(0);
 
       const persisted = JSON.parse(await readFile(path.join(root, "vectors.json"), "utf8")) as { records: unknown[] };
       expect(persisted.records).toHaveLength(2);
