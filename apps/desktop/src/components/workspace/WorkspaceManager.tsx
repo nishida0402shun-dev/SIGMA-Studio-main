@@ -150,8 +150,10 @@ export function WorkspaceManager() {
   // storage-change effect below), which can land mid-flight and would
   // otherwise revert an in-flight rename's display name for a frame.
   const pendingRenamesRef = useRef<Map<string, string>>(new Map());
+  const activeWorkspaceIdRef = useRef<string | null>(null);
 
   const applyOverview = useCallback((nextOverview: WorkspaceOverview, nextMessage?: string) => {
+    activeWorkspaceIdRef.current = nextOverview.activeWorkspaceId;
     setOverview(applyPendingRenames(nextOverview, pendingRenamesRef.current));
     setEditingFolderId(null);
     setFolderNameDraft("");
@@ -216,7 +218,7 @@ export function WorkspaceManager() {
       }
       timeoutId = window.setTimeout(() => {
         timeoutId = null;
-        void loadOverview(undefined, undefined, { silent: true });
+        void loadOverview(activeWorkspaceIdRef.current, undefined, { silent: true });
       }, 400);
     });
     return () => {
