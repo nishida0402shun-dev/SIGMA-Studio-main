@@ -34,7 +34,8 @@ export type AiSourceReference =
   | { type: "document"; fileId: string; title?: string; blockId?: string; note?: string }
   | { type: "web"; url: string; title?: string }
   | { type: "webSearch"; query: string }
-  | { type: "material"; materialId: string; name?: string };
+  | { type: "material"; materialId: string; name?: string }
+  | { type: "knowledgeDb"; sourceId: string; sourceName: string; pageNumber: number };
 
 // 寛容な型ガード: 壊れた/将来の値を持つ1件だけを黙って落とせるよう、配列全体ではなく
 // 要素単位で検証する (parseProposal 側で parseAiSourceReferences がこれでフィルタする)。
@@ -58,6 +59,13 @@ export function isAiSourceReference(value: unknown): value is AiSourceReference 
   }
   if (value.type === "material") {
     return typeof value.materialId === "string" && (value.name === undefined || typeof value.name === "string");
+  }
+  if (value.type === "knowledgeDb") {
+    return typeof value.sourceId === "string"
+      && typeof value.sourceName === "string"
+      && typeof value.pageNumber === "number"
+      && Number.isInteger(value.pageNumber)
+      && value.pageNumber >= 1;
   }
   return false;
 }
