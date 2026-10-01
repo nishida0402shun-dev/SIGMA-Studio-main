@@ -10,6 +10,15 @@ on:
     tags:
       - "v*"
   workflow_dispatch:
+    inputs:
+      channel:
+        description: "Release channel"
+        required: true
+        default: "stable"
+        type: choice
+        options:
+          - stable
+          - beta
 
 permissions:
   contents: write
@@ -39,13 +48,41 @@ jobs:
           node-version: 24
           cache: npm
 
+      - name: Resolve release channel
+        id: channel
+        shell: bash
+        run: |
+          if [[ "${GITHUB_REF_TYPE}" == "tag" ]]; then
+            if [[ "${GITHUB_REF_NAME}" == *"-beta."* ]]; then
+              channel="beta"
+            else
+              channel="stable"
+            fi
+          else
+            channel="${{ inputs.channel }}"
+          fi
+          echo "channel=${channel}" >> "${GITHUB_OUTPUT}"
+          echo "SIGMA_STUDIO_BETA_BUILD=$([[ "${channel}" == "beta" ]] && echo true || echo false)" >> "${GITHUB_ENV}"
+
       # The release tag and all workspace versions must agree.
       - name: Validate release version
         shell: bash
         run: |
           version="$(node -p "require('./package.json').version")"
-          if [[ "${GITHUB_REF_TYPE}" != "tag" || "${GITHUB_REF_NAME}" != "v${version}" ]]; then
-            echo "tag ${GITHUB_REF_NAME} とSigma Studio version v${version}が一致しません。" >&2
+          if [[ "${GITHUB_REF_TYPE}" == "tag" ]]; then
+            if [[ "${GITHUB_REF_NAME}" != "v${version}" ]]; then
+              echo "tag ${GITHUB_REF_NAME} とSigma Studio version v${version}が一致しません。" >&2
+              exit 1
+            fi
+          else
+            echo "manual release: channel=${{ steps.channel.outputs.channel }} version=v${version}"
+          fi
+          if [[ "${{ steps.channel.outputs.channel }}" == "beta" && "${version}" != *"-beta."* ]]; then
+            echo "Beta release requires a -beta.N package version (got ${version})." >&2
+            exit 1
+          fi
+          if [[ "${{ steps.channel.outputs.channel }}" == "stable" && "${version}" == *"-beta."* ]]; then
+            echo "Stable release cannot use a -beta.N package version." >&2
             exit 1
           fi
           npm run version:check
@@ -73,6 +110,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           RELEASE_CONTENT_RULES: ${{ secrets.RELEASE_CONTENT_RULES }}
           SIGMA_STUDIO_REQUIRE_RELEASE_AUDIT: "true"
+          SIGMA_STUDIO_BETA_BUILD: ${{ steps.channel.outputs.channel == 'beta' && 'true' || 'false' }}
           # macOS signing + notarization. Scoped to the mac job so the Windows
           # build never mistakes the .p12 for a Windows cert. Public macOS
           # releases require these secrets; missing values fail the mac job.
