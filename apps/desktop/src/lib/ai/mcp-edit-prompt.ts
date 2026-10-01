@@ -228,6 +228,7 @@ export function buildMcpEditInvariantGuidanceSection(t: PromptTranslate, toolPro
     section(t, "graphToolGuide"),
     section(t, "tableToolGuide"),
     section(t, "referenceExploration"),
+    section(t, "knowledgeDb"),
     section(t, "libraryReference"),
     section(t, "selfConfig"),
   ].join("\n\n");
