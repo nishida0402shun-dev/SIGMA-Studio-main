@@ -26,7 +26,6 @@ const initialDocument: SigmaDocument = {
     { type: "paragraph", id: "p_2", children: [{ type: "text", text: "Neighbor" }] }],
 };
 
-const KNOWLEDGE_DB_TOOL_NAMES = ["knowledge_db_get_page","knowledge_db_get_region","knowledge_db_list_sources","knowledge_db_search"] as const;
 
 describe("app MCP body tool profile", () => {
   let userDataDir: string;
