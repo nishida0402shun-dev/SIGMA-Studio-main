@@ -333,7 +333,11 @@ const desktopAPI = {
     importSources(paths: string[]): Promise<unknown[]> {
       return ipcRenderer.invoke("knowledge-db:import", paths);
     },
-    extractPages(payload: { sourceId: string; pageNumbers: number[] }): Promise<{ filePath: string; pageCount: number } | null> {
+    extractPages(payload: {
+      sourceId?: string;
+      pageNumbers?: number[];
+      selections?: Array<{ sourceId: string; pageNumbers: number[] }>;
+    }): Promise<{ filePath: string; pageCount: number } | null> {
       return ipcRenderer.invoke("knowledge-db:extract-pages", payload);
     },
     setPageType(payload: { sourceId: string; pageNumber: number; semanticType: string; title?: string }): Promise<unknown> {
