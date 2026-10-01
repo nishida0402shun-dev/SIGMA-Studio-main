@@ -932,6 +932,12 @@ const SourceReferenceSchema = z.discriminatedUnion("type", [
     materialId: z.string().min(1),
     name: z.string().optional(),
   }),
+  z.object({
+    type: z.literal("knowledgeDb"),
+    sourceId: z.string().min(1),
+    sourceName: z.string().min(1),
+    pageNumber: z.number().int().min(1),
+  }),
 ]);
 /** 1提案に載せる参照元の上限。入力スキーマと、台帳マージ後の永続化の両方で守る。 */
 const MAX_PERSISTED_SOURCE_REFERENCES = 10;
@@ -947,6 +953,8 @@ function sourceReferenceIdentity(reference: AiSourceReference): string {
       return `webSearch:${reference.query}`;
     case "material":
       return `material:${reference.materialId}`;
+    case "knowledgeDb":
+      return `knowledgeDb:${reference.sourceId}:${reference.pageNumber}`;
   }
 }
 
