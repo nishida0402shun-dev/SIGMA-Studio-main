@@ -1012,6 +1012,7 @@ async function executeRun(
       attachments: params.turnAttachments,
       mentionedDocuments: params.turnMentionedDocuments,
       aiResourceIds: params.turnAiResourceIds,
+      knowledgeDbSourceReferences: params.knowledgeDbSourceReferences,
       agentThreadId: params.runAgentThreadId,
       onRunId: (runId) => {
         activeAiEditRunIds.set(assistantTurnId, runId);
