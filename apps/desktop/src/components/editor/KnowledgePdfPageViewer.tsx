@@ -12,8 +12,6 @@ export interface KnowledgeRegion {
 interface Props {
   sourceId: string;
   pageNumber: number;
-  pageWidth: number;
-  pageHeight: number;
   getPagePdf: (payload: { sourceId: string; pageNumber: number }) => Promise<{ dataBase64: string; width: number; height: number } | null>;
   onRegionSelected: (region: KnowledgeRegion) => void;
 }
@@ -22,6 +20,7 @@ export function KnowledgePdfPageViewer({ sourceId, pageNumber, pageWidth, pageHe
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const stageRef = useRef<HTMLDivElement>(null);
   const [drag, setDrag] = useState<{ x: number; y: number; w: number; h: number } | null>(null);
+  const [pdfSize, setPdfSize] = useState({ width: 612, height: 792 });
 
   useEffect(() => {
     let cancelled = false;
@@ -31,6 +30,7 @@ export function KnowledgePdfPageViewer({ sourceId, pageNumber, pageWidth, pageHe
       const pdfjs = await import("pdfjs-dist/legacy/build/pdf.mjs");
       const bytes = Uint8Array.from(atob(payload.dataBase64), (char) => char.charCodeAt(0));
       const pdf = await pdfjs.getDocument({ data: bytes, disableWorker: true }).promise;
+      setPdfSize({ width: payload.width, height: payload.height });
       const page = await pdf.getPage(pageNumber);
       const base = page.getViewport({ scale: 1 });
       const maxWidth = 760;
@@ -78,10 +78,10 @@ export function KnowledgePdfPageViewer({ sourceId, pageNumber, pageWidth, pageHe
         const h = Math.abs(p.y - drag.y);
         setDrag(null);
         if (w < 8 || h < 8) return;
-        const renderedWidth = canvasRef.current?.clientWidth || pageWidth;
-        const renderedHeight = canvasRef.current?.clientHeight || pageHeight;
-        const scaleX = pageWidth / renderedWidth;
-        const scaleY = pageHeight / renderedHeight;
+        const renderedWidth = canvasRef.current?.clientWidth || pdfSize.width;
+        const renderedHeight = canvasRef.current?.clientHeight || pdfSize.height;
+        const scaleX = pdfSize.width / renderedWidth;
+        const scaleY = pdfSize.height / renderedHeight;
         onRegionSelected({ x: x * scaleX, y: (renderedHeight - y - h) * scaleY, width: w * scaleX, height: h * scaleY });
       }}
     >
