@@ -190,6 +190,12 @@ export const INTENTIONAL_RUNTIME_JAPANESE: readonly IntentionalJapaneseRule[] = 
     classification: "operational log",
     reason: "The fallback reason is recorded in the ledger log only; the renderer resolves its own localized document-open error.",
   },
+  {
+    path: /^electron\/shared-workspace-doc-store\.ts$/,
+    value: /^(?:共有Workspace|個人Workspaceと共有Workspaceの間では、フォルダ移動だけでは移動できません。|教材の読み込みに失敗しました。|元の教材を削除できなかったため移動を取り消しました。)$/,
+    classification: "workspace storage contract",
+    reason: "Workspace names and cross-workspace transfer failure strings are storage-layer contracts consumed by the workspace bridge, not locale-specific renderer labels.",
+  },
 ] as const;
 
 type JapaneseLiteral = { file: string; line: number; value: string };
