@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type PointerEvent } from "react";
 
 export interface KnowledgeRegion {
   x: number;
@@ -46,7 +46,7 @@ export function KnowledgePdfPageViewer({ sourceId, pageNumber, pageWidth, pageHe
     return () => { cancelled = true; };
   }, [getPagePdf, pageNumber, sourceId]);
 
-  function point(event: React.PointerEvent): { x: number; y: number } {
+  function point(event: PointerEvent): { x: number; y: number } {
     const rect = stageRef.current!.getBoundingClientRect();
     return {
       x: Math.max(0, Math.min(rect.width, event.clientX - rect.left)),
