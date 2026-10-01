@@ -4877,7 +4877,6 @@ describe("render_visual_edit_session", () => {
     await connectClient(deps);
 
     const statusPath = path.join(userDataDir, "data", "ai-run-context", visualSessionsFileName(provider, runId));
-    const renameSpy = vi.spyOn(fs, "rename");
     type SessionStatus = {
       sessionId: string;
       operationCount: number;
