@@ -97,7 +97,8 @@ module.exports = {
   },
   // Installers and update metadata share the project release repository.
   // Generate both latest and beta metadata so each channel has an explicit feed.
-  generateUpdatesFilesForAllChannels: true,\n  publish: {
+  generateUpdatesFilesForAllChannels: true,
+  publish: {
     provider: "github",
     owner: "Atsu-Taiyo",
     repo: "SIGMA-Studio",
