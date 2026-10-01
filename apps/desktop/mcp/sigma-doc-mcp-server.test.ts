@@ -59,8 +59,7 @@ const ENV_KEYS = [
   "SIGMA_STUDIO_USER_DATA_DIR",
   "SIGMA_STUDIO_RUN_CONTEXT_FILE",
   "SIGMA_STUDIO_MCP_PROVIDER",
-  SIGMA_STUDIO_RENDER_BRIDGE_FILE_ENV,
-] as const;
+  SIGMA_STUDIO_RENDER_BRIDGE_FILE_ENV] as const;
 
 const PNG_MAGIC_BYTES = [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a];
 
@@ -169,8 +168,7 @@ const DOCUMENTED_TOOL_NAMES = [
   "visual_remove_shape",
   "visual_replace_shape",
   "withdraw_current_edit_proposal",
-  "withdraw_edit_proposal",
-];
+  "withdraw_edit_proposal"];
 
 function extractPayload(result: unknown): Record<string, unknown> {
   const structured = (result as { structuredContent: Record<string, unknown> }).structuredContent;
@@ -251,8 +249,7 @@ describe("sigma-doc-mcp-server integration", () => {
     client = new Client({ name: "test-client", version: "0.0.0" });
     await Promise.all([
       client.connect(clientTransport),
-      server.connect(serverTransport),
-    ]);
+      server.connect(serverTransport)]);
   });
 
   afterEach(async () => {
@@ -439,8 +436,7 @@ describe("sigma-doc-mcp-server integration", () => {
       "ruledbox",
       "screenbox",
       "ovalbox",
-      "cornerbox",
-    ]) {
+      "cornerbox"]) {
       expect(schemaOf("insert_body_content")).toContain(styleId);
     }
     expect(descriptionOf("replace_block")).toContain("fallback");
@@ -474,8 +470,7 @@ describe("sigma-doc-mcp-server integration", () => {
       "surface",
       "tricylinder",
       "sphereTetrahedron",
-      "blank",
-    ]);
+      "blank"]);
     expect(schemaOf("insert_graph3d")).toContain("sphereTetrahedron");
     expect(schemaOf("insert_graph3d")).toContain("solidOfRevolution");
     // 描かれない入力は語彙に出さない (cutsとsection/inequality region)。propertyとして
@@ -513,8 +508,7 @@ describe("sigma-doc-mcp-server integration", () => {
       "delete_local_document",
       "create_local_folder",
       "update_local_folder",
-      "delete_local_folder",
-    ]) {
+      "delete_local_folder"]) {
       const properties = propertiesOf(name);
       expect(properties).not.toHaveProperty("path");
       expect(properties).not.toHaveProperty("filePath");
@@ -627,12 +621,10 @@ describe("sigma-doc-mcp-server integration", () => {
       "sigma_doc",
       "source_references",
       "target_id",
-      "write_mode",
-    ]);
+      "write_mode"]);
     const officialSkillPaths = [
       path.join(__dirname, "..", "electron", "official-skills", "sigma-graph-editing", "SKILL.md"),
-      path.join(__dirname, "..", "electron", "official-skills", "sigma-image-material-reconstruction", "SKILL.md"),
-    ];
+      path.join(__dirname, "..", "electron", "official-skills", "sigma-image-material-reconstruction", "SKILL.md")];
 
     for (const skillPath of officialSkillPaths) {
       const content = await fs.readFile(skillPath, "utf8");
@@ -662,8 +654,7 @@ describe("sigma-doc-mcp-server integration", () => {
       "get_neighbor_blocks",
       "get_active_reference",
       "get_attached_media",
-      "get_mentioned_sigma_docs",
-    ];
+      "get_mentioned_sigma_docs"];
     const tools = await client.listTools();
     for (const name of appContextToolNames) {
       const tool = tools.tools.find((item) => item.name === name);
@@ -700,8 +691,7 @@ describe("sigma-doc-mcp-server integration", () => {
       "update_column_layout",
       "align_shapes",
       "delete_shapes",
-      "begin_visual_edit_session",
-    ];
+      "begin_visual_edit_session"];
     const tools = await client.listTools();
     for (const name of writeToolNames) {
       const tool = tools.tools.find((item) => item.name === name);
@@ -1159,8 +1149,7 @@ describe("sigma-doc-mcp-server integration", () => {
       ...document,
       content: [
         ...document.content,
-        { type: "paragraph", id: "extra_p1", children: [{ type: "text", text: "図を見て面積を求めよ。" }] },
-      ],
+        { type: "paragraph", id: "extra_p1", children: [{ type: "text", text: "図を見て面積を求めよ。" }] }],
     });
     if (!saved.ok || saved.revision === undefined) {
       throw new Error(`failed to seed source paragraph: ${saved.error ?? "unknown error"}`);
@@ -1215,8 +1204,7 @@ describe("sigma-doc-mcp-server integration", () => {
     const proposal = await proposalStore.loadProposal(summaries[0]!.proposalId);
     expect(proposal?.draft.operationOrder).toEqual([
       { kind: "mutation", index: 0 },
-      { kind: "operation", index: 0 },
-    ]);
+      { kind: "operation", index: 0 }]);
     expect(proposal?.nextDocument.content.some((block) => block.id === "extra_p1")).toBe(false);
     expect(findBlock(proposal!.nextDocument, "extra_p1")).toMatchObject({
       type: "paragraph",
@@ -1284,8 +1272,7 @@ describe("sigma-doc-mcp-server integration", () => {
             runs: [
               "よって，両辺を ",
               { type: "math", id: "ai_reason_k", tex: "k" },
-              " 倍すると，",
-            ],
+              " 倍すると，"],
           },
           {
             type: "paragraph",
@@ -1296,8 +1283,7 @@ describe("sigma-doc-mcp-server integration", () => {
               id: "ai_conclusion_math_run",
               tex: String.raw`a^k+(k-1)b^k\geqq kab^{k-1}`,
             }],
-          },
-        ],
+          }],
         expectedRevision: 1,
         runId: "run_structural_split",
       },
@@ -1331,8 +1317,7 @@ describe("sigma-doc-mcp-server integration", () => {
       children: [
         { type: "text", text: "よって，両辺を " },
         { type: "mathInline", id: "ai_reason_k", tex: "k" },
-        { type: "text", text: " 倍すると，" },
-      ],
+        { type: "text", text: " 倍すると，" }],
     });
     expect(findBlock(nextDocument, "ai_conclusion_math")).toMatchObject({
       type: "paragraph",
@@ -1351,8 +1336,7 @@ describe("sigma-doc-mcp-server integration", () => {
     expect(problem.solution.slice(prefixIndex, prefixIndex + 3).map((block) => block.id)).toEqual([
       "p_ab_param_formula",
       "ai_reason_left",
-      "ai_conclusion_math",
-    ]);
+      "ai_conclusion_math"]);
   });
 
   it("rejects begin_visual_edit_session missing expectedRevision as an MCP tool-input error", async () => {
@@ -1602,8 +1586,7 @@ describe("sigma-doc-mcp-server new read/write tools", () => {
     client = new Client({ name: "test-client", version: "0.0.0" });
     await Promise.all([
       client.connect(clientTransport),
-      server.connect(serverTransport),
-    ]);
+      server.connect(serverTransport)]);
   });
 
   afterEach(async () => {
@@ -1692,8 +1675,7 @@ describe("sigma-doc-mcp-server new read/write tools", () => {
       ...document,
       content: [
         ...document.content,
-        { type: "paragraph" as const, id: "extra_p1", children: [{ type: "text" as const, text: "追加した段落" }] },
-      ],
+        { type: "paragraph" as const, id: "extra_p1", children: [{ type: "text" as const, text: "追加した段落" }] }],
     };
 
     let nextDocument = documentWithParagraph;
@@ -1743,14 +1725,12 @@ describe("sigma-doc-mcp-server new read/write tools", () => {
           layout: { columnCount: 2, columnGapMm: 7 },
           children: [
             { type: "paragraph", id: "p_col_1", children: [{ type: "text", text: "段組み本文1" }] },
-            { type: "paragraph", id: "p_col_2", children: [{ type: "text", text: "段組み本文2" }] },
-          ],
+            { type: "paragraph", id: "p_col_2", children: [{ type: "text", text: "段組み本文2" }] }],
         }]
       : [
           { type: "paragraph", id: "p_col_1", children: [{ type: "text", text: "段組み本文1" }] },
           { type: "paragraph", id: "p_col_2", children: [{ type: "text", text: "段組み本文2" }] },
-          { type: "paragraph", id: "p_col_3", children: [{ type: "text", text: "段組み本文3" }] },
-        ];
+          { type: "paragraph", id: "p_col_3", children: [{ type: "text", text: "段組み本文3" }] }];
     const nextDocument: SigmaDocument = {
       ...document,
       pageLayout: {
@@ -1874,8 +1854,7 @@ describe("sigma-doc-mcp-server new read/write tools", () => {
       ...document,
       content: [
         ...document.content,
-        { type: "paragraph" as const, id: "extra_p_geo", children: [{ type: "text" as const, text: "図形用の段落" }] },
-      ],
+        { type: "paragraph" as const, id: "extra_p_geo", children: [{ type: "text" as const, text: "図形用の段落" }] }],
     };
     const session = createSigmaDocAgentSession({ document: documentWithParagraph, selectedId: "extra_p_geo" });
     const line = executeSigmaDocAgentDraftTool(session, "draft_insert_shape", {
@@ -2052,8 +2031,7 @@ describe("sigma-doc-mcp-server new read/write tools", () => {
       "p_ab_point_intro",
       "p_ab_param_formula",
       "p_yotte",
-      "p_xy_define",
-    ];
+      "p_xy_define"];
     expect(context.targetId).toBe("p_ab_point_intro");
     expect(context.selection.runId).toBe(runId);
     expect(context.selection.references).toHaveLength(2);
@@ -2152,8 +2130,7 @@ describe("sigma-doc-mcp-server new read/write tools", () => {
   it("search_library finds a match in a document other than one specified via excludeFileId", async () => {
     const currentFileId = await getFileId();
     const otherFileId = await createExtraLibraryDocument("過去教材", [
-      { type: "paragraph", id: "p_other", children: [{ type: "text", text: "複素数平面上の点を図示する。" }] },
-    ]);
+      { type: "paragraph", id: "p_other", children: [{ type: "text", text: "複素数平面上の点を図示する。" }] }]);
 
     const result = extractPayload(await client.callTool({
       name: "search_library",
@@ -2169,8 +2146,7 @@ describe("sigma-doc-mcp-server new read/write tools", () => {
   it("cites a searched-then-read document even when the model omits sourceReferences", async () => {
     const currentFileId = await getFileId();
     const otherFileId = await createExtraLibraryDocument("参照した過去教材", [
-      { type: "paragraph", id: "p_other", children: [{ type: "text", text: "複素数平面上の点を図示する。" }] },
-    ]);
+      { type: "paragraph", id: "p_other", children: [{ type: "text", text: "複素数平面上の点を図示する。" }] }]);
 
     await client.callTool({
       name: "search_library",
@@ -2191,15 +2167,13 @@ describe("sigma-doc-mcp-server new read/write tools", () => {
     const listed = extractPayload(await client.callTool({ name: "list_edit_proposals", arguments: {} }));
     const proposals = listed.proposals as Array<{ sourceReferences?: Array<{ type: string; fileId?: string; title?: string }> }>;
     expect(proposals[0]?.sourceReferences).toEqual([
-      { type: "document", fileId: otherFileId, title: "参照した過去教材" },
-    ]);
+      { type: "document", fileId: otherFileId, title: "参照した過去教材" }]);
   });
 
   it("does not cite a search hit that was never read", async () => {
     const currentFileId = await getFileId();
     await createExtraLibraryDocument("ヒットしただけの教材", [
-      { type: "paragraph", id: "p_unread", children: [{ type: "text", text: "複素数平面上の点を図示する。" }] },
-    ]);
+      { type: "paragraph", id: "p_unread", children: [{ type: "text", text: "複素数平面上の点を図示する。" }] }]);
 
     await client.callTool({
       name: "search_library",
@@ -2220,8 +2194,7 @@ describe("sigma-doc-mcp-server new read/write tools", () => {
   it("keeps the blockId the model supplied when folding it with the ledger's citation", async () => {
     const currentFileId = await getFileId();
     const otherFileId = await createExtraLibraryDocument("blockId付きで挙がる教材", [
-      { type: "paragraph", id: "p_block", children: [{ type: "text", text: "複素数平面上の点を図示する。" }] },
-    ]);
+      { type: "paragraph", id: "p_block", children: [{ type: "text", text: "複素数平面上の点を図示する。" }] }]);
 
     await client.callTool({
       name: "search_library",
@@ -2248,15 +2221,13 @@ describe("sigma-doc-mcp-server new read/write tools", () => {
     const proposals = listed.proposals as Array<{ sourceReferences?: Array<{ fileId?: string; blockId?: string; title?: string }> }>;
     // 台帳側の title と、モデルが補足した blockId の両方が1件に残ること。
     expect(proposals[0]?.sourceReferences).toEqual([
-      { type: "document", fileId: otherFileId, title: "blockId付きで挙がる教材", blockId: "p_block" },
-    ]);
+      { type: "document", fileId: otherFileId, title: "blockId付きで挙がる教材", blockId: "p_block" }]);
   });
 
   it("cites the ledger even when the model omits runId on the write tool", async () => {
     const currentFileId = await getFileId();
     const otherFileId = await createExtraLibraryDocument("書き込みでrunId省略", [
-      { type: "paragraph", id: "p_norunid", children: [{ type: "text", text: "複素数平面上の点を図示する。" }] },
-    ]);
+      { type: "paragraph", id: "p_norunid", children: [{ type: "text", text: "複素数平面上の点を図示する。" }] }]);
 
     const staticStore = new LocalAiEditRunContextStore(userDataDir, "chatgpt");
     process.env.SIGMA_STUDIO_MCP_PROVIDER = "chatgpt";
@@ -2298,8 +2269,7 @@ describe("sigma-doc-mcp-server new read/write tools", () => {
   it("folds the ledger citation and the model's own declaration into one chip", async () => {
     const currentFileId = await getFileId();
     const otherFileId = await createExtraLibraryDocument("両方から挙がる教材", [
-      { type: "paragraph", id: "p_both", children: [{ type: "text", text: "複素数平面上の点を図示する。" }] },
-    ]);
+      { type: "paragraph", id: "p_both", children: [{ type: "text", text: "複素数平面上の点を図示する。" }] }]);
 
     await client.callTool({
       name: "search_library",
@@ -2339,8 +2309,7 @@ describe("sigma-doc-mcp-server new read/write tools", () => {
         prompt: [{ type: "paragraph", id: "p_prompt", children: [{ type: "text", text: "座標平面上の点Aの座標を求めよ。" }] }],
         solution: [],
         hints: [],
-      },
-    ]);
+      }]);
 
     const result = extractPayload(await client.callTool({
       name: "search_library",
@@ -2360,11 +2329,9 @@ describe("sigma-doc-mcp-server new read/write tools", () => {
 
   it("skips a corrupt/unparseable document file without failing the whole search_library call", async () => {
     const corruptFileId = await createExtraLibraryDocument("壊れた教材", [
-      { type: "paragraph", id: "p_corrupt", children: [{ type: "text", text: "検索対象キーワード" }] },
-    ]);
+      { type: "paragraph", id: "p_corrupt", children: [{ type: "text", text: "検索対象キーワード" }] }]);
     const goodFileId = await createExtraLibraryDocument("無事な教材", [
-      { type: "paragraph", id: "p_good", children: [{ type: "text", text: "検索対象キーワード" }] },
-    ]);
+      { type: "paragraph", id: "p_good", children: [{ type: "text", text: "検索対象キーワード" }] }]);
     const documentPath = path.join(
       userDataDir,
       "data",
@@ -2997,12 +2964,10 @@ describe("sigma-doc-mcp-server new read/write tools", () => {
     const oldLabelIds = new Set([
       ...Object.values(beforeGraph.props.axisLabelTextShapeIds ?? {}),
       ...Object.values(beforeGraph.props.labelTextShapeIdsByCurveId ?? {}),
-      ...(beforeGraph.props.labelTextShapeIds ?? []),
-    ]);
+      ...(beforeGraph.props.labelTextShapeIds ?? [])]);
     const editedLabelTextById = new Map([
       [beforeGraph.props.axisLabelTextShapeIds?.x, "edited x"],
-      [beforeGraph.props.labelTextShapeIdsByCurveId?.curve_before, "edited formula"],
-    ].filter((entry): entry is [string, string] => typeof entry[0] === "string"));
+      [beforeGraph.props.labelTextShapeIdsByCurveId?.curve_before, "edited formula"]].filter((entry): entry is [string, string] => typeof entry[0] === "string"));
     for (const shape of beforeShapes) {
       const text = editedLabelTextById.get(shape.id);
       if (shape.type !== "text" || text === undefined) {
@@ -4125,8 +4090,7 @@ describe("render_block_context / render_page", () => {
     client = new Client({ name: "test-client", version: "0.0.0" });
     await Promise.all([
       client.connect(clientTransport),
-      server.connect(serverTransport),
-    ]);
+      server.connect(serverTransport)]);
   });
 
   afterEach(async () => {
@@ -4167,8 +4131,7 @@ describe("render_block_context / render_page", () => {
     const fileId = await getFileId();
     for (const arguments_ of [
       { fileId },
-      { fileId, pageNumber: 1, blockId: "p_source_note" },
-    ]) {
+      { fileId, pageNumber: 1, blockId: "p_source_note" }]) {
       const result = extractPayload(await client.callTool({ name: "render_page", arguments: arguments_ }));
       expect(result.ok).toBe(false);
       expect(String(result.error)).toContain("pageNumberまたはblockIdのどちらか一方");
@@ -4409,8 +4372,7 @@ describe("sigma-doc-mcp-server context tools", () => {
     client = new Client({ name: "test-client", version: "0.0.0" });
     await Promise.all([
       client.connect(clientTransport),
-      server.connect(serverTransport),
-    ]);
+      server.connect(serverTransport)]);
   });
 
   afterEach(async () => {
@@ -4479,8 +4441,7 @@ describe("sigma-doc-mcp-server context tools", () => {
     await runContextStore.write(baseContext({
       attachments: [
         { id: "att_png", name: "a.png", mimeType: "image/png", dataUrl: "data:image/png;base64,AAAA" },
-        { id: "att_svg", name: "a.svg", mimeType: "image/svg+xml", dataUrl: "data:image/svg+xml;base64,AAAA" },
-      ],
+        { id: "att_svg", name: "a.svg", mimeType: "image/svg+xml", dataUrl: "data:image/svg+xml;base64,AAAA" }],
     }));
     const result = await client.callTool({ name: "get_attached_media", arguments: {} });
     const imageContent = (result.content as Array<{ type: string }>).filter((item) => item.type === "image");
@@ -4589,8 +4550,7 @@ describe("render_visual_edit_session", () => {
     client = new Client({ name: "test-client", version: "0.0.0" });
     await Promise.all([
       client.connect(clientTransport),
-      server.connect(serverTransport),
-    ]);
+      server.connect(serverTransport)]);
   }
 
   async function getFileId(): Promise<string> {
@@ -5007,7 +4967,7 @@ describe("render_visual_edit_session", () => {
     expect(afterDiscard.proposed).toBe(true);
     await waitForSessionStatus(discardedSessionId, (status) => status.discarded === true);
 
-    const statusRenames = renameSpy.mock.calls.filter(([, destination]) => String(destination) === statusPath);
+    const statusRenames = renameSpy.mock.calls.filter(([ destination]) => String(destination) === statusPath);
     expect(statusRenames.length).toBeGreaterThan(0);
     expect(statusRenames.every(([source]) => path.dirname(String(source)) === path.dirname(statusPath))).toBe(true);
     expect(statusRenames.every(([source]) => String(source).startsWith(`${statusPath}.tmp-`))).toBe(true);
@@ -5481,8 +5441,7 @@ describe("review_visual_edit_session gating", () => {
     client = new Client({ name: "test-client", version: "0.0.0" });
     await Promise.all([
       client.connect(clientTransport),
-      server.connect(serverTransport),
-    ]);
+      server.connect(serverTransport)]);
   });
 
   afterEach(async () => {
@@ -5709,8 +5668,7 @@ describe("save_ai_resource / delete_ai_resource / update_ai_settings", () => {
     client = new Client({ name: "test-client", version: "0.0.0" });
     await Promise.all([
       client.connect(clientTransport),
-      server.connect(serverTransport),
-    ]);
+      server.connect(serverTransport)]);
   });
 
   afterEach(async () => {
@@ -5846,8 +5804,7 @@ describe("insert_graph3d / update_graph3d", () => {
     client = new Client({ name: "test-client", version: "0.0.0" });
     await Promise.all([
       client.connect(clientTransport),
-      server.connect(serverTransport),
-    ]);
+      server.connect(serverTransport)]);
   }
 
   async function getFileId(): Promise<string> {
