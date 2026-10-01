@@ -62,8 +62,8 @@ if (
 
 /** @type {import('electron-builder').Configuration} */
 module.exports = {
-  appId: "com.atsutaiyo.sigmastudio",
-  productName: "Sigma Studio",
+  appId: isBetaBuild ? "com.atsutaiyo.sigmastudio.beta" : "com.atsutaiyo.sigmastudio",
+  productName: isBetaBuild ? "Sigma Studio Beta" : "Sigma Studio",
   electronVersion: "34.5.8",
   npmRebuild: false,
   afterPack: "./scripts/check-native-lock-package.cjs",
@@ -71,7 +71,9 @@ module.exports = {
     buildResources: "build",
     output: "release",
   },
-  artifactName: "Sigma-Studio-${version}-${arch}.${ext}",
+  artifactName: isBetaBuild
+    ? "Sigma-Studio-Beta-${version}-${arch}.${ext}"
+    : "Sigma-Studio-${version}-${arch}.${ext}",
   // A single suffix is portable across OS file-type registries. Never claim .json.
   fileAssociations: [{
     ext: "sigma",
@@ -137,7 +139,7 @@ module.exports = {
     identityName: windowsStoreIdentityName || undefined,
     publisher: windowsStorePublisher || undefined,
     publisherDisplayName: windowsStorePublisherDisplayName || undefined,
-    displayName: "Sigma Studio",
+    displayName: isBetaBuild ? "Sigma Studio Beta" : "Sigma Studio",
     languages: ["ja-JP", "en-US"],
     backgroundColor: "#ffffff",
     artifactName: "Sigma-Studio-Store-${version}-${arch}.${ext}",
