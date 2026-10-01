@@ -5,12 +5,14 @@ export interface VectorRecord {
   id: string;
   sourceId: string;
   pageNumber: number;
+  /** Zero-based chunk number within the source page. */
+  chunkIndex: number;
   text: string;
   vector: number[];
 }
 
 interface VectorIndexFile {
-  version: 1;
+  version: 2;
   dimensions: number;
   records: VectorRecord[];
 }
@@ -36,10 +38,15 @@ export class LocalVectorIndex {
   async upsertMany(records: Array<Omit<VectorRecord, "vector">>): Promise<void> {
     if (records.length === 0) return;
     const index = await this.read();
-    const keys = new Set(records.map((record) => record.sourceId + ":" + record.pageNumber));
-    const next = index.records.filter((item) => !keys.has(item.sourceId + ":" + item.pageNumber));
+    const keys = new Set(records.map((record) => record.sourceId + ":" + record.pageNumber + ":" + record.chunkIndex));
+    const next = index.records.filter((item) => !keys.has(item.sourceId + ":" + item.pageNumber + ":" + item.chunkIndex));
     next.push(...records.map((record) => ({ ...record, vector: embed(record.text) })));
     await this.write({ version: 1, dimensions: DIMENSIONS, records: next });
+  }
+
+  async hasSource(sourceId: string): Promise<boolean> {
+    const index = await this.read();
+    return index.records.some((item) => item.sourceId === sourceId);
   }
 
   async removeSource(sourceId: string): Promise<void> {
@@ -64,13 +71,13 @@ export class LocalVectorIndex {
     try {
       const raw = await fs.readFile(this.indexPath, "utf8");
       const parsed = JSON.parse(raw) as Partial<VectorIndexFile>;
-      if (parsed.version === 1 && parsed.dimensions === DIMENSIONS && Array.isArray(parsed.records)) {
+      if (parsed.version === 2 && parsed.dimensions === DIMENSIONS && Array.isArray(parsed.records)) {
         return parsed as VectorIndexFile;
       }
     } catch {
       // First launch or an incomplete index.
     }
-    return { version: 1, dimensions: DIMENSIONS, records: [] };
+    return { version: 2, dimensions: DIMENSIONS, records: [] };
   }
 
   private async write(index: VectorIndexFile): Promise<void> {
