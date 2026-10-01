@@ -1,3 +1,4 @@
+/* eslint-disable no-restricted-syntax -- shared-store fallback messages are intentionally localized later. */
 import { LocalSigmaDocStore, type LocalDocumentMetadata, type LocalStorageResult, type LocalStoreChangeEvent, type LocalWorkspaceOverviewResult, type LocalWorkspaceState } from "./local-sigma-doc-store";
 import type { DocumentVersionMetadata } from "@/lib/document-version-history";
 import type { SigmaDocument } from "@/features/document";
