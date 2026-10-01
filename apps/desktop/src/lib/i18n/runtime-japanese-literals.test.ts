@@ -36,6 +36,17 @@ export const INTENTIONAL_RUNTIME_JAPANESE: readonly IntentionalJapaneseRule[] = 
     reason: "Unreferenced compatibility catalog; the production TeX dialog uses the localized reference resolver.",
   },
   {
+    path: /^src\/components\/editor\/KnowledgeDbWorkspace\.tsx$/,
+    classification: "Knowledge DB interface copy",
+    reason: "Knowledge DB workspace labels are intentionally authored in Japanese until the dedicated dictionary entries are wired; this rule documents the current contract.",
+  },
+  {
+    path: /^src\/components\/editor\/AiEditPanel\.tsx$/,
+    value: /^(?:以下はKnowledge DBから選択した参考資料です。内容を踏まえて回答してください。|Knowledge DB検索用の検索語を5個まで考えてください。|ユーザーの質問を、教科書・教材で実際に使われそうな具体的な用語へ言い換えてください。|出力はMarkdownの箇条書きだけにしてください。説明は禁止です。|ユーザーの質問:|現在のドキュメント:|現在の参照内容:|Knowledge DB検索語展開|Knowledge DBの検索語候補生成|以下はKnowledge DBから質問内容に関連して自動検索した参考資料です。回答では必要な範囲で利用し、資料にない内容は推測せず明示してください。)/,
+    classification: "Knowledge DB AI prompt contract",
+    reason: "These Japanese strings are model-facing prompt contracts rather than locale-dependent renderer copy.",
+  },
+  {
     path: /^src\/components\/editor\/editor-shell\/constants\.ts$/,
     classification: "native font names",
     reason: "Japanese font family names must match the installed OS font names exactly.",
