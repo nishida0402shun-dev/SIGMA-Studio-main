@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { Database, Download, FilePlus2, FileText, MessageSquare, Search, X } from "lucide-react";
+import { Database, Download, ExternalLink, FilePlus2, FileText, MessageSquare, Search, Trash2, X } from "lucide-react";
 import { getDesktopBridge } from "@/lib/desktop-bridge";
 import type { KnowledgeDbAiContext, KnowledgeSearchResult, KnowledgeSemanticType, KnowledgeSource } from "@/types/knowledge-db";
 import type { Translate } from "@/lib/i18n";
@@ -103,6 +103,28 @@ export function KnowledgeDbWorkspace({ open, onClose, onOpenAi, t }: Props) {
       pageNumbers,
     }));
     await knowledgeDb.extractPages({ selections });
+  }
+
+  async function openSelectedPage(): Promise<void> {
+    if (!knowledgeDb || selectedPages.length === 0) return;
+    const target = selectedPages[0];
+    const result = await knowledgeDb.openPage(target);
+    if (!result.ok) console.warn("Knowledge DB page open failed:", result.error);
+  }
+
+  async function deleteSource(sourceId: string): Promise<void> {
+    if (!knowledgeDb) return;
+    const source = sources.find((item) => item.id === sourceId);
+    if (!source || !window.confirm(`Knowledge DBから「${source.name}」を削除しますか？`)) return;
+    const result = await knowledgeDb.deleteSource(sourceId);
+    if (!result.ok) return;
+    setSources((current) => current.filter((item) => item.id !== sourceId));
+    setSelected((current) => {
+      const next = { ...current };
+      delete next[sourceId];
+      return next;
+    });
+    setSearchResults((current) => current.filter((item) => item.sourceId !== sourceId));
   }
 
   async function handoffAi(): Promise<void> {
@@ -285,6 +307,64 @@ export function KnowledgeDbWorkspace({ open, onClose, onOpenAi, t }: Props) {
   font-weight: 700;
 }
 
+.knowledge-db-detail-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 34px;
+  padding: 6px 10px;
+  border: 1px solid rgb(100 116 139 / 0.3);
+  border-radius: 8px;
+  background: white;
+  cursor: pointer;
+}
+
+.knowledge-db-source-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 10px;
+}
+
+.knowledge-db-source-list > strong {
+  font-size: 13px;
+}
+
+.knowledge-db-source-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.knowledge-db-source-row span {
+  min-width: 0;
+  flex: 1;
+  font-size: 12px;
+  font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.knowledge-db-source-row button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  flex: 0 0 auto;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  cursor: pointer;
+}
+
+.knowledge-db-source-row button:hover {
+  background: rgb(248 113 113 / 0.14);
+}
+
 .knowledge-db-detail p,
 .knowledge-db-empty {
   color: rgb(71 85 105);
@@ -355,7 +435,23 @@ export function KnowledgeDbWorkspace({ open, onClose, onOpenAi, t }: Props) {
           <aside className="knowledge-db-detail">
             <strong>{t("appMenu.knowledgeDb.selected")}</strong>
             <span>{t("appMenu.knowledgeDb.selectedPages", { count: selectedPages.length })}</span>
+            {selectedPages.length > 0 && (
+              <button type="button" className="knowledge-db-detail-button" onClick={() => void openSelectedPage()}>
+                <ExternalLink size={15} />選択ページを開く
+              </button>
+            )}
             <p>{t("appMenu.knowledgeDb.help")}</p>
+            <div className="knowledge-db-source-list">
+              <strong>登録資料</strong>
+              {sources.map((source) => (
+                <div key={source.id} className="knowledge-db-source-row">
+                  <span title={source.name}>{source.name} · {source.pageCount}p</span>
+                  <button type="button" onClick={() => void deleteSource(source.id)} aria-label={`「${source.name}」を削除`}>
+                    <Trash2 size={14} />
+                  </button>
+                </div>
+              ))}
+            </div>
           </aside>
         </div>
       </section>
