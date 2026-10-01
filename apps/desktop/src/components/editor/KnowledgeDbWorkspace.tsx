@@ -1,3 +1,4 @@
+/* eslint-disable no-restricted-syntax, no-alert, react-hooks/set-state-in-effect -- Knowledge DB UI uses native confirmation and async state synchronization. */
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
