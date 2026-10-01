@@ -85,7 +85,7 @@ export function KnowledgePdfPageViewer({ sourceId, pageNumber, pageWidth, pageHe
         onRegionSelected({ x: x * scaleX, y: (renderedHeight - y - h) * scaleY, width: w * scaleX, height: h * scaleY });
       }}
     >
-      <canvas ref={canvasRef} aria-label={\`PDF page \${pageNumber}\`} />
+      <canvas ref={canvasRef} aria-label={`PDF page ${pageNumber}`} />
       {drag && <div style={{ position: "absolute", left: drag.x, top: drag.y, width: drag.w, height: drag.h, border: "2px solid currentColor", background: "rgb(59 130 246 / 0.12)", pointerEvents: "none" }} />}
     </div>
   );
