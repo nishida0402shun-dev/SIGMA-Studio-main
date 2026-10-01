@@ -69,8 +69,8 @@ workspaceのprepackによる再ビルドは行いません。既存版はスキ�
 「未公開」と扱わず停止します。初回手動公開のためにアプリ配布用タグを打ち直す必要はありません。
 
 
-## Beta → Stable データ移行
+## ローカル共有Workspace
 
-Beta版とStable版は安全のためデータ保存先を分離しています。Betaで検証した教材・Knowledge DB・設定などを正式版へ引き継ぐ場合は、Beta版の **Data Migration → Export Beta Data for Stable…** で移行ZIPを書き出し、Stable版の **Data Migration → Import Beta Data into Stable…** で取り込みます。
+Beta版とStable版はアプリ設定やAI実行環境を分離したまま、教材の保存先だけをローカルの共有Workspaceにできます。既定ではOSのユーザーアプリデータ領域にある `Sigma Studio/Workspace` を使い、Betaで作成・保存した教材はStableからも同じWorkspaceとして表示されます。
 
-Stable側は取り込み前に現在のデータを自動バックアップし、取り込み後に再起動します。BetaからStableへの移行ファイル以外は拒否します。移行前に未保存の変更を保存してください。
+共有Workspaceの場所は `SIGMA_STUDIO_SHARED_WORKSPACE_DIR` で明示的に変更できます。クラウド同期は行わず、同一PC上のローカルファイルとして扱います。
