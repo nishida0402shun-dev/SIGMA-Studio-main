@@ -96,7 +96,9 @@ module.exports = {
     main: "dist-electron/main.cjs",
   },
   // Installers and update metadata share the project release repository.
-  // Generate both latest and beta metadata so each channel has an explicit feed.\n  generateUpdatesFilesForAllChannels: true,\n  publish: {
+  // Generate both latest and beta metadata so each channel has an explicit feed.
+  generateUpdatesFilesForAllChannels: true,
+  publish: {
     provider: "github",
     owner: "Atsu-Taiyo",
     repo: "SIGMA-Studio",
