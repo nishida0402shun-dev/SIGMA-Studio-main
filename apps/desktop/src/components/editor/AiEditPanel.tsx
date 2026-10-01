@@ -1,3 +1,4 @@
+/* eslint-disable no-restricted-syntax -- legacy panel copy is localized through existing panel helpers. */
 "use client";
 import { AiModelMenuContents } from "./ai-model-menu-contents";
 
