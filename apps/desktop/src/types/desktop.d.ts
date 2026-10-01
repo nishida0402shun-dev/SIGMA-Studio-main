@@ -601,7 +601,8 @@ export type DesktopAiSourceReference =
   | { type: "document"; fileId: string; title?: string; blockId?: string; note?: string }
   | { type: "web"; url: string; title?: string }
   | { type: "webSearch"; query: string }
-  | { type: "material"; materialId: string; name?: string };
+  | { type: "material"; materialId: string; name?: string }
+  | { type: "knowledgeDb"; sourceId: string; sourceName: string; pageNumber: number };
 
 export interface DesktopMcpEditProposalSummary {
   proposalId: string;
