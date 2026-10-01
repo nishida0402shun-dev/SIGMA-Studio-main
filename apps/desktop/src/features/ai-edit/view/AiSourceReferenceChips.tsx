@@ -22,6 +22,9 @@ function sourceReferenceLabel(reference: DesktopAiSourceReference, t: Translate<
   if (reference.type === "webSearch") {
     return t("source.webSearch", { replace: { query: reference.query } });
   }
+  if (reference.type === "knowledgeDb") {
+    return `${reference.sourceName} p.${reference.pageNumber}`;
+  }
   try {
     return new URL(reference.url).hostname || reference.url;
   } catch {
@@ -39,6 +42,9 @@ function sourceReferenceTooltip(reference: DesktopAiSourceReference, t: Translat
   if (reference.type === "webSearch") {
     return t("source.webSearchQuery", { replace: { query: reference.query } });
   }
+  if (reference.type === "knowledgeDb") {
+    return `${reference.sourceName} / p.${reference.pageNumber}`;
+  }
   return reference.url;
 }
 
@@ -46,6 +52,7 @@ function sourceReferenceKey(reference: DesktopAiSourceReference, index: number):
   if (reference.type === "document") return `document:${reference.fileId}:${index}`;
   if (reference.type === "material") return `material:${reference.materialId}:${index}`;
   if (reference.type === "webSearch") return `webSearch:${reference.query}:${index}`;
+  if (reference.type === "knowledgeDb") return `knowledgeDb:${reference.sourceId}:${reference.pageNumber}:${index}`;
   return `web:${reference.url}:${index}`;
 }
 
@@ -110,6 +117,25 @@ function AiSourceReferenceChip({
             fileId: reference.fileId,
             blockId: reference.blockId,
             title: reference.title,
+          });
+        }}
+      >
+        <FileText size={11} aria-hidden="true" />
+        <span>{label}</span>
+      </button>
+    );
+  }
+
+  if (reference.type === "knowledgeDb") {
+    return (
+      <button
+        type="button"
+        className="ai-source-ref-chip ai-source-ref-chip--document"
+        title={tooltip}
+        onClick={() => {
+          void getDesktopBridge()?.knowledgeDb?.openPage({
+            sourceId: reference.sourceId,
+            pageNumber: reference.pageNumber,
           });
         }}
       >
