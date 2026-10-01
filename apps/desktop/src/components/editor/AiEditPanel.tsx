@@ -1127,31 +1127,88 @@ export function AiEditPanel({
   // even if the live composer state has since moved on to something else.
   const retrieveKnowledgeDbContext = useCallback(async (query: string): Promise<string> => {
     const desktop = getDesktopBridge();
-    if (!desktop?.knowledgeDb?.search || !query.trim()) {
+    const normalizedQuery = query.trim();
+    if (!desktop?.knowledgeDb?.search || !normalizedQuery) {
       return "";
     }
     try {
-      const matches = await desktop.knowledgeDb.search({ query: query.trim(), limit: 4 }) as Array<{
-        sourceId?: string;
-        pageNumber?: number;
-        text?: string;
-        score?: number;
-      }>;
-      const usable = matches.filter((match) =>
-        typeof match.sourceId === "string"
-        && typeof match.pageNumber === "number"
-        && typeof match.text === "string"
-        && match.text.trim().length > 0,
+      const sources = desktop.knowledgeDb.listSources
+        ? await desktop.knowledgeDb.listSources()
+        : [];
+      const sourceNames = new Map(
+        sources.map((source) => [source.id, source.name]),
       );
+
+      // A vague request such as 「この単元について」 is usually meaningful only
+      // in combination with the current document/selection. Search several
+      // context-aware variants instead of forcing the user to formulate a
+      // precise database query.
+      const contextQueries = [
+        normalizedQuery,
+        \`\${resolveDocumentTitle(document)} \${normalizedQuery}\`.trim(),
+        ...turnReferences
+          .map((item) => getReferenceContextText(item).trim())
+          .filter(Boolean)
+          .slice(0, 2)
+          .map((context) => \`\${normalizedQuery} \${context}\`.trim()),
+      ].filter((candidate, index, candidates) =>
+        candidate.length > 0 && candidates.indexOf(candidate) === index,
+      ).slice(0, 4);
+
+      const queryResults = await Promise.all(
+        contextQueries.map((candidate) =>
+          desktop.knowledgeDb!.search({ query: candidate, limit: 6 }) as Promise<Array<{
+            sourceId?: string;
+            pageNumber?: number;
+            text?: string;
+            score?: number;
+          }>>,
+        ),
+      );
+
+      const bestByChunk = new Map<string, {
+        sourceId: string;
+        pageNumber: number;
+        text: string;
+        score: number;
+      }>();
+      for (const matches of queryResults) {
+        for (const match of matches) {
+          if (
+            typeof match.sourceId !== "string"
+            || typeof match.pageNumber !== "number"
+            || typeof match.text !== "string"
+            || !match.text.trim()
+          ) {
+            continue;
+          }
+          const key = \`\${match.sourceId}:\${match.pageNumber}:\${match.text}\`;
+          const score = typeof match.score === "number" ? match.score : 0;
+          const current = bestByChunk.get(key);
+          if (!current || score > current.score) {
+            bestByChunk.set(key, {
+              sourceId: match.sourceId,
+              pageNumber: match.pageNumber,
+              text: match.text.trim(),
+              score,
+            });
+          }
+        }
+      }
+
+      const usable = [...bestByChunk.values()]
+        .sort((a, b) => b.score - a.score)
+        .slice(0, 6);
       if (usable.length === 0) return "";
+
       return usable.map((match) =>
-        `[Knowledge DB / source ${match.sourceId} / p.${match.pageNumber} / score ${typeof match.score === "number" ? match.score.toFixed(3) : "n/a"}]\n${match.text!.trim()}`,
-      ).join("\n\n");
+        \`[Knowledge DB / \${sourceNames.get(match.sourceId) ?? match.sourceId} / p.\${match.pageNumber} / score \${match.score.toFixed(3)}]\\n\${match.text}\`,
+      ).join("\\n\\n");
     } catch (error) {
       console.warn("Knowledge DB retrieval failed; continuing without retrieved context.", error);
       return "";
     }
-  }, []);
+  }, [document, turnReferences]);
 
   const buildRunParams = useCallback(async (): Promise<RunParams> => {
     const turnAttachments = await createAttachmentsWithSelectedOverlayPreview({
