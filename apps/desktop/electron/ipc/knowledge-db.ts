@@ -60,6 +60,32 @@ export function registerKnowledgeDbIpc(deps: RegisterKnowledgeDbIpcDeps): void {
     return { ok: await store.deleteSource(sourceId.trim()) };
   });
 
+  ipcMain.handle("knowledge-db:get-page-pdf", async (event, payload: unknown) => {
+    if (event.sender !== getMainWindow()?.webContents) return null;
+    if (!payload || typeof payload !== "object") throw new Error("invalid page request");
+    const sourceId = "sourceId" in payload && typeof payload.sourceId === "string" ? payload.sourceId : "";
+    const pageNumber = "pageNumber" in payload && typeof payload.pageNumber === "number" ? payload.pageNumber : 0;
+    if (!sourceId || !Number.isInteger(pageNumber) || pageNumber < 1) throw new Error("invalid page request");
+    return store.getPagePdfBase64(sourceId, pageNumber);
+  });
+
+  ipcMain.handle("knowledge-db:extract-region", async (event, payload: unknown) => {
+    if (event.sender !== getMainWindow()?.webContents) return null;
+    if (!payload || typeof payload !== "object") throw new Error("invalid region request");
+    const sourceId = "sourceId" in payload && typeof payload.sourceId === "string" ? payload.sourceId : "";
+    const pageNumber = "pageNumber" in payload && typeof payload.pageNumber === "number" ? payload.pageNumber : 0;
+    const rect = "rect" in payload && payload.rect && typeof payload.rect === "object" ? payload.rect : null;
+    if (!sourceId || !Number.isInteger(pageNumber) || pageNumber < 1 || !rect) throw new Error("invalid region request");
+    const x = "x" in rect && typeof rect.x === "number" ? rect.x : 0;
+    const y = "y" in rect && typeof rect.y === "number" ? rect.y : 0;
+    const width = "width" in rect && typeof rect.width === "number" ? rect.width : 0;
+    const height = "height" in rect && typeof rect.height === "number" ? rect.height : 0;
+    if (!(width > 0) || !(height > 0)) throw new Error("invalid region request");
+    const filePath = await store.extractRegion(sourceId, pageNumber, { x, y, width, height });
+    const error = await shell.openPath(filePath);
+    return error ? { ok: false, error } : { ok: true, filePath };
+  });
+
   ipcMain.handle("knowledge-db:open-page", async (event, payload: unknown) => {
     if (event.sender !== getMainWindow()?.webContents) return { ok: false };
     if (!payload || typeof payload !== "object") throw new Error("invalid page request");
