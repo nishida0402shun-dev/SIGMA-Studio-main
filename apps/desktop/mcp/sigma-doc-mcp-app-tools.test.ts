@@ -23,8 +23,7 @@ const initialDocument: SigmaDocument = {
   pageLayout: getDefaultPageLayout(),
   content: [
     { type: "paragraph", id: "p_1", children: [{ type: "text", text: "Before text", marks: ["bold"], fontSize: 14 }] },
-    { type: "paragraph", id: "p_2", children: [{ type: "text", text: "Neighbor" }] },
-  ],
+    { type: "paragraph", id: "p_2", children: [{ type: "text", text: "Neighbor" }] }],
 };
 
 describe("app MCP body tool profile", () => {
@@ -206,8 +205,7 @@ describe("app MCP body tool profile", () => {
       ["edit_problem", { edit: { action: "create", targetId: "p_1" } }],
       ["organize_blocks", { edit: { action: "move", blockIds: ["p_1"] } }],
       ["organize_blocks", { edit: { action: "delete", blockIds: ["p_1"], targetId: "p_2" } }],
-      ["insert_content", { content: { format: "markdown", markdown: " ", blocks: ["Invalid mixed input"] } }],
-    ] as const) {
+      ["insert_content", { content: { format: "markdown", markdown: " ", blocks: ["Invalid mixed input"] } }]] as const) {
       expect((await client.callTool({ name, arguments: { ...context(), ...args } })).isError).toBe(true);
     }
     const failed = await client.callTool({ name: "edit_text", arguments: {
@@ -226,8 +224,7 @@ describe("app MCP body tool profile", () => {
       ...context(),
       edit: { action: "patch", operations: [
         { op: "replace_text", target: { type: "text", blockId: "p_1", text: "Before" }, replacement: "After" },
-        { op: "replace_text", target: { type: "text", blockId: "p_2", text: "Does not exist" }, replacement: "Never applied" },
-      ] },
+        { op: "replace_text", target: { type: "text", blockId: "p_2", text: "Does not exist" }, replacement: "Never applied" }] },
     } });
     expect(result.isError).toBe(true);
     expect(await proposals.listProposals({ status: "pending" })).toHaveLength(0);
