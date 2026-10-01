@@ -63,7 +63,9 @@ export class SharedWorkspaceDocStore extends LocalSigmaDocStore {
   constructor(personalUserDataPath: string, sharedWorkspacePath: string) {
     super(personalUserDataPath);
     this.personalStore = new LocalSigmaDocStore(personalUserDataPath);
-    this.sharedStore = new LocalSigmaDocStore(sharedWorkspacePath);
+    this.sharedStore = new LocalSigmaDocStore(sharedWorkspacePath, {
+      defaultWorkspaceName: "共有Workspace",
+    });
   }
 
   private storeForFile(fileId: string): { store: LocalSigmaDocStore; rawFileId: string; shared: boolean } {
