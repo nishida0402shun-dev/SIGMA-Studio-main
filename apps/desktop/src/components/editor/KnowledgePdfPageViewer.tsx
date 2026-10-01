@@ -39,8 +39,8 @@ export function KnowledgePdfPageViewer({ sourceId, pageNumber, pageWidth, pageHe
       const canvas = canvasRef.current;
       canvas.width = Math.ceil(viewport.width);
       canvas.height = Math.ceil(viewport.height);
-      canvas.style.width = \`\${viewport.width}px\`;
-      canvas.style.height = \`\${viewport.height}px\`;
+      canvas.style.width = `${viewport.width}px`;
+      canvas.style.height = `${viewport.height}px`;
       await page.render({ canvasContext: canvas.getContext("2d")!, viewport }).promise;
     })().catch((error) => console.warn("Knowledge DB PDF preview failed:", error));
     return () => { cancelled = true; };
