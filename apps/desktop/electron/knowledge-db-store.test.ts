@@ -22,6 +22,25 @@ afterEach(async () => {
 });
 
 describe("KnowledgeDbStore", () => {
+  it("opens an individual imported page and removes a source with its index", async () => {
+    const dataDir = await fs.mkdtemp(path.join(os.tmpdir(), "sigma-knowledge-db-data-"));
+    tempDirs.push(dataDir);
+    const sourcePath = await createPdf("source.pdf", 3);
+    const store = new KnowledgeDbStore(dataDir);
+
+    const [source] = await store.addFiles([sourcePath]);
+    expect(source).toBeTruthy();
+
+    const openedPath = await store.openPage(source!.id, 2);
+    const opened = await PDFDocument.load(await fs.readFile(openedPath));
+    expect(opened.getPageCount()).toBe(1);
+    expect(await fs.stat(openedPath)).toBeTruthy();
+
+    expect(await store.deleteSource(source!.id)).toBe(true);
+    expect(await store.listSources()).toHaveLength(0);
+    expect(await store.search("source")).toHaveLength(0);
+  });
+
   it("extracts selected pages from multiple imported PDFs into one PDF", async () => {
     const dataDir = await fs.mkdtemp(path.join(os.tmpdir(), "sigma-knowledge-db-data-"));
     tempDirs.push(dataDir);
