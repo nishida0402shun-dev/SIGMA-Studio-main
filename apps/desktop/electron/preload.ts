@@ -349,6 +349,12 @@ const desktopAPI = {
     openPage(payload: { sourceId: string; pageNumber: number }): Promise<{ ok: boolean; error?: string; filePath?: string }> {
       return ipcRenderer.invoke("knowledge-db:open-page", payload);
     },
+    getPagePdf(payload: { sourceId: string; pageNumber: number }): Promise<{ dataBase64: string; width: number; height: number } | null> {
+      return ipcRenderer.invoke("knowledge-db:get-page-pdf", payload);
+    },
+    extractRegion(payload: { sourceId: string; pageNumber: number; rect: { x: number; y: number; width: number; height: number } }): Promise<{ ok: boolean; error?: string; filePath?: string }> {
+      return ipcRenderer.invoke("knowledge-db:extract-region", payload);
+    },
   },
 
   aiRender: {
