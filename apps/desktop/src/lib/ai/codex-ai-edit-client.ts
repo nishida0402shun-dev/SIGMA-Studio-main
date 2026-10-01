@@ -22,6 +22,7 @@ export interface CodexAiEditRequest {
   attachments?: AiEditAttachment[];
   mentionedDocuments?: AiEditMentionedDocumentContext[];
   aiResourceIds?: string[];
+  knowledgeDbSourceReferences?: Array<{ sourceId: string; sourceName: string; pageNumber: number }>;
   agentThreadId?: string | null;
   // 帰属情報 (feedback loop / MCP提案の帰属付けに使う)。すべて任意。
   // chatのroomId・assistant turnId、UIに出すセッションラベル (部屋タイトルや指示の抜粋)。
@@ -51,6 +52,7 @@ export async function runAiEditViaDesktopRuntime(request: CodexAiEditRequest): P
     attachments: request.attachments ?? [],
     mentionedDocuments: request.mentionedDocuments ?? [],
     aiResourceIds: request.aiResourceIds ?? [],
+    knowledgeDbSourceReferences: request.knowledgeDbSourceReferences ?? [],
     agentThreadId: request.agentThreadId ?? null,
     roomId: request.roomId,
     turnId: request.turnId,
