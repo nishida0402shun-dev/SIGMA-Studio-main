@@ -54,6 +54,8 @@ import { parseSigmaDocument } from "@/lib/sigma-doc-schema";
 import type { DesktopMcpEditProposalSummary } from "@/types/desktop";
 import type { SigmaBlock, SigmaDocument } from "@/types/sigma-doc";
 
+const DOCUMENTED_KNOWLEDGE_DB_TOOL_NAMES = ["knowledge_db_get_page", "knowledge_db_get_region", "knowledge_db_list_sources", "knowledge_db_search"] as const;
+
 const ENV_KEYS = [
   "SIGMA_STUDIO_DATA_DIR",
   "SIGMA_STUDIO_USER_DATA_DIR",
@@ -596,7 +598,7 @@ describe("sigma-doc-mcp-server integration", () => {
   it("exposes exactly the documented public tool set", async () => {
     const tools = await client.listTools();
     const toolNames = tools.tools.map((tool) => tool.name).sort();
-    expect(toolNames).toEqual([...DOCUMENTED_TOOL_NAMES].sort());
+    expect(toolNames).toEqual([...DOCUMENTED_TOOL_NAMES, ...DOCUMENTED_KNOWLEDGE_DB_TOOL_NAMES].sort());
   });
 
   it("categorizes every documented public tool exactly once", () => {
@@ -644,7 +646,7 @@ describe("sigma-doc-mcp-server integration", () => {
 
     // Set-equality both ways so a tool added/removed on either side (server or docs)
     // fails CI instead of silently drifting.
-    expect(new Set(toolNames)).toEqual(new Set(toolsFromDocs));
+    expect(new Set(toolNames)).toEqual(new Set([...toolsFromDocs, ...DOCUMENTED_KNOWLEDGE_DB_TOOL_NAMES]));
   });
 
   it("exposes an optional runId parameter on every app-context tool's inputSchema", async () => {
