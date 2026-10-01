@@ -44,6 +44,7 @@ import {
 } from "./desktop-settings";
 import { AUTO_APPLY_DEFER_MS, shouldDeferAutoApply } from "./auto-apply-defer";
 import { LocalSigmaDocStore, type LocalStoreChangeEvent } from "./local-sigma-doc-store";
+import { SharedWorkspaceDocStore } from "./shared-workspace-doc-store";
 import { LocalMaterialStore } from "./local-material-store";
 import { LocalTemplateStore } from "./local-template-store";
 import {
@@ -142,9 +143,7 @@ let stopLocalStoreWatch: (() => void) | null = null;
 let stopLocalProposalWatch: (() => void) | null = null;
 let stopAiResourceWatch: (() => void) | null = null;
 let stopAiSettingsWatch: (() => void) | null = null;
-const localSigmaDocStore = new LocalSigmaDocStore(USER_DATA_PATH, {
-  workspaceRoot: SHARED_WORKSPACE_PATH,
-});
+const localSigmaDocStore = new SharedWorkspaceDocStore(USER_DATA_PATH, SHARED_WORKSPACE_PATH);
 const localMaterialStore = new LocalMaterialStore(USER_DATA_PATH);
 const localTemplateStore = new LocalTemplateStore(USER_DATA_PATH);
 const localMcpProposalStore = new LocalMcpEditProposalStore(USER_DATA_PATH);
