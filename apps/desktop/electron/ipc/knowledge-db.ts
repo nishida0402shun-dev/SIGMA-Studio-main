@@ -1,4 +1,4 @@
-import { dialog, ipcMain, type BrowserWindow } from "electron";
+import { dialog, ipcMain, shell, type BrowserWindow } from "electron";
 import fs from "node:fs/promises";
 import path from "node:path";
 import { KnowledgeDbStore, type KnowledgeSemanticType } from "../knowledge-db-store";
@@ -52,6 +52,23 @@ export function registerKnowledgeDbIpc(deps: RegisterKnowledgeDbIpcDeps): void {
       throw new Error(te("invalid source paths"));
     }
     return store.addFiles(filePaths as string[]);
+  });
+
+  ipcMain.handle("knowledge-db:delete-source", async (event, sourceId: unknown) => {
+    if (event.sender !== getMainWindow()?.webContents) return { ok: false };
+    if (typeof sourceId !== "string" || !sourceId.trim()) throw new Error("invalid source id");
+    return { ok: await store.deleteSource(sourceId.trim()) };
+  });
+
+  ipcMain.handle("knowledge-db:open-page", async (event, payload: unknown) => {
+    if (event.sender !== getMainWindow()?.webContents) return { ok: false };
+    if (!payload || typeof payload !== "object") throw new Error("invalid page request");
+    const sourceId = "sourceId" in payload && typeof payload.sourceId === "string" ? payload.sourceId : "";
+    const pageNumber = "pageNumber" in payload && typeof payload.pageNumber === "number" ? payload.pageNumber : 0;
+    if (!sourceId || !Number.isInteger(pageNumber) || pageNumber < 1) throw new Error("invalid page request");
+    const filePath = await store.openPage(sourceId, pageNumber);
+    const error = await shell.openPath(filePath);
+    return error ? { ok: false, error } : { ok: true, filePath };
   });
 
   ipcMain.handle("knowledge-db:extract-pages", async (event, payload: unknown) => {
