@@ -249,6 +249,11 @@ interface UpdateFolderPayload {
 
 export interface LocalSigmaDocStoreOptions {
   /**
+   * Beta/Stableで共通利用するローカルWorkspaceのルート。
+   * 未指定時は従来どおり各アプリのuserData配下を使う。
+   */
+  workspaceRoot?: string;
+  /**
    * reconcileDocumentFile が「本文が読めない」行を外部削除とみなしてソフトデリート
    * するまでの猶予時間 (ms)。作成直後でまだ本文が書き込まれていないだけの行を
    * 誤って消してしまわないための窓。省略時は DEFAULT_MISSING_BODY_GRACE_MS。
@@ -346,7 +351,8 @@ export class LocalSigmaDocStore {
   private readonly ledgerTransactionStorage = new AsyncLocalStorage<LedgerTransactionState>();
 
   constructor(userDataPath: string, options: LocalSigmaDocStoreOptions = {}) {
-    this.dataDir = path.join(userDataPath, DATA_DIR_NAME);
+    const workspaceRoot = options.workspaceRoot ?? userDataPath;
+    this.dataDir = path.join(workspaceRoot, DATA_DIR_NAME);
     this.documentsDir = path.join(this.dataDir, DOCUMENTS_DIR_NAME);
     this.docBlockHashesDir = path.join(this.dataDir, DOC_BLOCK_HASHES_DIR_NAME);
     this.docVersionsDir = path.join(this.dataDir, DOC_VERSIONS_DIR_NAME);
