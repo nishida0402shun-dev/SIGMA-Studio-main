@@ -1125,11 +1125,11 @@ export function AiEditPanel({
   // immediate run and a later queued-follow-up dispatch (R3) go through this
   // same snapshot shape so a follow-up replays exactly what the user composed,
   // even if the live composer state has since moved on to something else.
-  const retrieveKnowledgeDbContext = useCallback(async (query: string): Promise<string> => {
+  const retrieveKnowledgeDbContext = useCallback(async (query: string): Promise<{ text: string; references: Array<{ sourceId: string; sourceName: string; pageNumber: number }> }> => {
     const desktop = getDesktopBridge();
     const normalizedQuery = query.trim();
     if (!desktop?.knowledgeDb?.search || !normalizedQuery) {
-      return "";
+      return { text: "", references: [] };
     }
     try {
       const sources = await desktop.knowledgeDb.list() as Array<{
@@ -1244,14 +1244,27 @@ export function AiEditPanel({
         }
       }
 
-      if (usable.length === 0) return "";
+      if (usable.length === 0) return { text: "", references: [] };
 
-      return usable.map((match) =>
-        `[Knowledge DB / ${sourceNames.get(match.sourceId) ?? match.sourceId} / p.${match.pageNumber} / score ${match.score.toFixed(3)}]\n${match.text}`,
-      ).join("\n\n");
+      const references = usable.map((match) => ({
+        sourceId: match.sourceId,
+        sourceName: sourceNames.get(match.sourceId) ?? match.sourceId,
+        pageNumber: match.pageNumber,
+      })).filter((reference, index, values) =>
+        values.findIndex((candidate) =>
+          candidate.sourceId === reference.sourceId && candidate.pageNumber === reference.pageNumber,
+        ) === index,
+      );
+
+      return {
+        text: usable.map((match) =>
+          `[Knowledge DB / ${sourceNames.get(match.sourceId) ?? match.sourceId} / p.${match.pageNumber} / score ${match.score.toFixed(3)}]\n${match.text}`,
+        ).join("\n\n"),
+        references,
+      };
     } catch (error) {
       console.warn("Knowledge DB retrieval failed; continuing without retrieved context.", error);
-      return "";
+      return { text: "", references: [] };
     }
   }, [document, lockedProvider, provider, turnReferences]);
 
@@ -1264,8 +1277,8 @@ export function AiEditPanel({
       activeReferenceKey,
     });
     const retrievedKnowledge = await retrieveKnowledgeDbContext(instruction);
-    const knowledgeInstruction = retrievedKnowledge
-      ? `\n\n以下はKnowledge DBから質問内容に関連して自動検索した参考資料です。回答では必要な範囲で利用し、資料にない内容は推測せず明示してください。\n\n${retrievedKnowledge}`
+    const knowledgeInstruction = retrievedKnowledge.text
+      ? `\n\n以下はKnowledge DBから質問内容に関連して自動検索した参考資料です。回答では必要な範囲で利用し、資料にない内容は推測せず明示してください。\n\n${retrievedKnowledge.text}`
       : "";
     // A room bound to a provider always runs on it, even if the composer's
     // `provider` state hasn't caught up to a just-selected room yet.
@@ -1285,6 +1298,7 @@ export function AiEditPanel({
       turnProvider: runProvider,
       turnAiResourceIds,
       turnInstruction: (instruction.trim() || getAttachmentDefaultInstruction(turnAttachments)) + knowledgeInstruction,
+      knowledgeDbSourceReferences: retrievedKnowledge.references,
       turnModel: runProvider === "claude" ? claudeModel : runProvider === "antigravity" ? geminiModel : model,
       turnReasoningEffort: reasoningEffort,
       aiTargetId,
