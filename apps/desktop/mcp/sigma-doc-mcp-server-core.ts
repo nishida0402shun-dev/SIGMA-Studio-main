@@ -40,6 +40,7 @@ import {
   type AiEditRunContextProvider,
 } from "../electron/ai-edit-run-context";
 import { LocalMaterialStore } from "../electron/local-material-store";
+import { KnowledgeDbStore } from "../electron/knowledge-db-store";
 import { LocalAiResourceStore } from "../electron/ai-resource-store";
 import { isAiWebSearchEnabled, readDesktopSettingsSync, writeDesktopSettings } from "../electron/desktop-settings";
 import {
@@ -3021,6 +3022,79 @@ const { registerTool, bodyImplementations } = createMcpToolRegistrar(server, {
   activityLogger: createToolActivityLogger(process.env),
   visualSessionRunId: (sessionId) => visualEditSessions.peek(sessionId)?.runId ?? undefined,
 });
+
+registerTool(
+  "knowledge_db_list_sources",
+  {
+    title: "Knowledge DBの資料一覧",
+    description: "登録済みPDF資料とページ数・ページ分類を取得します。Knowledge DBを使った回答では、必要に応じてこのツールで資料候補を確認してください。",
+  },
+  async () => withToolErrorHandling(async () => {
+    const sources = await new KnowledgeDbStore(storeContext.dataDir).listSources();
+    return { ok: true, sources: sources.map((source) => ({
+      id: source.id,
+      name: source.name,
+      pageCount: source.pageCount,
+      importedAt: source.importedAt,
+      pages: source.pages.map((page) => ({ id: page.id, pageNumber: page.pageNumber, semanticType: page.semanticType, title: page.title })),
+    })) };
+  }),
+);
+
+registerTool(
+  "knowledge_db_search",
+  {
+    title: "Knowledge DBを検索",
+    description: "登録PDFのページ内容を意味検索します。質問文をそのまま渡せ、完全一致のキーワード検索に限定されません。",
+    inputSchema: {
+      query: z.string().min(1).max(2000),
+      limit: z.number().int().min(1).max(20).optional(),
+    },
+  },
+  async ({ query, limit }) => withToolErrorHandling(async () => {
+    const results = await new KnowledgeDbStore(storeContext.dataDir).search(query, limit ?? 8);
+    return { ok: true, results };
+  }),
+);
+
+registerTool(
+  "knowledge_db_get_page",
+  {
+    title: "Knowledge DBのページを取得",
+    description: "資料IDとページ番号を指定して、そのページの本文・分類・タイトルを取得します。検索結果の確認に使います。",
+    inputSchema: {
+      sourceId: z.string().min(1),
+      pageNumber: z.number().int().min(1),
+    },
+  },
+  async ({ sourceId, pageNumber }) => withToolErrorHandling(async () => {
+    const sources = await new KnowledgeDbStore(storeContext.dataDir).listSources();
+    const source = sources.find((item) => item.id === sourceId);
+    const page = source?.pages.find((item) => item.pageNumber === pageNumber);
+    if (!source || !page) throw new Error("Knowledge DB page not found");
+    return { ok: true, source: { id: source.id, name: source.name }, page };
+  }),
+);
+
+registerTool(
+  "knowledge_db_get_region",
+  {
+    title: "Knowledge DBの指定範囲を取得",
+    description: "PDFページ内の座標範囲を指定して、その範囲をPDFとして抽出します。ドラッグ選択から渡された範囲の再利用に使えます。",
+    inputSchema: {
+      sourceId: z.string().min(1),
+      pageNumber: z.number().int().min(1),
+      x: z.number().min(0),
+      y: z.number().min(0),
+      width: z.number().positive(),
+      height: z.number().positive(),
+    },
+  },
+  async ({ sourceId, pageNumber, x, y, width, height }) => withToolErrorHandling(async () => {
+    const filePath = await new KnowledgeDbStore(storeContext.dataDir).extractRegion(sourceId, pageNumber, { x, y, width, height });
+    return { ok: true, sourceId, pageNumber, rect: { x, y, width, height }, filePath };
+  }),
+);
 
 registerTool(
   "get_local_app_status",
