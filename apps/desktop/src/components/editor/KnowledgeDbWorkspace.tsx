@@ -496,7 +496,7 @@ export function KnowledgeDbWorkspace({ open, onClose, onOpenAi, t }: Props) {
             {visible.map(({ source, page, score }) => {
               const checked = selected[source.id]?.has(page.pageNumber) ?? false;
               return (
-                <label key={page.id} className={`knowledge-db-item ${checked ? "selected" : ""}`}>
+                <label key={page.id} className={`knowledge-db-item ${checked ? "selected" : ""}`} onContextMenu={(event) => { event.preventDefault(); setSelected({ [source.id]: new Set([page.pageNumber]) }); setContextMenu({ x: event.clientX, y: event.clientY }); }}>
                   <input
                     type="checkbox"
                     checked={checked}
@@ -558,7 +558,7 @@ export function KnowledgeDbWorkspace({ open, onClose, onOpenAi, t }: Props) {
             <div className="knowledge-db-source-list">
               <strong>登録資料</strong>
               {sources.map((source) => (
-                <div key={source.id} className="knowledge-db-source-row">
+                <div key={source.id} className="knowledge-db-source-row" onContextMenu={(event) => { event.preventDefault(); setSelected({ [source.id]: new Set(source.pages.map((page) => page.pageNumber)) }); setRegion(null); setContextMenu({ x: event.clientX, y: event.clientY }); }}>
                   <span title={source.name}>{source.name} · {source.pageCount}p</span>
                   <button type="button" onClick={() => void deleteSource(source.id)} aria-label={`「${source.name}」を削除`}>
                     <Trash2 size={14} />
@@ -571,7 +571,7 @@ export function KnowledgeDbWorkspace({ open, onClose, onOpenAi, t }: Props) {
       </section>
       {contextMenu && selectedPages.length > 0 && (
         <div className="knowledge-db-context-menu" style={{ left: contextMenu.x, top: contextMenu.y }} onMouseLeave={() => setContextMenu(null)}>
-          <button type="button" onClick={() => void handoffAi()}>AIに送る</button>
+          <button type="button" onClick={() => void handoffAi(selectedPages.length > 1 ? "選択した資料・ページをまとめて確認する" : undefined)}>AIに送る</button>
           {region && <button type="button" onClick={() => void extractRegionPdf()}>選択範囲をPDF抽出</button>}
           <button type="button" onClick={() => void handoffAi("内容を解説する")}>解説する</button>
           <button type="button" onClick={() => void handoffAi("数値や条件を変更した類似問題を作る")}>数値を変える</button>
