@@ -205,17 +205,15 @@ export class SharedWorkspaceDocStore extends LocalSigmaDocStore {
             id: SHARED_WORKSPACE_PREFIX + workspace.id,
           })),
         ],
-        folders: [
-          ...personal.overview.folders,
-          ...shared.overview.folders.map((folder) => ({
-            ...folder,
-            workspaceId: SHARED_WORKSPACE_PREFIX + folder.workspaceId,
-          })),
-        ],
-        files: [
-          ...personal.overview.files,
-          ...shared.overview.files.map(mapSharedFile),
-        ],
+        folders: isSharedId(workspaceId)
+          ? shared.overview.folders.map((folder) => ({
+              ...folder,
+              workspaceId: SHARED_WORKSPACE_PREFIX + folder.workspaceId,
+            }))
+          : personal.overview.folders,
+        files: isSharedId(workspaceId)
+          ? shared.overview.files.map(mapSharedFile)
+          : personal.overview.files,
       },
     };
   }
