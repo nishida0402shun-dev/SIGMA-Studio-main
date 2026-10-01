@@ -1142,76 +1142,119 @@ export function AiEditPanel({
           .map((source) => [source.id as string, source.name as string]),
       );
 
-      // A vague request such as 「この単元について」 is usually meaningful only
-      // in combination with the current document/selection. Search several
-      // context-aware variants instead of forcing the user to formulate a
-      // precise database query.
-      const contextQueries = [
+      const baseQueries = [
         normalizedQuery,
-        \`\${resolveDocumentTitle(document)} \${normalizedQuery}\`.trim(),
+        `${resolveDocumentTitle(document)} ${normalizedQuery}`.trim(),
         ...turnReferences
           .map((item) => getReferenceContextText(item).trim())
           .filter(Boolean)
           .slice(0, 2)
-          .map((context) => \`\${normalizedQuery} \${context}\`.trim()),
+          .map((context) => `${normalizedQuery} ${context}`.trim()),
       ].filter((candidate, index, candidates) =>
         candidate.length > 0 && candidates.indexOf(candidate) === index,
       ).slice(0, 4);
 
-      const queryResults = await Promise.all(
-        contextQueries.map((candidate) =>
-          desktop.knowledgeDb!.search({ query: candidate, limit: 6 }) as Promise<Array<{
-            sourceId?: string;
-            pageNumber?: number;
-            text?: string;
-            score?: number;
-          }>>,
-        ),
-      );
+      const searchQueries = async (candidates: string[]) => {
+        const queryResults = await Promise.all(
+          candidates.map((candidate) =>
+            desktop.knowledgeDb!.search({ query: candidate, limit: 6 }) as Promise<Array<{
+              sourceId?: string;
+              pageNumber?: number;
+              text?: string;
+              score?: number;
+            }>>,
+          ),
+        );
+        const bestByChunk = new Map<string, {
+          sourceId: string;
+          pageNumber: number;
+          text: string;
+          score: number;
+        }>();
+        for (const matches of queryResults) {
+          for (const match of matches) {
+            if (
+              typeof match.sourceId !== "string"
+              || typeof match.pageNumber !== "number"
+              || typeof match.text !== "string"
+              || !match.text.trim()
+            ) {
+              continue;
+            }
+            const key = `${match.sourceId}:${match.pageNumber}:${match.text}`;
+            const score = typeof match.score === "number" ? match.score : 0;
+            const current = bestByChunk.get(key);
+            if (!current || score > current.score) {
+              bestByChunk.set(key, {
+                sourceId: match.sourceId,
+                pageNumber: match.pageNumber,
+                text: match.text.trim(),
+                score,
+              });
+            }
+          }
+        }
+        return [...bestByChunk.values()].sort((a, b) => b.score - a.score);
+      };
 
-      const bestByChunk = new Map<string, {
-        sourceId: string;
-        pageNumber: number;
-        text: string;
-        score: number;
-      }>();
-      for (const matches of queryResults) {
-        for (const match of matches) {
-          if (
-            typeof match.sourceId !== "string"
-            || typeof match.pageNumber !== "number"
-            || typeof match.text !== "string"
-            || !match.text.trim()
-          ) {
-            continue;
+      let usable = (await searchQueries(baseQueries)).slice(0, 6);
+      const bestScore = usable[0]?.score ?? 0;
+
+      // Search is intentionally AI-assisted only when the local retrieval is weak.
+      // The one-shot skill-draft runtime has no MCP/tools, so it cannot recursively
+      // search the Knowledge DB or invent source contents.
+      if ((usable.length < 3 || bestScore < 0.32) && desktop.aiSkillDraft?.generate) {
+        const runProvider = lockedProvider ?? provider;
+        try {
+          const expanded = await desktop.aiSkillDraft.generate({
+            provider: runProvider,
+            prompt: [
+              "Knowledge DB検索用の検索語を5個まで考えてください。",
+              "ユーザーの質問を、教科書・教材で実際に使われそうな具体的な用語へ言い換えてください。",
+              "出力はMarkdownの箇条書きだけにしてください。説明は禁止です。",
+              `ユーザーの質問: ${normalizedQuery}`,
+              `現在のドキュメント: ${resolveDocumentTitle(document)}`,
+              ...turnReferences
+                .map((item) => getReferenceContextText(item).trim())
+                .filter(Boolean)
+                .slice(0, 2)
+                .map((context) => `現在の参照内容: ${context}`),
+            ].join("\n"),
+            context: {
+              title: "Knowledge DB検索語展開",
+              description: "Knowledge DBの検索語候補生成",
+              currentContent: "",
+            },
+          });
+          const raw = expanded && typeof expanded === "object" && "ok" in expanded && expanded.ok === true
+            && "text" in expanded && typeof expanded.text === "string"
+            ? expanded.text
+            : "";
+          const expandedQueries = raw
+            .split(/\r?\n/)
+            .map((line) => line.replace(/^\s*[-*•]\s*/, "").replace(/^\d+[.)]\s*/, "").trim())
+            .filter((line) => line.length >= 2 && line.length <= 120)
+            .filter((line, index, values) => values.indexOf(line) === index)
+            .slice(0, 5);
+          if (expandedQueries.length > 0) {
+            usable = (await searchQueries([...baseQueries, ...expandedQueries])).slice(0, 6);
           }
-          const key = \`\${match.sourceId}:\${match.pageNumber}:\${match.text}\`;
-          const score = typeof match.score === "number" ? match.score : 0;
-          const current = bestByChunk.get(key);
-          if (!current || score > current.score) {
-            bestByChunk.set(key, {
-              sourceId: match.sourceId,
-              pageNumber: match.pageNumber,
-              text: match.text.trim(),
-              score,
-            });
-          }
+        } catch (error) {
+          console.warn("Knowledge DB AI query expansion failed; continuing with local retrieval.", error);
         }
       }
 
-      const usable = [...bestByChunk.values()]
-        .sort((a, b) => b.score - a.score)
-        .slice(0, 6);
       if (usable.length === 0) return "";
 
       return usable.map((match) =>
-        \`[Knowledge DB / \${sourceNames.get(match.sourceId) ?? match.sourceId} / p.\${match.pageNumber} / score \${match.score.toFixed(3)}]\\n\${match.text}\`,
-      ).join("\\n\\n");
+        `[Knowledge DB / ${sourceNames.get(match.sourceId) ?? match.sourceId} / p.${match.pageNumber} / score ${match.score.toFixed(3)}]\n${match.text}`,
+      ).join("\n\n");
     } catch (error) {
       console.warn("Knowledge DB retrieval failed; continuing without retrieved context.", error);
       return "";
     }
-  }, [document, turnReferences]);
+  }, [document, lockedProvider, provider, turnReferences]);
+
 
   const buildRunParams = useCallback(async (): Promise<RunParams> => {
     const turnAttachments = await createAttachmentsWithSelectedOverlayPreview({
