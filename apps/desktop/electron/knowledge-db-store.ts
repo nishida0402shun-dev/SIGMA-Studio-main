@@ -156,17 +156,31 @@ export class KnowledgeDbStore {
   }
 
   async extractPages(sourceId: string, pageNumbers: number[]): Promise<Uint8Array> {
-    const source = (await this.readLibrary()).sources.find((item) => item.id === sourceId);
-    if (!source) throw new Error("knowledge source not found");
-    const sourceBytes = await fs.readFile(source.storedPath);
-    const input = await PDFDocument.load(sourceBytes);
+    return this.extractSelectedPages([{ sourceId, pageNumbers }]);
+  }
+
+  async extractSelectedPages(
+    selections: Array<{ sourceId: string; pageNumbers: number[] }>,
+  ): Promise<Uint8Array> {
+    const library = await this.readLibrary();
     const output = await PDFDocument.create();
-    const uniquePages = [...new Set(pageNumbers)]
-      .filter((page) => Number.isInteger(page) && page >= 1 && page <= input.getPageCount())
-      .map((page) => page - 1);
-    if (uniquePages.length === 0) throw new Error("no valid pages selected");
-    const copied = await output.copyPages(input, uniquePages);
-    for (const page of copied) output.addPage(page);
+    let copiedCount = 0;
+
+    for (const selection of selections) {
+      const source = library.sources.find((item) => item.id === selection.sourceId);
+      if (!source) throw new Error("knowledge source not found");
+      const sourceBytes = await fs.readFile(source.storedPath);
+      const input = await PDFDocument.load(sourceBytes);
+      const uniquePages = [...new Set(selection.pageNumbers)]
+        .filter((page) => Number.isInteger(page) && page >= 1 && page <= input.getPageCount())
+        .map((page) => page - 1);
+      if (uniquePages.length === 0) continue;
+      const copied = await output.copyPages(input, uniquePages);
+      for (const page of copied) output.addPage(page);
+      copiedCount += copied.length;
+    }
+
+    if (copiedCount === 0) throw new Error("no valid pages selected");
     return output.save();
   }
 
