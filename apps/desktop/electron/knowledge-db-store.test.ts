@@ -36,6 +36,13 @@ describe("KnowledgeDbStore", () => {
     expect(opened.getPageCount()).toBe(1);
     expect(await fs.stat(openedPath)).toBeTruthy();
 
+    const regionPath = await store.extractRegion(source!.id, 2, { x: 10, y: 20, width: 200, height: 300 });
+    const region = await PDFDocument.load(await fs.readFile(regionPath));
+    expect(region.getPageCount()).toBe(1);
+    const regionSize = region.getPage(0).getSize();
+    expect(regionSize.width).toBe(200);
+    expect(regionSize.height).toBe(300);
+
     expect(await store.deleteSource(source!.id)).toBe(true);
     expect(await store.listSources()).toHaveLength(0);
     expect(await store.search("source")).toHaveLength(0);
