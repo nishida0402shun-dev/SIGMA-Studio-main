@@ -95,10 +95,14 @@ export function KnowledgeDbWorkspace({ open, onClose, onOpenAi, t }: Props) {
   async function extractPdf(): Promise<void> {
     if (!knowledgeDb || selectedPages.length === 0) return;
     const grouped = new Map<string, number[]>();
-    for (const item of selectedPages) grouped.set(item.sourceId, [...(grouped.get(item.sourceId) ?? []), item.pageNumber]);
-    if (grouped.size !== 1) return;
-    const [sourceId, pageNumbers] = [...grouped.entries()][0]!;
-    await knowledgeDb.extractPages({ sourceId, pageNumbers });
+    for (const item of selectedPages) {
+      grouped.set(item.sourceId, [...(grouped.get(item.sourceId) ?? []), item.pageNumber]);
+    }
+    const selections = [...grouped.entries()].map(([sourceId, pageNumbers]) => ({
+      sourceId,
+      pageNumbers,
+    }));
+    await knowledgeDb.extractPages({ selections });
   }
 
   async function handoffAi(): Promise<void> {
