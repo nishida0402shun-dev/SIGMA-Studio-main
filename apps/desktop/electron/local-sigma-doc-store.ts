@@ -253,6 +253,8 @@ export interface LocalSigmaDocStoreOptions {
    * 未指定時は従来どおり各アプリのuserData配下を使う。
    */
   workspaceRoot?: string;
+  /** 初回作成する既定Workspace名。 */
+  defaultWorkspaceName?: string;
   /**
    * reconcileDocumentFile が「本文が読めない」行を外部削除とみなしてソフトデリート
    * するまでの猶予時間 (ms)。作成直後でまだ本文が書き込まれていないだけの行を
@@ -322,6 +324,7 @@ export class LocalSigmaDocStore {
   private readonly watchFactory: LocalWatchFactory;
   private readonly watchRetryBaseMs: number;
   private readonly watchMaxRetries: number;
+  private readonly defaultWorkspaceName: string;
   private readonly appendDocumentVersion: typeof appendDocumentVersion;
   private readonly deleteDocumentVersions: typeof deleteDocumentVersions;
   // readLibraryFileWithReport が最後に正常パースできた生バイト列 (library.json
@@ -353,6 +356,7 @@ export class LocalSigmaDocStore {
   constructor(userDataPath: string, options: LocalSigmaDocStoreOptions = {}) {
     const workspaceRoot = options.workspaceRoot ?? userDataPath;
     this.dataDir = path.join(workspaceRoot, DATA_DIR_NAME);
+    this.defaultWorkspaceName = options.defaultWorkspaceName?.trim() || "マイ教材";
     this.documentsDir = path.join(this.dataDir, DOCUMENTS_DIR_NAME);
     this.docBlockHashesDir = path.join(this.dataDir, DOC_BLOCK_HASHES_DIR_NAME);
     this.docVersionsDir = path.join(this.dataDir, DOC_VERSIONS_DIR_NAME);
@@ -1674,7 +1678,7 @@ export class LocalSigmaDocStore {
     const now = new Date().toISOString();
     const workspace: LocalWorkspaceRecord = {
       id: createId("workspace"),
-      name: "マイ教材",
+      name: this.defaultWorkspaceName,
       createdAt: now,
       updatedAt: now,
       deletedAt: null,
