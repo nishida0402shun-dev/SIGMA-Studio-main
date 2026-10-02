@@ -1,4 +1,3 @@
-/* eslint-disable no-restricted-syntax -- Electron MCP protocol/error strings are not UI copy. */
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
 import type { CallToolResult, Tool } from "@modelcontextprotocol/sdk/types.js";
