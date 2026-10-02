@@ -3,7 +3,7 @@
 import { ChevronDown, ExternalLink, Globe, Monitor, RefreshCw } from "lucide-react";
 import { useEffect, useMemo, useRef, useState, type ElementType } from "react";
 
-import { AntigravityMark, ClaudeMark, OpenAiMark } from "@/components/branding/provider-logos";
+import { AntigravityMark, ClaudeMark, GeminiMark, OpenAiMark } from "@/components/branding/provider-logos";
 import { getDesktopBridge } from "@/lib/desktop-bridge";
 
 export type AiWebProvider = "chatgpt" | "claude" | "gemini";
@@ -16,7 +16,7 @@ const PROVIDERS: Array<{ id: AiWebProvider; label: string; url: string }> = [
 
 function providerMark(provider: AiWebProvider) {
   if (provider === "claude") return <ClaudeMark size={15} />;
-  if (provider === "gemini") return <AntigravityMark size={15} />;
+  if (provider === "gemini") return <GeminiMark size={15} />;
   return <OpenAiMark size={15} />;
 }
 
