@@ -54,7 +54,7 @@ export function registerKnowledgeDbIpc(deps: RegisterKnowledgeDbIpcDeps): void {
     return store.listSources(requireWorkspaceId(payload));
   });
 
-  ipcMain.handle("knowledge-db:import", async (event, filePaths: unknown) => {
+  ipcMain.handle("knowledge-db:import", async (event, payload: unknown) => {
     if (event.sender !== getMainWindow()?.webContents) return [];
     if (!payload || typeof payload !== "object") throw new Error(te("invalid source paths"));
     const workspaceId = requireWorkspaceId(payload);
@@ -84,6 +84,7 @@ export function registerKnowledgeDbIpc(deps: RegisterKnowledgeDbIpcDeps): void {
   ipcMain.handle("knowledge-db:extract-region", async (event, payload: unknown) => {
     if (event.sender !== getMainWindow()?.webContents) return null;
     if (!payload || typeof payload !== "object") throw new Error("invalid region request");
+    const workspaceId = requireWorkspaceId(payload);
     const sourceId = "sourceId" in payload && typeof payload.sourceId === "string" ? payload.sourceId : "";
     const pageNumber = "pageNumber" in payload && typeof payload.pageNumber === "number" ? payload.pageNumber : 0;
     const rect = "rect" in payload && payload.rect && typeof payload.rect === "object" ? payload.rect : null;
@@ -101,6 +102,7 @@ export function registerKnowledgeDbIpc(deps: RegisterKnowledgeDbIpcDeps): void {
   ipcMain.handle("knowledge-db:open-page", async (event, payload: unknown) => {
     if (event.sender !== getMainWindow()?.webContents) return { ok: false };
     if (!payload || typeof payload !== "object") throw new Error("invalid page request");
+    const workspaceId = requireWorkspaceId(payload);
     const sourceId = "sourceId" in payload && typeof payload.sourceId === "string" ? payload.sourceId : "";
     const pageNumber = "pageNumber" in payload && typeof payload.pageNumber === "number" ? payload.pageNumber : 0;
     if (!sourceId || !Number.isInteger(pageNumber) || pageNumber < 1) throw new Error("invalid page request");
@@ -165,6 +167,7 @@ export function registerKnowledgeDbIpc(deps: RegisterKnowledgeDbIpcDeps): void {
   ipcMain.handle("knowledge-db:set-page-type", async (event, payload: unknown) => {
     if (event.sender !== getMainWindow()?.webContents) return null;
     if (!payload || typeof payload !== "object") throw new Error("invalid page metadata");
+    const workspaceId = requireWorkspaceId(payload);
     const sourceId = "sourceId" in payload && typeof payload.sourceId === "string" ? payload.sourceId : "";
     const pageNumber = "pageNumber" in payload && typeof payload.pageNumber === "number" ? payload.pageNumber : 0;
     const semanticType = "semanticType" in payload && typeof payload.semanticType === "string"
