@@ -2701,6 +2701,7 @@ export function AiEditPanel({
                 appliedChange={appliedChangesByTurnId?.get(turn.id)}
                 onRevertAppliedChange={onRevertAppliedChange}
                 onOpenSourceDocument={onOpenSourceDocument}
+                documentWorkspaceId={documentWorkspaceId}
                 restorable={restorableProposalsByTurnId?.get(turn.id)}
                 onRestoreProposal={onRestoreProposal}
                 proposal={proposal}
@@ -3524,6 +3525,7 @@ export function AssistantTurnView({
   appliedChange,
   onRevertAppliedChange,
   onOpenSourceDocument,
+  documentWorkspaceId,
   restorable,
   onRestoreProposal,
   proposal,
@@ -3542,6 +3544,7 @@ export function AssistantTurnView({
   appliedChange?: AiAppliedTurnChange;
   onRevertAppliedChange?: (proposalIds: string[]) => Promise<{ ok: true } | { ok: false; reason: string }>;
   onOpenSourceDocument?: (params: AiSourceReferenceOpenDocumentParams) => void;
+  documentWorkspaceId?: string | null;
   /** Set only when this turn's latest proposal ended up rejected/reverted, i.e.
    * can be revived with a single click (see buildRestorableProposalsByTurnId). */
   restorable?: { proposalIds: string[] };
