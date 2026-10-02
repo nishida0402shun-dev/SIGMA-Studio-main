@@ -389,7 +389,11 @@ export interface DesktopGeminiAPI {
   onStatusChange(handler: () => void): () => void;
 }
 
-export interface DesktopShellAPI {
+export interface DesktopWebAiAPI {
+  getPreloadUrl(): Promise<string>;
+}
+
+interface DesktopShellAPI {
   openExternal(url: string): Promise<{ ok: boolean; error?: string }>;
 }
 
@@ -887,6 +891,7 @@ export interface DesktopAPI {
   app: DesktopAppAPI;
   updater?: DesktopUpdaterAPI;
   shell: DesktopShellAPI;
+  webAi?: DesktopWebAiAPI;
   settings?: DesktopSettingsAPI;
   fonts?: DesktopFontsAPI;
   codex: DesktopCodexAPI;
