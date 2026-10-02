@@ -41,8 +41,6 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
         with:
-          ref: ${{ needs.prepare.outputs.ref }}
-        with:
           fetch-depth: 2
 
       - name: Set up Node.js
@@ -96,6 +94,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.prepare.outputs.ref }}
 
       - name: Set up Node.js
         uses: actions/setup-node@v4
