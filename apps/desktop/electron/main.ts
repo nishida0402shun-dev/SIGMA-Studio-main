@@ -69,6 +69,7 @@ import { createProposalApprovalCoordinator } from "./proposal-approval";
 import { registerWorkspacePreviewIpc } from "./ipc/workspace-preview";
 import { createWindowCloseHandshake, type WindowCloseHandshake } from "./window-close-handshake";
 import { LocalWebAiBridgeStore, createWebAiBridgeServer, type WebAiBridgeInfo } from "./web-ai-bridge";
+import { createWebAiMcpGateway, type WebAiMcpGateway } from "./web-ai-mcp-gateway";
 import { createWebAiAgentRuntime } from "./web-ai-agent-runtime";
 import {
   getPageMetrics,
@@ -290,6 +291,7 @@ void localAiRenderBridgeStore.clear();
 let aiRenderBridgeServer: http.Server | null = null;
 let webAiBridgeServer: http.Server | null = null;
 let webAiBridgeInfo: WebAiBridgeInfo | null = null;
+let webAiMcpGateway: WebAiMcpGateway | null = null;
 const pendingRenderDocuments = new Map<string, SigmaDocument>();
 
 const webAiAgentRuntime = createWebAiAgentRuntime({
@@ -1809,6 +1811,8 @@ async function startAiRenderBridgeServer(): Promise<void> {
 }
 
 async function startWebAiBridgeServer(): Promise<void> {
+  webAiMcpGateway ??= createWebAiMcpGateway({ mcpServerPath: resolveMcpServerScriptPath(), userDataPath: USER_DATA_PATH });
+  await webAiMcpGateway.start();
   const token = crypto.randomBytes(32).toString("hex");
   const server = createWebAiBridgeServer({
     token,
@@ -1826,6 +1830,7 @@ async function startWebAiBridgeServer(): Promise<void> {
     rejectProposal: async (proposalId) => localMcpProposalStore.rejectProposals([proposalId], "Web AI rejected"),
     startRun: async (input, onEvent) => webAiAgentRuntime.start(input, onEvent),
     cancelRun: (runId) => webAiAgentRuntime.cancel(runId),
+    mcpGateway: webAiMcpGateway ?? createWebAiMcpGateway({ mcpServerPath: resolveMcpServerScriptPath(), userDataPath: USER_DATA_PATH }),
   });
   webAiBridgeServer = server;
   server.on("error", (error) => {
@@ -1852,6 +1857,8 @@ async function startWebAiBridgeServer(): Promise<void> {
 
 function stopWebAiBridgeServer(): void {
   webAiBridgeServer?.close();
+  void webAiMcpGateway?.stop();
+  webAiMcpGateway = null;
   webAiBridgeServer = null;
   webAiBridgeInfo = null;
   void localWebAiBridgeStore.clear();
