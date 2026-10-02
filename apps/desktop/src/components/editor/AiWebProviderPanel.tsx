@@ -1,7 +1,7 @@
 "use client";
 
 import { ChevronDown, ExternalLink, Globe, Monitor, RefreshCw } from "lucide-react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type ElementType } from "react";
 
 import { AntigravityMark, ClaudeMark, OpenAiMark } from "@/components/branding/provider-logos";
 
@@ -48,8 +48,7 @@ export function AiWebProviderPanel({
 
     const allowedHosts = new Set(["chatgpt.com", "www.chatgpt.com", "claude.ai", "www.claude.ai", "gemini.google.com"]);
     const onNavigate = (event: Event) => {
-      const detail = (event as CustomEvent<{ url?: string }>).detail;
-      const url = detail?.url;
+      const url = (event as Event & { url?: string }).url;
       if (!url) return;
       try {
         const host = new URL(url).hostname;
@@ -131,7 +130,7 @@ export function AiWebProviderPanel({
       </div>
       <div className="ai-web-provider-surface">
         {(() => {
-          const Webview = "webview" as unknown as React.ElementType;
+          const Webview = "webview" as unknown as ElementType;
           return (
             <Webview
               ref={(node: HTMLElement | null) => {
