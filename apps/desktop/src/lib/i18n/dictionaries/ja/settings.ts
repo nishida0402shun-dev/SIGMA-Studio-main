@@ -355,6 +355,7 @@ export const settings = {
     title: "AI設定",
     navAria: "AI設定のナビゲーション",
     connection: "接続・動作",
+    webAi: "Web AI",
     scopeGlobal: "グローバル · すべてのワークスペースで使用",
     scopeWorkspace: "ワークスペース · このワークスペースで使用",
     instructions: "AIへの指示",
