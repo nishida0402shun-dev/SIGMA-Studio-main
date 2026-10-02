@@ -36,6 +36,7 @@ import  {
 
 import { APP_READY_EVENT } from "@/components/StartupSplash";
 import { AiEditPanel } from "@/components/editor/AiEditPanel";
+import { type AiWebProvider } from "@/components/editor/AiWebProviderPanel";
 import { KnowledgeDbWorkspace } from "@/components/editor/KnowledgeDbWorkspace";
 import type { KnowledgeDbAiContext } from "@/types/knowledge-db";
 import { AiSettingsDialog } from "@/components/editor/AiSettingsDialog";
@@ -933,6 +934,8 @@ function EditorShellBody({ embeddedHost, editorStore }: EditorShellProps & { edi
 
   const versionHistoryWarning = versionHistoryWarnings[activeFileId] ?? null;
   const [aiDisplayMode, setAiDisplayMode] = useState<AiDisplayMode>("inline");
+  const [aiContentMode, setAiContentMode] = useState<"cli" | "web-ai">("cli");
+  const [webAiProvider, setWebAiProvider] = useState<AiWebProvider>("chatgpt");
   const [aiInlineOpen, setAiInlineOpen] = useState(false);
   const [aiInlineAnchor, setAiInlineAnchor] = useState<{ left: number; top: number } | null>(null);
   const [aiInlineRunAnchor, setAiInlineRunAnchor] = useState<{ left: number; top: number } | null>(null);
@@ -6817,6 +6820,16 @@ function EditorShellBody({ embeddedHost, editorStore }: EditorShellProps & { edi
           editorCanvasRef={editorCanvasRef}
           closeLabel={tEditor("aria.closeAiChat")}
           onClose={closeAiSurface}
+          contentMode={aiContentMode}
+          onContentModeChange={(mode) => {
+            setAiContentMode(mode);
+            if (mode === "web-ai" && aiDisplayMode !== "sidebar") {
+              setAiDisplayMode("sidebar");
+            }
+          }}
+          webAiProvider={webAiProvider}
+          onWebAiProviderChange={setWebAiProvider}
+          workspaceId={activeDocumentMetadata?.workspaceId ?? null}
         >
           <AiEditPanel
             document={document}
