@@ -3804,3 +3804,158 @@
   cursor: pointer;
   line-height: 1.1;
 }
+
+/* Shared AI surface switcher. CLI and Web intentionally live in the same sidebar
+   so changing the surface never changes the surrounding editor layout. */
+.ai-surface-switcher {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  flex: 0 0 auto;
+  min-height: 30px;
+  padding: 4px 6px;
+  border-bottom: 1px solid var(--border-subtle);
+  background: var(--surface-muted, rgba(0, 0, 0, 0.02));
+}
+
+.ai-surface-switcher-tab {
+  border: 0;
+  border-radius: 6px;
+  padding: 4px 10px;
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+  font: inherit;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.ai-surface-switcher-tab:hover,
+.ai-surface-switcher-tab[data-active="true"] {
+  background: var(--surface-raised, rgba(0, 0, 0, 0.07));
+  color: var(--text-primary);
+}
+
+.ai-web-provider-panel {
+  display: flex;
+  flex: 1 1 auto;
+  min-height: 0;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.ai-web-provider-header {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  flex: 0 0 auto;
+  min-height: 34px;
+  padding: 5px 7px;
+  border-bottom: 1px solid var(--border-subtle);
+  background: var(--surface);
+}
+
+.ai-web-provider-selector {
+  position: relative;
+}
+
+.ai-web-provider-select,
+.ai-web-provider-close,
+.ai-web-provider-icon-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  min-height: 26px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 6px;
+  background: var(--surface-raised, transparent);
+  color: var(--text-primary);
+  cursor: pointer;
+  font: inherit;
+  font-size: 11px;
+}
+
+.ai-web-provider-select {
+  padding: 4px 7px;
+}
+
+.ai-web-provider-icon-button {
+  justify-content: center;
+  width: 26px;
+  padding: 0;
+}
+
+.ai-web-provider-close {
+  padding: 4px 7px;
+}
+
+.ai-web-provider-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.ai-web-provider-menu {
+  position: absolute;
+  z-index: 5000;
+  top: calc(100% + 4px);
+  left: 0;
+  min-width: 140px;
+  padding: 4px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.18);
+}
+
+.ai-web-provider-menu-item {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  gap: 7px;
+  padding: 7px 8px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-primary);
+  cursor: pointer;
+  font: inherit;
+  font-size: 11px;
+  text-align: left;
+}
+
+.ai-web-provider-menu-item:hover {
+  background: var(--surface-muted, rgba(0, 0, 0, 0.06));
+}
+
+.ai-web-provider-menu-item > :last-child {
+  margin-left: auto;
+}
+
+.ai-web-provider-note {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  flex: 0 0 auto;
+  min-height: 24px;
+  padding: 3px 8px;
+  border-bottom: 1px solid var(--border-subtle);
+  color: var(--text-secondary);
+  font-size: 10px;
+}
+
+.ai-web-provider-surface {
+  position: relative;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: hidden;
+  background: var(--surface);
+}
+
+.ai-web-provider-surface webview {
+  display: flex;
+  width: 100%;
+  height: 100%;
+}
