@@ -36,11 +36,12 @@ describe("Web AI bridge", () => {
       getDocument: async () => null,
       listDocuments: async () => [],
       listProposals: async () => [],
+      getProposal: async () => null,
       approveProposal: async () => null,
       rejectProposal: async () => null,
       startRun: async () => ({ status: "answer" }),
       cancelRun: () => false,
-       mcpGateway,
+      mcpGateway,
     });
     servers.push(server);
     const base = await listen(server);
@@ -66,6 +67,7 @@ describe("Web AI bridge", () => {
       getDocument: async (fileId) => ({
         fileId,
         revision: 7,
+        workspaceId: "workspace_test",
         document: { docId: "doc_test" } as never,
       }),
       listDocuments: async () => [{ fileId: "file_test", revision: 7 }],
@@ -93,6 +95,7 @@ describe("Web AI bridge", () => {
       headers: {
         Authorization: "Bearer test-token",
         "Content-Type": "application/json",
+        "X-Sigma-Workspace-Id": "workspace_test",
       },
       body: JSON.stringify({
         provider: "chatgpt",
@@ -107,7 +110,7 @@ describe("Web AI bridge", () => {
     let status: { run: { status: string; result?: { status?: string } }; events: unknown[] } | null = null;
     for (let attempt = 0; attempt < 20; attempt += 1) {
       const response = await fetch(`${base}/v1/agent/runs/${encodeURIComponent(createdBody.runId)}`, {
-        headers: { Authorization: "Bearer test-token" },
+        headers: { Authorization: "Bearer test-token", "X-Sigma-Workspace-Id": "workspace_test" },
       });
       status = await response.json();
       if (status?.run.status !== "running") break;
@@ -118,7 +121,7 @@ describe("Web AI bridge", () => {
     expect(status?.events).toHaveLength(1);
 
     const documents = await fetch(`${base}/v1/documents`, {
-      headers: { Authorization: "Bearer test-token" },
+      headers: { Authorization: "Bearer test-token", "X-Sigma-Workspace-Id": "workspace_test" },
     });
     expect((await documents.json()).documents).toEqual([{ fileId: "file_test", revision: 7 }]);
   });
