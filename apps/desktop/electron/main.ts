@@ -5,7 +5,7 @@ import { resolveDevServerUrl, isDevServerNavigation } from "./dev-server";
 import http from "node:http";
 import path from "node:path";
 import { existsSync, readFileSync, watch, type FSWatcher } from "node:fs";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 
 import { LocalAiEditChatRoomStore } from "./ai-edit-chat-room-store";
 import { LocalAiEditRunContextStore, sweepOrphanPerRunContextFiles } from "./ai-edit-run-context";
@@ -109,6 +109,38 @@ if (!hasSingleInstanceLock) {
   } else app.exit(0);
 }
 let mainWindow: BrowserWindow | null = null;
+const WEB_AI_ALLOWED_HOSTS = new Set([
+  "chatgpt.com",
+  "chat.openai.com",
+  "claude.ai",
+  "gemini.google.com",
+]);
+
+ipcMain.handle("web-ai:get-preload-url", (event) => {
+  if (event.sender !== mainWindow?.webContents) {
+    throw new Error("web AI preload URL is only available to the main renderer");
+  }
+  return pathToFileURL(path.join(__dirname, "web-ai-preload.cjs")).toString();
+});
+
+ipcMain.handle("web-ai:get-bridge-info", (event) => {
+  const url = event.senderFrame?.url ?? "";
+  let hostname = "";
+  try {
+    hostname = new URL(url).hostname;
+  } catch {
+    throw new Error("invalid Web AI frame origin");
+  }
+  const allowed = [...WEB_AI_ALLOWED_HOSTS].some((host) => hostname === host || hostname.endsWith(`.\${host}`));
+  if (!allowed || !webAiBridgeInfo) {
+    throw new Error("Web AI bridge is unavailable for this origin");
+  }
+  return {
+    url: webAiBridgeInfo.url,
+    token: webAiBridgeInfo.token,
+  };
+});
+
 const externalDocumentOpenQueue = new ExternalDocumentOpenQueue(() => {
   if (mainWindow && !mainWindow.isDestroyed()) {
     mainWindow.webContents.send("file:open-document-available");
@@ -453,6 +485,26 @@ function createWindow() {
       installUpdateAfterMainWindowClose = false;
     },
     isExpectedSender: (sender) => sender === win.webContents,
+  });
+
+  win.webContents.on("will-attach-webview", (event, webPreferences, params) => {
+    const expectedPreload = path.join(__dirname, "web-ai-preload.cjs");
+    const requestedPreload = webPreferences.preload ?? "";
+    let hostname = "";
+    try {
+      hostname = new URL(params.src).hostname;
+    } catch {
+      event.preventDefault();
+      return;
+    }
+    const allowed = [...WEB_AI_ALLOWED_HOSTS].some((host) => hostname === host || hostname.endsWith(`.\${host}`));
+    if (requestedPreload !== expectedPreload || !allowed) {
+      event.preventDefault();
+      return;
+    }
+    webPreferences.nodeIntegration = false;
+    webPreferences.contextIsolation = true;
+    webPreferences.sandbox = false;
   });
 
   win.webContents.setWindowOpenHandler(({ url }) => {
