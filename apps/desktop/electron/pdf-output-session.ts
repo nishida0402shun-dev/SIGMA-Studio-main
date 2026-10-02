@@ -54,7 +54,7 @@ export async function renderPdfOutputSession(
       await writeHiddenPdfPage(hiddenWindow, captured.documentHtml);
       const pdf = await hiddenWindow.webContents.printToPDF({
         displayHeaderFooter: false,
-        margins: { marginType: "none" },
+        margins: { top: 0, bottom: 0, left: 0, right: 0 },
         pageSize: {
           width: expectation.pageWidthMm / MM_PER_INCH,
           height: expectation.pageHeightMm / MM_PER_INCH,
