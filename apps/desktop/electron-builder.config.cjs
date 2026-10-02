@@ -149,6 +149,9 @@ module.exports = {
   },
   nsis: {
     oneClick: false,
+    // Windows assisted NSIS can crash in the per-user default mode on some runners/machines.
+    // Keep the install-mode choice available, but start from the per-machine path.
+    selectPerMachineByDefault: true,
     allowToChangeInstallationDirectory: true,
     differentialPackage: true,
   },
