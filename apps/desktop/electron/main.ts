@@ -1818,6 +1818,10 @@ async function startWebAiBridgeServer(): Promise<void> {
     },
     listDocuments: async () => localSigmaDocStore.listFiles(),
     listProposals: async (fileId) => localMcpProposalStore.listProposals({ fileId }),
+    getProposal: async (proposalId) => {
+      const proposal = await localMcpProposalStore.loadProposal(proposalId);
+      return proposal ? { fileId: proposal.fileId } : null;
+    },
     approveProposal: async (proposalId) => approveSingleProposal(proposalId),
     rejectProposal: async (proposalId) => localMcpProposalStore.rejectProposals([proposalId], "Web AI rejected"),
     startRun: async (input, onEvent) => webAiAgentRuntime.start(input, onEvent),
