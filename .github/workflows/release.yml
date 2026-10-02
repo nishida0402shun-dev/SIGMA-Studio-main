@@ -161,6 +161,20 @@ jobs:
       - name: Build and publish installer
         working-directory: apps/desktop
         run: npx --no-install electron-builder --${{ matrix.platform }} --publish always --config electron-builder.config.cjs
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_CONTENT_RULES: ${{ secrets.RELEASE_CONTENT_RULES }}
+          SIGMA_STUDIO_REQUIRE_RELEASE_AUDIT: ${{ secrets.RELEASE_CONTENT_RULES != '' && 'true' || 'false' }}
+          SIGMA_STUDIO_BETA_BUILD: ${{ steps.channel.outputs.channel == 'beta' && 'true' || 'false' }}
+          # macOS signing + notarization. Scoped to the mac job so the Windows
+          # build never mistakes the .p12 for a Windows cert. Public macOS
+          # releases require these secrets; missing values fail the mac job.
+          CSC_LINK: ${{ matrix.platform == 'mac' && secrets.MAC_CSC_LINK || '' }}
+          CSC_KEY_PASSWORD: ${{ matrix.platform == 'mac' && secrets.MAC_CSC_KEY_PASSWORD || '' }}
+          APPLE_ID: ${{ matrix.platform == 'mac' && secrets.APPLE_ID || '' }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ matrix.platform == 'mac' && secrets.APPLE_APP_SPECIFIC_PASSWORD || '' }}
+          APPLE_TEAM_ID: ${{ matrix.platform == 'mac' && secrets.APPLE_TEAM_ID || '' }}
+          SIGMA_STUDIO_REQUIRE_MAC_SIGNING: ${{ matrix.platform == 'mac' && secrets.MAC_CSC_LINK != '' && secrets.MAC_CSC_KEY_PASSWORD != '' && secrets.APPLE_ID != '' && secrets.APPLE_APP_SPECIFIC_PASSWORD != '' && secrets.APPLE_TEAM_ID != '' && 'true' || 'false' }}
 
       - name: Install and launch Windows installer
         if: matrix.platform == 'win'
@@ -189,17 +203,3 @@ jobs:
           }
 
 
-        env:
-          GH_TOKEN: ${{ github.token }}
-          RELEASE_CONTENT_RULES: ${{ secrets.RELEASE_CONTENT_RULES }}
-          SIGMA_STUDIO_REQUIRE_RELEASE_AUDIT: ${{ secrets.RELEASE_CONTENT_RULES != '' && 'true' || 'false' }}
-          SIGMA_STUDIO_BETA_BUILD: ${{ steps.channel.outputs.channel == 'beta' && 'true' || 'false' }}
-          # macOS signing + notarization. Scoped to the mac job so the Windows
-          # build never mistakes the .p12 for a Windows cert. Public macOS
-          # releases require these secrets; missing values fail the mac job.
-          CSC_LINK: ${{ matrix.platform == 'mac' && secrets.MAC_CSC_LINK || '' }}
-          CSC_KEY_PASSWORD: ${{ matrix.platform == 'mac' && secrets.MAC_CSC_KEY_PASSWORD || '' }}
-          APPLE_ID: ${{ matrix.platform == 'mac' && secrets.APPLE_ID || '' }}
-          APPLE_APP_SPECIFIC_PASSWORD: ${{ matrix.platform == 'mac' && secrets.APPLE_APP_SPECIFIC_PASSWORD || '' }}
-          APPLE_TEAM_ID: ${{ matrix.platform == 'mac' && secrets.APPLE_TEAM_ID || '' }}
-          SIGMA_STUDIO_REQUIRE_MAC_SIGNING: ${{ matrix.platform == 'mac' && secrets.MAC_CSC_LINK != '' && secrets.MAC_CSC_KEY_PASSWORD != '' && secrets.APPLE_ID != '' && secrets.APPLE_APP_SPECIFIC_PASSWORD != '' && secrets.APPLE_TEAM_ID != '' && 'true' || 'false' }}
