@@ -4,7 +4,6 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ChevronLeft, Plus } from "lucide-react";
 
 import { ChatPromptField } from "./ChatPromptField";
-import { AiWebProviderPanel, type AiWebProvider } from "./AiWebProviderPanel";
 import { DesktopSettingsModal } from "./DesktopSettingsModal";
 import { Button, IconButton } from "@/components/ui/Button";
 import { ModalBody, ModalFrame, ModalHeader } from "@/components/ui/Modal";
@@ -33,7 +32,7 @@ export interface AiSettingsDialogProps {
   focusEntryId?: string;
 }
 
-type NavSection = "ai-runtime" | "web-ai" | "global-instructions" | "global-skills" | "workspace-instructions" | "workspace-skills";
+type NavSection = "ai-runtime" | "global-instructions" | "global-skills" | "workspace-instructions" | "workspace-skills";
 
 const DESCRIPTION_MAX_LENGTH = 250;
 const CONTENT_MAX_LENGTH = 12_000;
@@ -63,7 +62,6 @@ function AiSettingsBody({ onClose, activeWorkspaceId, focusEntryId }: { onClose:
   const [selectedWorkspaceId, setSelectedWorkspaceId] = useState<string | null>(activeWorkspaceId ?? null);
   const [workspacePickerOpen, setWorkspacePickerOpen] = useState(false);
   const [editingSkillId, setEditingSkillId] = useState<string | null>(null);
-  const [webAiProvider, setWebAiProvider] = useState<AiWebProvider>("chatgpt");
 
   const refreshTree = useCallback(async () => {
     if (!bridge?.aiResources) {
@@ -172,16 +170,6 @@ function AiSettingsBody({ onClose, activeWorkspaceId, focusEntryId }: { onClose:
               >
                 {t("ai.connection")}
               </Button>
-              <Button
-                tone="ghost"
-                size="sm"
-                className={`ai-settings-nav-button ${section === "web-ai" ? "active" : ""}`}
-                aria-pressed={section === "web-ai"}
-                aria-current={section === "web-ai" ? "page" : undefined}
-                onClick={() => selectSection("web-ai")}
-              >
-                {t("ai.webAi")}
-              </Button>
             </Stack>
             <Stack className="ai-settings-nav-group" gap="xs">
               <p className="ai-settings-nav-caption">{t("ai.scopeGlobal")}</p>
@@ -256,16 +244,6 @@ function AiSettingsBody({ onClose, activeWorkspaceId, focusEntryId }: { onClose:
                 focusEntryId={focusEntryId}
                 onClose={onClose}
               />
-            )}
-            {section === "web-ai" && (
-              <div className="ai-settings-web-ai-pane">
-                <AiWebProviderPanel
-                  provider={webAiProvider}
-                  onProviderChange={setWebAiProvider}
-                  workspaceId={selectedWorkspaceId}
-                  embedded
-                />
-              </div>
             )}
             {section === "global-instructions" && (
               <InstructionPane
