@@ -294,20 +294,12 @@ export function createWebAiBridgeServer(deps: CreateWebAiBridgeServerDeps): http
       }
 
       if (req.method === "GET" && pathname === "/v1/mcp/tools") {
-        if (!workspaceId) {
-          sendJson(res, 400, { ok: false, error: "workspace is required" }, origin);
-          return;
-        }
         const tools = await deps.mcpGateway.listTools(workspaceId);
         sendJson(res, 200, { ok: true, workspaceId, tools }, origin);
         return;
       }
 
       if (req.method === "POST" && pathname === "/v1/mcp/call") {
-        if (!workspaceId) {
-          sendJson(res, 400, { ok: false, error: "workspace is required" }, origin);
-          return;
-        }
         const body = await readBody(req);
         if (!body || typeof body !== "object" || Array.isArray(body)) {
           sendJson(res, 400, { ok: false, error: "invalid request" }, origin);
