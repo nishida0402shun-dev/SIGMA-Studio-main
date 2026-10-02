@@ -248,6 +248,32 @@ async function registerSigmaWebAiTools(): Promise<void> {
   }, { signal: controller.signal });
 
   await modelContext.registerTool({
+    name: "sigma_mcp_list_tools",
+    description: "List the read-only MCP tools exposed by Sigma Studio for the selected Workspace.",
+    inputSchema: { type: "object", properties: {} },
+    annotations: { readOnlyHint: true, untrustedContentHint: false },
+    execute: async () => callApi("/v1/mcp/tools"),
+  }, { signal: controller.signal });
+
+  await modelContext.registerTool({
+    name: "sigma_mcp_call_tool",
+    description: "Call a read-only SIGMA MCP tool returned by sigma_mcp_list_tools.",
+    inputSchema: {
+      type: "object",
+      properties: { name: { type: "string" }, arguments: { type: "object" } },
+      required: ["name"],
+    },
+    annotations: { readOnlyHint: true, untrustedContentHint: true },
+    execute: async (input) => callApi("/v1/mcp/call", {
+      method: "POST",
+      body: JSON.stringify({
+        name: String(input.name),
+        arguments: asRecord(input.arguments),
+      }),
+    }),
+  }, { signal: controller.signal });
+
+  await modelContext.registerTool({
     name: "sigma_run_agent",
     description: "Run Codex, Claude, or Gemini through Sigma Studio's Agent Runtime. The agent can create normal Sigma edit proposals; it cannot execute arbitrary shell commands through this tool.",
     inputSchema: {
