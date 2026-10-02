@@ -1120,6 +1120,8 @@ const AI_SETTINGS_STYLE = `
 .ai-settings-loading-line { width: min(360px, 82%); height: 16px; border-radius: var(--radius-control); }
 .ai-settings-loading-surface { flex: 1; min-height: 260px; border-radius: var(--radius-panel); }
 .ai-settings-pane { min-height: 100%; display: flex; flex-direction: column; gap: var(--space-lg); }
+.ai-settings-web-ai-pane { min-height: 100%; height: 100%; display: flex; overflow: hidden; border: 1px solid var(--border-subtle,#e5e5e5); border-radius: var(--radius-panel); background: var(--surface,#fff); }
+.ai-settings-web-ai-pane .ai-web-provider-panel { min-height: 0; width: 100%; }
 .ai-settings-textarea-wrap { position: relative; flex: 1; min-height: 260px; display: flex; }
 .ai-settings-textarea { flex: 1; width: 100%; resize: none; border: 1px solid var(--border,#dadada); border-radius: var(--radius-control); padding: var(--space-md) var(--space-lg); font: 13.5px/1.75 -apple-system,BlinkMacSystemFont,"Hiragino Sans",sans-serif; color: var(--text-primary,#111); background: var(--background,#fff); }
 .ai-settings-textarea:focus { outline: none; border-color: var(--accent,#1f5eff); }
