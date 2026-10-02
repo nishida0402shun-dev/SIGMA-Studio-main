@@ -131,7 +131,7 @@ ipcMain.handle("web-ai:get-bridge-info", (event) => {
   } catch {
     throw new Error("invalid Web AI frame origin");
   }
-  const allowed = [...WEB_AI_ALLOWED_HOSTS].some((host) => hostname === host || hostname.endsWith(`.\${host}`));
+  const allowed = [...WEB_AI_ALLOWED_HOSTS].some((host) => hostname === host || hostname.endsWith(`.${host}`));
   if (!allowed || !webAiBridgeInfo) {
     throw new Error("Web AI bridge is unavailable for this origin");
   }
@@ -498,7 +498,7 @@ function createWindow() {
       event.preventDefault();
       return;
     }
-    const allowed = [...WEB_AI_ALLOWED_HOSTS].some((host) => hostname === host || hostname.endsWith(`.\${host}`));
+    const allowed = [...WEB_AI_ALLOWED_HOSTS].some((host) => hostname === host || hostname.endsWith(`.${host}`));
     if (requestedPreload !== expectedPreloadPath && requestedPreload !== expectedPreloadUrl || !allowed) {
       event.preventDefault();
       return;
