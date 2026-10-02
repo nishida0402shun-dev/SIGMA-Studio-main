@@ -324,35 +324,36 @@ const desktopAPI = {
     chooseSources(): Promise<{ paths: string[] } | null> {
       return ipcRenderer.invoke("knowledge-db:choose-sources");
     },
-    list(): Promise<unknown[]> {
-      return ipcRenderer.invoke("knowledge-db:list");
+    list(payload: { workspaceId: string }): Promise<unknown[]> {
+      return ipcRenderer.invoke("knowledge-db:list", payload);
     },
-    search(payload: { query: string; limit?: number }): Promise<unknown[]> {
+    search(payload: { workspaceId: string; query: string; limit?: number }): Promise<unknown[]> {
       return ipcRenderer.invoke("knowledge-db:search", payload);
     },
-    importSources(paths: string[]): Promise<unknown[]> {
-      return ipcRenderer.invoke("knowledge-db:import", paths);
+    importSources(payload: { workspaceId: string; paths: string[] }): Promise<unknown[]> {
+      return ipcRenderer.invoke("knowledge-db:import", payload);
     },
     extractPages(payload: {
+      workspaceId: string;
       sourceId?: string;
       pageNumbers?: number[];
       selections?: Array<{ sourceId: string; pageNumbers: number[] }>;
     }): Promise<{ filePath: string; pageCount: number } | null> {
       return ipcRenderer.invoke("knowledge-db:extract-pages", payload);
     },
-    setPageType(payload: { sourceId: string; pageNumber: number; semanticType: string; title?: string }): Promise<unknown> {
+    setPageType(payload: { workspaceId: string; sourceId: string; pageNumber: number; semanticType: string; title?: string }): Promise<unknown> {
       return ipcRenderer.invoke("knowledge-db:set-page-type", payload);
     },
-    deleteSource(sourceId: string): Promise<{ ok: boolean }> {
-      return ipcRenderer.invoke("knowledge-db:delete-source", sourceId);
+    deleteSource(payload: { workspaceId: string; sourceId: string }): Promise<{ ok: boolean }> {
+      return ipcRenderer.invoke("knowledge-db:delete-source", payload);
     },
-    openPage(payload: { sourceId: string; pageNumber: number }): Promise<{ ok: boolean; error?: string; filePath?: string }> {
+    openPage(payload: { workspaceId: string; sourceId: string; pageNumber: number }): Promise<{ ok: boolean; error?: string; filePath?: string }> {
       return ipcRenderer.invoke("knowledge-db:open-page", payload);
     },
-    getPagePdf(payload: { sourceId: string; pageNumber: number }): Promise<{ dataBase64: string; width: number; height: number } | null> {
+    getPagePdf(payload: { workspaceId: string; sourceId: string; pageNumber: number }): Promise<{ dataBase64: string; width: number; height: number } | null> {
       return ipcRenderer.invoke("knowledge-db:get-page-pdf", payload);
     },
-    extractRegion(payload: { sourceId: string; pageNumber: number; rect: { x: number; y: number; width: number; height: number } }): Promise<{ ok: boolean; error?: string; filePath?: string }> {
+    extractRegion(payload: { workspaceId: string; sourceId: string; pageNumber: number; rect: { x: number; y: number; width: number; height: number } }): Promise<{ ok: boolean; error?: string; filePath?: string }> {
       return ipcRenderer.invoke("knowledge-db:extract-region", payload);
     },
   },
