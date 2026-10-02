@@ -291,6 +291,23 @@ export function createWebAiBridgeServer(deps: CreateWebAiBridgeServerDeps): http
         return;
       }
 
+      if (req.method === "GET" && pathname === "/v1/context") {
+        const documents = await deps.listDocuments();
+        const scoped = workspaceId
+          ? documents.filter((document) => (
+              Boolean(document)
+              && typeof document === "object"
+              && (document as { workspaceId?: unknown }).workspaceId === workspaceId
+            ))
+          : [];
+        sendJson(res, 200, {
+          ok: true,
+          workspaceId,
+          documents: scoped,
+        }, origin);
+        return;
+      }
+
       if (req.method === "GET" && pathname === "/v1/documents") {
         const documents = await deps.listDocuments();
         const scoped = workspaceId
