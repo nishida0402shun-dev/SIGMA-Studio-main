@@ -37,6 +37,7 @@ export function AiWebProviderPanel({
   const webviewRef = useRef<HTMLElement | null>(null);
   const [menuOpen, setMenuOpen] = useState(false);
   const [preloadUrl, setPreloadUrl] = useState<string | null>(null);
+  const [webMcpAvailable, setWebMcpAvailable] = useState<boolean | null>(null);
   useEffect(() => {
     let cancelled = false;
     const promise = getDesktopBridge()?.webAi?.getPreloadUrl();
@@ -62,6 +63,14 @@ export function AiWebProviderPanel({
     }) | null;
     if (!webview) return;
 
+    const onIpcMessage = (event: Event) => {
+      const payload = (event as Event & { channel?: string; args?: unknown[] }).args?.[0];
+      if ((event as Event & { channel?: string }).channel !== "sigma-web-ai-status" || !payload || typeof payload !== "object") return;
+      const status = payload as { webMcp?: unknown };
+      if (typeof status.webMcp === "boolean") setWebMcpAvailable(status.webMcp);
+    };
+    webview.addEventListener("ipc-message", onIpcMessage);
+
     const allowedHosts = new Set(["chatgpt.com", "www.chatgpt.com", "claude.ai", "www.claude.ai", "gemini.google.com"]);
     const onNavigate = (event: Event) => {
       const url = (event as Event & { url?: string }).url;
@@ -76,7 +85,10 @@ export function AiWebProviderPanel({
       }
     };
     webview.addEventListener("will-navigate", onNavigate);
-    return () => webview.removeEventListener("will-navigate", onNavigate);
+    return () => {
+      webview.removeEventListener("will-navigate", onNavigate);
+      webview.removeEventListener("ipc-message", onIpcMessage);
+    };
   }, [provider]);
 
   useEffect(() => {
@@ -149,6 +161,9 @@ export function AiWebProviderPanel({
       <div className="ai-web-provider-note">
         <Globe size={12} />
         <span>Web版AI。SIGMA StudioのCLIセッションとは独立した会話です。</span>
+        <span aria-label="SIGMA connection status">
+          {workspaceId ? "Workspace選択済み" : "Workspace未選択"} · Bridge {preloadUrl ? "接続" : "準備中"} · WebMCP {webMcpAvailable === true ? "接続" : webMcpAvailable === false ? "非対応/未接続" : "確認中"}
+        </span>
       </div>
       <div className="ai-web-provider-surface">
         {preloadUrl ? (() => {
