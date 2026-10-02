@@ -19,6 +19,7 @@ export interface KnowledgePage {
 
 export interface KnowledgeSource {
   id: string;
+  workspaceId: string;
   name: string;
   originalPath: string;
   storedPath: string;
@@ -32,6 +33,7 @@ export interface KnowledgeSource {
 
 export interface KnowledgeSearchResult {
   id: string;
+  workspaceId: string;
   sourceId: string;
   pageNumber: number;
   chunkIndex: number;
@@ -41,6 +43,8 @@ export interface KnowledgeSearchResult {
 
 
 export interface KnowledgeDbAiContext {
+  sourceId: string;
+  pageId: string;
   sourceName: string;
   pageNumber: number;
   semanticType: KnowledgeSemanticType;
