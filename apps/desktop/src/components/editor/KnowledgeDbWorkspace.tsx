@@ -134,7 +134,8 @@ export function KnowledgeDbWorkspace({ open, onClose, onOpenAi, t }: Props) {
   }
 
   async function updateSelectedPageType(semanticType: KnowledgeSemanticType): Promise<void> {
-    if (!knowledgeDb || !selectedWorkspaceId || selectedPages.length === 0) return; = selectedPages[0];
+    if (!knowledgeDb || !selectedWorkspaceId || selectedPages.length === 0) return;
+    const target = selectedPages[0];
     const result = await knowledgeDb.setPageType({
       workspaceId: selectedWorkspaceId,
       sourceId: target.sourceId,
@@ -154,14 +155,14 @@ export function KnowledgeDbWorkspace({ open, onClose, onOpenAi, t }: Props) {
   }
 
   async function openSelectedPage(): Promise<void> {
-    if (!knowledgeDb || selectedPages.length === 0) return;
+    if (!knowledgeDb || !selectedWorkspaceId || selectedPages.length === 0) return;
     const target = selectedPages[0];
     const result = await knowledgeDb.openPage({ workspaceId: selectedWorkspaceId!, ...target });
     if (!result.ok) console.warn("Knowledge DB page open failed:", result.error);
   }
 
   async function deleteSource(sourceId: string): Promise<void> {
-    if (!knowledgeDb) return;
+    if (!knowledgeDb || !selectedWorkspaceId) return;
     const source = sources.find((item) => item.id === sourceId);
     if (!source || !window.confirm(`Knowledge DBから「${source.name}」を削除しますか？`)) return;
     const result = await knowledgeDb.deleteSource({ workspaceId: selectedWorkspaceId!, sourceId });
@@ -580,7 +581,7 @@ export function KnowledgeDbWorkspace({ open, onClose, onOpenAi, t }: Props) {
                   <KnowledgePdfPageViewer
                     sourceId={selectedPages[0]!.sourceId}
                     pageNumber={selectedPages[0]!.pageNumber}
-                    getPagePdf={(payload) => knowledgeDb?.getPagePdf(payload) ?? Promise.resolve(null)}
+                    getPagePdf={(payload) => knowledgeDb?.getPagePdf({ workspaceId: selectedWorkspaceId!, ...payload }) ?? Promise.resolve(null)}
                     onRegionSelected={(nextRegion) => setRegion(nextRegion)}
                   />
                 </div>
