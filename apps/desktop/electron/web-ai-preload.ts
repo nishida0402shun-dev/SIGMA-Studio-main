@@ -307,29 +307,7 @@ async function registerSigmaWebAiTools(): Promise<void> {
     execute: async ({ runId }) => callApi(`/v1/agent/runs/${encodeURIComponent(String(runId))}/cancel`, { method: "POST", body: "{}" }),
   }, { signal: controller.signal });
 
-  await modelContext.registerTool({
-    name: "sigma_approve_proposal",
-    description: "Approve one pending Sigma Studio AI edit proposal. This changes the document and is subject to Sigma Studio revision/conflict validation.",
-    inputSchema: {
-      type: "object",
-      properties: { proposalId: { type: "string" } },
-      required: ["proposalId"],
-    },
-    annotations: { readOnlyHint: false, consequentialHint: true, untrustedContentHint: true },
-    execute: async ({ proposalId }) => callApi(`/v1/proposals/${encodeURIComponent(String(proposalId))}/approve`, { method: "POST", body: "{}" }),
-  }, { signal: controller.signal });
 
-  await modelContext.registerTool({
-    name: "sigma_reject_proposal",
-    description: "Reject one pending Sigma Studio AI edit proposal.",
-    inputSchema: {
-      type: "object",
-      properties: { proposalId: { type: "string" } },
-      required: ["proposalId"],
-    },
-    annotations: { readOnlyHint: false, consequentialHint: true, untrustedContentHint: true },
-    execute: async ({ proposalId }) => callApi(`/v1/proposals/${encodeURIComponent(String(proposalId))}/reject`, { method: "POST", body: "{}" }),
-  }, { signal: controller.signal });
 }
 
 void registerSigmaWebAiTools().catch((error) => {
