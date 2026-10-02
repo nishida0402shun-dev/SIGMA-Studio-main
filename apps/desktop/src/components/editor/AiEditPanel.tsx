@@ -52,6 +52,7 @@ import  {
 } from "@/components/editor/ai-edit-preview-types";
 import { AiChatTextInput } from "@/components/editor/AiChatTextInput";
 import { AiConnectionGate, ClaudeConnectionGate, GeminiConnectionGate } from "@/components/editor/AiConnectionGate";
+import { AiWebProviderPanel, type AiWebProvider } from "@/components/editor/AiWebProviderPanel";
 import { AiStaleProposalNotice } from "@/components/editor/AiStaleProposalNotice";
 import { drawCroppedImageToCanvas } from "@/components/editor/overlay-canvas/image-crop";
 import type { OverlayAsset, OverlayShape } from "@/components/editor/overlay-canvas/types";
@@ -415,6 +416,8 @@ export function AiEditPanel({
   const claudeConnection = useClaudeConnection();
   const geminiConnection = useGeminiConnection();
   const [provider, setProvider] = useState<AiProvider>(initialModelPreferences.provider);
+  const [aiSurface, setAiSurface] = useState<"cli" | "web">("cli");
+  const [webProvider, setWebProvider] = useState<AiWebProvider>("chatgpt");
   const [model, setModel] = useState<AiEditModel>(initialModelPreferences.model);
   const [claudeModel, setClaudeModel] = useState<string>(initialModelPreferences.claudeModel);
   const [geminiModel, setGeminiModel] = useState<string>(initialModelPreferences.geminiModel);
@@ -2653,7 +2656,38 @@ export function AiEditPanel({
 
   return (
     <div className="ai-edit-panel" data-variant={variant}>
-      <ChatRoomHistory
+      {variant === "sidebar" && (
+        <div className="ai-surface-switcher" role="tablist" aria-label="AI surface">
+          <button
+            type="button"
+            role="tab"
+            aria-selected={aiSurface === "cli"}
+            className="ai-surface-switcher-tab"
+            data-active={aiSurface === "cli"}
+            onClick={() => setAiSurface("cli")}
+          >
+            CLI
+          </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={aiSurface === "web"}
+            className="ai-surface-switcher-tab"
+            data-active={aiSurface === "web"}
+            onClick={() => setAiSurface("web")}
+          >
+            Web
+          </button>
+        </div>
+      )}
+      {variant === "sidebar" && aiSurface === "web" ? (
+        <AiWebProviderPanel
+          provider={webProvider}
+          onProviderChange={setWebProvider}
+          onClose={() => setAiSurface("cli")}
+        />
+      ) : (
+        <>     <ChatRoomHistory
         rooms={chatRooms}
         activeRoomId={activeRoomId}
         loading={historyLoading}
@@ -2702,7 +2736,8 @@ export function AiEditPanel({
                 onRevertAppliedChange={onRevertAppliedChange}
                 onOpenSourceDocument={onOpenSourceDocument}
                 documentWorkspaceId={documentWorkspaceId}
-                restorable={restorableProposalsByTurnId?.get(turn.id)}
+        
+        </>\n      )}\n    </div>\n  );\n}e={restorableProposalsByTurnId?.get(turn.id)}
                 onRestoreProposal={onRestoreProposal}
                 proposal={proposal}
                 proposalDiff={proposalDiff}
