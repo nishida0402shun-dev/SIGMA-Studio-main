@@ -864,19 +864,21 @@ export interface DesktopWorkspacePreviewAPI {
 
 export interface DesktopKnowledgeDbAPI {
   chooseSources(): Promise<{ paths: string[] } | null>;
-  list(): Promise<unknown[]>;
-  search(payload: { query: string; limit?: number }): Promise<unknown[]>;
-  importSources(paths: string[]): Promise<unknown[]>;
+  list(payload: { workspaceId: string }): Promise<unknown[]>;
+  search(payload: { workspaceId: string; query: string; limit?: number }): Promise<unknown[]>;
+  importSources(payload: { workspaceId: string; paths: string[] }): Promise<unknown[]>;
+
   extractPages(payload: {
+    workspaceId: string;
     sourceId?: string;
     pageNumbers?: number[];
     selections?: Array<{ sourceId: string; pageNumbers: number[] }>;
   }): Promise<{ filePath: string; pageCount: number } | null>;
-  setPageType(payload: { sourceId: string; pageNumber: number; semanticType: string; title?: string }): Promise<unknown>;
-  deleteSource(sourceId: string): Promise<{ ok: boolean }>;
-  openPage(payload: { sourceId: string; pageNumber: number }): Promise<{ ok: boolean; error?: string; filePath?: string }>;
-  getPagePdf(payload: { sourceId: string; pageNumber: number }): Promise<{ dataBase64: string; width: number; height: number } | null>;
-  extractRegion(payload: { sourceId: string; pageNumber: number; rect: { x: number; y: number; width: number; height: number } }): Promise<{ ok: boolean; error?: string; filePath?: string }>;
+  setPageType(payload: { workspaceId: string; sourceId: string; pageNumber: number; semanticType: string; title?: string }): Promise<unknown>;
+  deleteSource(payload: { workspaceId: string; sourceId: string }): Promise<{ ok: boolean }>;
+  openPage(payload: { workspaceId: string; sourceId: string; pageNumber: number }): Promise<{ ok: boolean; error?: string; filePath?: string }>;
+  getPagePdf(payload: { workspaceId: string; sourceId: string; pageNumber: number }): Promise<{ dataBase64: string; width: number; height: number } | null>;
+  extractRegion(payload: { workspaceId: string; sourceId: string; pageNumber: number; rect: { x: number; y: number; width: number; height: number } }): Promise<{ ok: boolean; error?: string; filePath?: string }>;
 }
 
 export interface DesktopAPI {
