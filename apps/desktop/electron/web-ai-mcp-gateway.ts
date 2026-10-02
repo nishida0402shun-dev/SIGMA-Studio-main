@@ -90,10 +90,12 @@ export function createWebAiMcpGateway(options: WebAiMcpGatewayOptions): WebAiMcp
       if (!READ_ONLY_TOOLS.has(name)) throw new Error(`Web AI cannot use this Tool: ${name}`);
       const currentClient = await ensureStarted();
       const input = { ...args };
+      if (typeof input.workspaceId === "string" && input.workspaceId !== workspaceId) {
+        throw new Error("MCP access is restricted to the selected Workspace.");
+      }
       if (name === "list_local_documents") {
         input.workspaceId = workspaceId;
       }
-      if (typeof input.workspaceId === "string" && input.workspaceId !== workspaceId) {
         throw new Error("MCP access is restricted to the selected Workspace.");
       }
       if (typeof input.fileId === "string" && !hasExactWorkspaceFileId(
