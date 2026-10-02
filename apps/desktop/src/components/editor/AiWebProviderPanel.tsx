@@ -24,8 +24,9 @@ function providerMark(provider: AiWebProvider) {
 export interface AiWebProviderPanelProps {
   provider: AiWebProvider;
   onProviderChange: (provider: AiWebProvider) => void;
-  onClose: () => void;
+  onClose?: () => void;
   workspaceId?: string | null;
+  embedded?: boolean;
 }
 
 export function AiWebProviderPanel({
@@ -33,6 +34,7 @@ export function AiWebProviderPanel({
   onProviderChange,
   onClose,
   workspaceId = null,
+  embedded = false,
 }: AiWebProviderPanelProps) {
   const t = useT("common");
   const webviewRef = useRef<HTMLElement | null>(null);
@@ -153,10 +155,12 @@ export function AiWebProviderPanel({
           >
             <ExternalLink size={13} />
           </button>
-          <button type="button" className="ai-web-provider-close" onClick={onClose}>
-            <Monitor size={13} />
-            <span>CLI</span>
-          </button>
+          {!embedded && onClose && (
+            <button type="button" className="ai-web-provider-close" onClick={onClose}>
+              <Monitor size={13} />
+              <span>CLI</span>
+            </button>
+          )}
         </div>
       </header>
       <div className="ai-web-provider-note">
