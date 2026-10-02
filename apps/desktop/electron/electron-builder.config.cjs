@@ -101,8 +101,8 @@ module.exports = {
   generateUpdatesFilesForAllChannels: true,
   publish: {
     provider: "github",
-    owner: "Atsu-Taiyo",
-    repo: "SIGMA-Studio",
+    owner: "nishida0402shun-dev",
+    repo: "SIGMA-Studio-main",
     releaseType: isBetaBuild ? "prerelease" : "release",
     ...(isBetaBuild ? { channel: "beta" } : {}),
   },
