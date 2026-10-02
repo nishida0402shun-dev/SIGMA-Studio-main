@@ -27,25 +27,26 @@ describe("KnowledgeDbStore", () => {
     tempDirs.push(dataDir);
     const sourcePath = await createPdf("source.pdf", 3);
     const store = new KnowledgeDbStore(dataDir);
+    const workspaceId = "workspace-a";
 
-    const [source] = await store.addFiles([sourcePath]);
+    const [source] = await store.addFiles(workspaceId, [sourcePath]);
     expect(source).toBeTruthy();
 
-    const openedPath = await store.openPage(source!.id, 2);
+    const openedPath = await store.openPage(workspaceId, source!.id, 2);
     const opened = await PDFDocument.load(await fs.readFile(openedPath));
     expect(opened.getPageCount()).toBe(1);
     expect(await fs.stat(openedPath)).toBeTruthy();
 
-    const regionPath = await store.extractRegion(source!.id, 2, { x: 10, y: 20, width: 200, height: 300 });
+    const regionPath = await store.extractRegion(workspaceId, source!.id, 2, { x: 10, y: 20, width: 200, height: 300 });
     const region = await PDFDocument.load(await fs.readFile(regionPath));
     expect(region.getPageCount()).toBe(1);
     const regionSize = region.getPage(0).getSize();
     expect(regionSize.width).toBe(200);
     expect(regionSize.height).toBe(300);
 
-    expect(await store.deleteSource(source!.id)).toBe(true);
-    expect(await store.listSources()).toHaveLength(0);
-    expect(await store.search("source")).toHaveLength(0);
+    expect(await store.deleteSource(workspaceId, source!.id)).toBe(true);
+    expect(await store.listSources(workspaceId)).toHaveLength(0);
+    expect(await store.search(workspaceId, "source")).toHaveLength(0);
   });
 
   it("extracts selected pages from multiple imported PDFs into one PDF", async () => {
@@ -54,16 +55,33 @@ describe("KnowledgeDbStore", () => {
     const first = await createPdf("first.pdf", 3);
     const second = await createPdf("second.pdf", 2);
     const store = new KnowledgeDbStore(dataDir);
+    const workspaceId = "workspace-a";
 
-    const added = await store.addFiles([first, second]);
+    const added = await store.addFiles(workspaceId, [first, second]);
     expect(added).toHaveLength(2);
 
-    const bytes = await store.extractSelectedPages([
+    const bytes = await store.extractSelectedPages(workspaceId, [
       { sourceId: added[0]!.id, pageNumbers: [1, 3] },
       { sourceId: added[1]!.id, pageNumbers: [2] },
     ]);
     const output = await PDFDocument.load(bytes);
 
     expect(output.getPageCount()).toBe(3);
+  });
+});
+
+
+describe("workspace isolation", () => {
+  it("never exposes sources across workspace boundaries", async () => {
+    const dataDir = await fs.mkdtemp(path.join(os.tmpdir(), "sigma-knowledge-db-isolation-"));
+    tempDirs.push(dataDir);
+    const sourcePath = await createPdf("isolated.pdf", 1);
+    const store = new KnowledgeDbStore(dataDir);
+
+    const [source] = await store.addFiles("workspace-a", [sourcePath]);
+    expect(await store.listSources("workspace-a")).toHaveLength(1);
+    expect(await store.listSources("workspace-b")).toHaveLength(0);
+    await expect(store.getPage("workspace-b", source!.id, 1)).rejects.toThrow("knowledge source not found");
+    expect(await store.search("workspace-b", "isolated")).toHaveLength(0);
   });
 });
