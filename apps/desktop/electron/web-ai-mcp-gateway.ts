@@ -15,6 +15,23 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
+function hasExactWorkspaceFileId(result: unknown, fileId: string, workspaceId: string): boolean {
+  if (!isRecord(result) || !Array.isArray(result.content)) return false;
+  for (const item of result.content) {
+    if (!isRecord(item) || item.type !== "text" || typeof item.text !== "string") continue;
+    try {
+      const parsed: unknown = JSON.parse(item.text);
+      if (!isRecord(parsed) || !isRecord(parsed.overview) || !Array.isArray(parsed.overview.files)) continue;
+      return parsed.overview.files.some((file) =>
+        isRecord(file) && file.fileId === fileId && file.workspaceId === workspaceId,
+      );
+    } catch {
+      continue;
+    }
+  }
+  return false;
+}
+
 export interface WebAiMcpGatewayOptions { mcpServerPath: string; userDataPath: string; }
 export interface WebAiMcpGateway {
   start(): Promise<void>;
@@ -59,22 +76,32 @@ export function createWebAiMcpGateway(options: WebAiMcpGatewayOptions): WebAiMcp
       if (currentTransport) await currentTransport.close().catch(() => undefined);
     },
     async listTools(workspaceId) {
+      if (!workspaceId) return [];
       const currentClient = await ensureStarted();
       const result = await currentClient.listTools();
       return result.tools.filter((tool) => READ_ONLY_TOOLS.has(tool.name)).map((tool) =>
         tool.name === "list_local_documents" && isRecord(tool.inputSchema)
-          ? { ...tool, description: `${tool.description ?? ""} SIGMAの現在選択Workspace: ${workspaceId ?? "未選択"}。` }
+          ? { ...tool, description: `${tool.description ?? ""} Current SIGMA Workspace: ${workspaceId}.` }
           : tool,
       );
     },
     async callTool(name, args, workspaceId) {
-      if (!READ_ONLY_TOOLS.has(name)) throw new Error(`Web AIから利用できないToolです: ${name}`);
+      if (!workspaceId) throw new Error("Select a SIGMA Workspace before using MCP.");
+      if (!READ_ONLY_TOOLS.has(name)) throw new Error(`Web AI cannot use this Tool: ${name}`);
       const currentClient = await ensureStarted();
       const input = { ...args };
-      if (name === "list_local_documents" && input.workspaceId === undefined && workspaceId) input.workspaceId = workspaceId;
-      if (typeof input.fileId === "string" && workspaceId) {
-        const overview = await currentClient.callTool({ name: "list_local_documents", arguments: { workspaceId } });
-        if (!JSON.stringify(overview).includes(input.fileId)) throw new Error("指定されたfileIdは現在のWorkspaceに属していません。");
+      if (name === "list_local_documents") {
+        input.workspaceId = workspaceId;
+      }
+      if (typeof input.workspaceId === "string" && input.workspaceId !== workspaceId) {
+        throw new Error("MCP access is restricted to the selected Workspace.");
+      }
+      if (typeof input.fileId === "string" && !hasExactWorkspaceFileId(
+        await currentClient.callTool({ name: "list_local_documents", arguments: { workspaceId } }),
+        input.fileId,
+        workspaceId,
+      )) {
+        throw new Error("The specified fileId does not belong to the selected Workspace.");
       }
       return (await currentClient.callTool({ name, arguments: input })) as CallToolResult;
     },
