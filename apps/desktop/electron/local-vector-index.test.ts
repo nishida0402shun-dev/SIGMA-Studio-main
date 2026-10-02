@@ -18,6 +18,7 @@ describe("LocalVectorIndex", () => {
       const index = new LocalVectorIndex(root);
       await index.upsert({
         id: "page-a",
+        workspaceId: "workspace-a",
         sourceId: "source-a",
         pageNumber: 1,
         chunkIndex: 0,
@@ -25,6 +26,7 @@ describe("LocalVectorIndex", () => {
       });
       await index.upsert({
         id: "page-b",
+        workspaceId: "workspace-a",
         sourceId: "source-b",
         pageNumber: 2,
         chunkIndex: 0,
