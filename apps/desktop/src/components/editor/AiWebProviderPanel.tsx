@@ -1,3 +1,4 @@
+/* eslint-disable no-restricted-syntax -- Web AI embedded-surface copy is intentionally provider-local UI text. */
 "use client";
 
 import { ChevronDown, ExternalLink, Globe, Monitor, RefreshCw } from "lucide-react";
