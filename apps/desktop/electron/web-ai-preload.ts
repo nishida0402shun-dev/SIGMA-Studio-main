@@ -172,16 +172,16 @@ function installSigmaContextOverlay(): void {
   const refresh = document.createElement("button");
   refresh.type = "button";
   refresh.textContent = "↻";
-  refresh.title = "SIGMAコンテキストを更新";
+  refresh.title = "Refresh SIGMA context";
   const copy = document.createElement("button");
   copy.type = "button";
   copy.textContent = "Context";
-  copy.title = "SIGMAコンテキストをコピー";
+  copy.title = "Copy SIGMA context";
 
   const render = async () => {
     const context = await fetchSigmaContext();
     dot.classList.toggle("ok", Boolean(context.workspaceId));
-    const workspace = context.workspaceId ? `Workspace: ${context.workspaceId}` : "Workspace未選択";
+    const workspace = context.workspaceId ? `Workspace: ${context.workspaceId}` : "Workspace not selected";
     meta.textContent = `${workspace} · ${context.documents.length} docs`;
     const payload = [
       "SIGMA Studio context",
