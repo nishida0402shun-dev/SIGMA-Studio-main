@@ -3836,6 +3836,44 @@
   color: var(--text-primary);
 }
 
+.ai-sidebar-header {
+  gap: 8px;
+}
+
+.ai-sidebar-mode-switch {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  min-width: 0;
+}
+
+.ai-sidebar-mode-switch button {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 26px;
+  padding: 3px 7px;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  font: inherit;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.ai-sidebar-mode-switch button:hover {
+  color: var(--text-primary);
+  background: var(--surface-muted, rgba(0, 0, 0, 0.05));
+}
+
+.ai-sidebar-mode-switch button.active {
+  border-color: var(--border-subtle);
+  background: var(--surface-raised, var(--surface));
+  color: var(--text-primary);
+}
+
 .ai-web-provider-panel {
   display: flex;
   flex: 1 1 auto;
