@@ -113,10 +113,9 @@ async function waitForModelContext(): Promise<WebMcpModelContext | null> {
 
 async function registerSigmaWebAiTools(): Promise<void> {
   if (!ORIGIN_ALLOWLIST.has(window.location.origin)) return;
-  if (!(await ensureBridgeConfig())) return;
-
   const modelContext = await waitForModelContext();
   if (!modelContext) return;
+  if (!(await ensureBridgeConfig())) return;
 
   const controller = new AbortController();
 
