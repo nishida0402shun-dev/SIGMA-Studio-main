@@ -3,6 +3,7 @@ import path from "node:path";
 
 export interface VectorRecord {
   id: string;
+  workspaceId: string;
   sourceId: string;
   pageNumber: number;
   /** Zero-based chunk number within the source page. */
@@ -38,8 +39,8 @@ export class LocalVectorIndex {
   async upsertMany(records: Array<Omit<VectorRecord, "vector">>): Promise<void> {
     if (records.length === 0) return;
     const index = await this.read();
-    const keys = new Set(records.map((record) => record.sourceId + ":" + record.pageNumber + ":" + record.chunkIndex));
-    const next = index.records.filter((item) => !keys.has(item.sourceId + ":" + item.pageNumber + ":" + item.chunkIndex));
+    const keys = new Set(records.map((record) => record.workspaceId + ":" + record.sourceId + ":" + record.pageNumber + ":" + record.chunkIndex));
+    const next = index.records.filter((item) => !keys.has(item.workspaceId + ":" + item.sourceId + ":" + item.pageNumber + ":" + item.chunkIndex));
     next.push(...records.map((record) => ({ ...record, vector: embed(record.text) })));
     await this.write({ version: 2, dimensions: DIMENSIONS, records: next });
   }
