@@ -3029,9 +3029,10 @@ registerTool(
   {
     title: "Knowledge DBの資料一覧",
     description: "登録済みPDF資料とページ数・ページ分類を取得します。Knowledge DBを使った回答では、必要に応じてこのツールで資料候補を確認してください。",
+    inputSchema: { workspaceId: z.string().min(1).max(256) },
   },
-  async () => withToolErrorHandling(async () => {
-    const sources = await new KnowledgeDbStore(storeContext.dataDir).listSources();
+  async ({ workspaceId }) => withToolErrorHandling(async () => {
+    const sources = await new KnowledgeDbStore(storeContext.dataDir).listSources(workspaceId);
     return { ok: true, sources: sources.map((source) => ({
       id: source.id,
       name: source.name,
