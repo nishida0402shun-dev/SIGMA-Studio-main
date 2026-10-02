@@ -440,7 +440,7 @@ function getAppIconPath(): string | undefined {
 
 function applyDockIcon(): void {
   const iconPath = getAppIconPath();
-  if (process.platform === "darwin" && iconPath) {
+  if (process.platform === "darwin" && iconPath && app.dock) {
     app.dock.setIcon(iconPath);
   }
 }
