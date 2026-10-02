@@ -51,9 +51,11 @@ export function KnowledgeDbWorkspace({ open, onClose, onOpenAi, t }: Props) {
     let cancelled = false;
     void desktop.storage.getWorkspaceOverview(null).then((result) => {
       if (cancelled || !result || typeof result !== "object" || !("state" in result) || result.state !== "ready") return;
-      const overview = result.overview;
-      if (!overview) return;
-      setWorkspaces(Array.isArray(overview.workspaces) ? overview.workspaces as DesktopWorkspaceSummary[] : []);
+      const overview = "overview" in result && result.overview && typeof result.overview === "object"
+        ? result.overview
+        : null;
+      const rawWorkspaces = overview && "workspaces" in overview ? overview.workspaces : [];
+      setWorkspaces(Array.isArray(rawWorkspaces) ? rawWorkspaces as DesktopWorkspaceSummary[] : []);
     });
     return () => { cancelled = true; };
   }, [desktop, open]);
