@@ -35,7 +35,7 @@ export function createWebAiMcpGateway(options: WebAiMcpGatewayOptions): WebAiMcp
         const nextTransport = new StdioClientTransport({
           command: process.execPath,
           args: [options.mcpServerPath],
-          env: { ...process.env, SIGMA_STUDIO_USER_DATA_DIR: options.userDataPath, MCP_TOOL_PROFILE: "external" },
+          env: { ...process.env, ELECTRON_RUN_AS_NODE: "1", SIGMA_STUDIO_USER_DATA_DIR: options.userDataPath, MCP_TOOL_PROFILE: "external" },
           stderr: "pipe",
         });
         await nextClient.connect(nextTransport);
