@@ -40,6 +40,17 @@ export const common = {
     green: "Green",
     blue: "Blue",
   },
+  webAi: {
+    note: "Web AI. This conversation is independent of the SIGMA Studio CLI session.",
+    workspaceSelected: "Workspace selected",
+    workspaceUnselected: "No Workspace selected",
+    bridgeConnected: "connected",
+    bridgePreparing: "preparing",
+    webMcpConnected: "connected",
+    webMcpUnavailable: "unsupported/disconnected",
+    webMcpChecking: "checking",
+    preparing: "Preparing Web AI…",
+  },
   status: {
     loading: "Loading…",
     saving: "Saving…",
