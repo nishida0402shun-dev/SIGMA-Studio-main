@@ -42,6 +42,17 @@ export const common = {
     green: "緑",
     blue: "青",
   },
+  webAi: {
+    note: "Web版AI。SIGMA StudioのCLIセッションとは独立した会話です。",
+    workspaceSelected: "Workspace選択済み",
+    workspaceUnselected: "Workspace未選択",
+    bridgeConnected: "接続",
+    bridgePreparing: "準備中",
+    webMcpConnected: "接続",
+    webMcpUnavailable: "非対応/未接続",
+    webMcpChecking: "確認中",
+    preparing: "Web AIを準備しています…",
+  },
   status: {
     loading: "読み込み中…",
     saving: "保存中…",
