@@ -102,12 +102,21 @@ function asRecord(input: unknown): Record<string, unknown> {
   return input as Record<string, unknown>;
 }
 
+async function waitForModelContext(): Promise<WebMcpModelContext | null> {
+  for (let attempt = 0; attempt < 20; attempt += 1) {
+    const modelContext = (document as WebMcpDocument).modelContext;
+    if (modelContext?.registerTool) return modelContext;
+    await new Promise<void>((resolve) => window.setTimeout(resolve, 250));
+  }
+  return null;
+}
+
 async function registerSigmaWebAiTools(): Promise<void> {
   if (!ORIGIN_ALLOWLIST.has(window.location.origin)) return;
   if (!(await ensureBridgeConfig())) return;
 
-  const modelContext = (document as WebMcpDocument).modelContext;
-  if (!modelContext?.registerTool) return;
+  const modelContext = await waitForModelContext();
+  if (!modelContext) return;
 
   const controller = new AbortController();
 
