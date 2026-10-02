@@ -35,6 +35,7 @@ let currentWorkspaceId: string | null = null;
 
 ipcRenderer.on("sigma-web-ai-scope", (_event, workspaceId: unknown) => {
   currentWorkspaceId = typeof workspaceId === "string" && workspaceId.trim() ? workspaceId.trim() : null;
+  window.setTimeout(installSigmaContextOverlay, 300);
 });
 
 async function ensureBridgeConfig(): Promise<boolean> {
@@ -114,6 +115,87 @@ async function waitForRun(runId: string, signal?: AbortSignal): Promise<unknown>
 function asRecord(input: unknown): Record<string, unknown> {
   if (!input || typeof input !== "object" || Array.isArray(input)) throw new TypeError("tool input must be an object");
   return input as Record<string, unknown>;
+}
+
+async function fetchSigmaContext(): Promise<{ workspaceId: string | null; documents: unknown[] }> {
+  if (!(await ensureBridgeConfig())) {
+    return { workspaceId: currentWorkspaceId, documents: [] };
+  }
+  try {
+    const body = await callApi("/v1/context");
+    return {
+      workspaceId: typeof body.workspaceId === "string" ? body.workspaceId : currentWorkspaceId,
+      documents: Array.isArray(body.documents) ? body.documents : [],
+    };
+  } catch {
+    return { workspaceId: currentWorkspaceId, documents: [] };
+  }
+}
+
+function installSigmaContextOverlay(): void {
+  if (window.top !== window) return;
+  const marker = "data-sigma-web-ai-overlay";
+  if (document.querySelector(`[${marker}]`)) return;
+
+  const host = document.createElement("div");
+  host.setAttribute(marker, "true");
+  host.style.position = "fixed";
+  host.style.top = "12px";
+  host.style.right = "12px";
+  host.style.zIndex = "2147483647";
+  host.style.pointerEvents = "auto";
+
+  const shadow = host.attachShadow({ mode: "closed" });
+  const style = document.createElement("style");
+  style.textContent = `
+    :host { all: initial; font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+    .card { display:flex; align-items:center; gap:7px; padding:6px 8px; border:1px solid rgba(128,128,128,.28); border-radius:10px; background:rgba(255,255,255,.92); color:#222; box-shadow:0 4px 18px rgba(0,0,0,.12); backdrop-filter:blur(12px); font-size:11px; }
+    .dot { width:7px; height:7px; border-radius:50%; background:#888; }
+    .dot.ok { background:#2e9b62; }
+    .label { font-weight:650; }
+    .meta { color:#666; max-width:180px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    button { border:0; background:transparent; color:inherit; cursor:pointer; padding:2px 4px; border-radius:5px; }
+    button:hover { background:rgba(0,0,0,.06); }
+  `;
+  shadow.appendChild(style);
+
+  const card = document.createElement("div");
+  card.className = "card";
+  const dot = document.createElement("span");
+  dot.className = "dot";
+  const label = document.createElement("span");
+  label.className = "label";
+  label.textContent = "SIGMA";
+  const meta = document.createElement("span");
+  meta.className = "meta";
+  const refresh = document.createElement("button");
+  refresh.type = "button";
+  refresh.textContent = "↻";
+  refresh.title = "SIGMAコンテキストを更新";
+  const copy = document.createElement("button");
+  copy.type = "button";
+  copy.textContent = "Context";
+  copy.title = "SIGMAコンテキストをコピー";
+
+  const render = async () => {
+    const context = await fetchSigmaContext();
+    dot.classList.toggle("ok", Boolean(context.workspaceId));
+    const workspace = context.workspaceId ? `Workspace: ${context.workspaceId}` : "Workspace未選択";
+    meta.textContent = `${workspace} · ${context.documents.length} docs`;
+    const payload = [
+      "SIGMA Studio context",
+      `workspaceId: ${context.workspaceId ?? "(none selected)"}`,
+      `documents: ${context.documents.length}`,
+    ].join("\\n");
+    copy.onclick = () => {
+      void navigator.clipboard?.writeText(payload);
+    };
+  };
+
+  refresh.onclick = () => { void render(); };
+  card.append(dot, label, meta, refresh, copy);
+  shadow.appendChild(card);
+  void render();
 }
 
 async function waitForModelContext(): Promise<WebMcpModelContext | null> {
@@ -226,3 +308,9 @@ async function registerSigmaWebAiTools(): Promise<void> {
 void registerSigmaWebAiTools().catch((error) => {
   console.warn("[sigma-web-ai] WebMCP tool registration failed", error);
 });
+
+if (document.readyState === "loading") {
+  document.addEventListener("DOMContentLoaded", () => installSigmaContextOverlay(), { once: true });
+} else {
+  installSigmaContextOverlay();
+}
