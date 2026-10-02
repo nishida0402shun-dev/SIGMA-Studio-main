@@ -31,6 +31,11 @@ function arg(name: string): string {
 
 let bridgeUrl = arg("sigma-web-ai-url");
 let bridgeToken = arg("sigma-web-ai-token");
+let currentWorkspaceId: string | null = null;
+
+ipcRenderer.on("sigma-web-ai-scope", (_event, workspaceId: unknown) => {
+  currentWorkspaceId = typeof workspaceId === "string" && workspaceId.trim() ? workspaceId.trim() : null;
+});
 
 async function ensureBridgeConfig(): Promise<boolean> {
   if (bridgeUrl && bridgeToken) return true;
@@ -73,6 +78,7 @@ async function callApi(path: string, init: RequestInit = {}): Promise<WebAiApiRe
     headers: {
       Authorization: `Bearer ${bridgeToken}`,
       "Content-Type": "application/json",
+      ...(currentWorkspaceId ? { "X-Sigma-Workspace-Id": currentWorkspaceId } : {}),
       ...(init.headers ?? {}),
     },
   });
