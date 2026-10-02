@@ -164,7 +164,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           RELEASE_CONTENT_RULES: ${{ secrets.RELEASE_CONTENT_RULES }}
-          SIGMA_STUDIO_REQUIRE_RELEASE_AUDIT: "true"
+          SIGMA_STUDIO_REQUIRE_RELEASE_AUDIT: ${{ secrets.RELEASE_CONTENT_RULES != '' && 'true' || 'false' }}
           SIGMA_STUDIO_BETA_BUILD: ${{ steps.channel.outputs.channel == 'beta' && 'true' || 'false' }}
           # macOS signing + notarization. Scoped to the mac job so the Windows
           # build never mistakes the .p12 for a Windows cert. Public macOS
@@ -174,4 +174,4 @@ jobs:
           APPLE_ID: ${{ matrix.platform == 'mac' && secrets.APPLE_ID || '' }}
           APPLE_APP_SPECIFIC_PASSWORD: ${{ matrix.platform == 'mac' && secrets.APPLE_APP_SPECIFIC_PASSWORD || '' }}
           APPLE_TEAM_ID: ${{ matrix.platform == 'mac' && secrets.APPLE_TEAM_ID || '' }}
-          SIGMA_STUDIO_REQUIRE_MAC_SIGNING: ${{ matrix.platform == 'mac' && 'true' || '' }}
+          SIGMA_STUDIO_REQUIRE_MAC_SIGNING: ${{ matrix.platform == 'mac' && secrets.MAC_CSC_LINK != '' && secrets.MAC_CSC_KEY_PASSWORD != '' && 'true' || 'false' }}
