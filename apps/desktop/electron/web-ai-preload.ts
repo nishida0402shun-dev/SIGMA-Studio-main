@@ -1,3 +1,5 @@
+import { ipcRenderer } from "electron";
+
 interface WebMcpModelContext {
   registerTool(
     tool: {
@@ -27,8 +29,23 @@ function arg(name: string): string {
   return process.argv.find((value) => value.startsWith(prefix))?.slice(prefix.length) ?? "";
 }
 
-const bridgeUrl = arg("sigma-web-ai-url");
-const bridgeToken = arg("sigma-web-ai-token");
+let bridgeUrl = arg("sigma-web-ai-url");
+let bridgeToken = arg("sigma-web-ai-token");
+
+async function ensureBridgeConfig(): Promise<boolean> {
+  if (bridgeUrl && bridgeToken) return true;
+  try {
+    const info = await ipcRenderer.invoke("web-ai:get-bridge-info") as { url?: unknown; token?: unknown };
+    if (typeof info?.url !== "string" || typeof info?.token !== "string" || !info.url || !info.token) {
+      return false;
+    }
+    bridgeUrl = info.url;
+    bridgeToken = info.token;
+    return true;
+  } catch {
+    return false;
+  }
+}
 
 function apiUrl(path: string): string {
   return `${bridgeUrl}${path}`;
@@ -87,7 +104,7 @@ function asRecord(input: unknown): Record<string, unknown> {
 
 async function registerSigmaWebAiTools(): Promise<void> {
   if (!ORIGIN_ALLOWLIST.has(window.location.origin)) return;
-  if (!bridgeUrl || !bridgeToken) return;
+  if (!(await ensureBridgeConfig())) return;
 
   const modelContext = (document as WebMcpDocument).modelContext;
   if (!modelContext?.registerTool) return;
