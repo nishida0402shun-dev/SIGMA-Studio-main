@@ -294,12 +294,20 @@ export function createWebAiBridgeServer(deps: CreateWebAiBridgeServerDeps): http
       }
 
       if (req.method === "GET" && pathname === "/v1/mcp/tools") {
+        if (!workspaceId) {
+          sendJson(res, 409, { ok: false, error: "Select a SIGMA Workspace before using MCP." }, origin);
+          return;
+        }
         const tools = await deps.mcpGateway.listTools(workspaceId);
         sendJson(res, 200, { ok: true, workspaceId, tools }, origin);
         return;
       }
 
       if (req.method === "POST" && pathname === "/v1/mcp/call") {
+        if (!workspaceId) {
+          sendJson(res, 409, { ok: false, error: "Select a SIGMA Workspace before using MCP." }, origin);
+          return;
+        }
         const body = await readBody(req);
         if (!body || typeof body !== "object" || Array.isArray(body)) {
           sendJson(res, 400, { ok: false, error: "invalid request" }, origin);
@@ -339,15 +347,17 @@ export function createWebAiBridgeServer(deps: CreateWebAiBridgeServerDeps): http
       }
 
       if (req.method === "GET" && pathname === "/v1/documents") {
+        if (!workspaceId) {
+          sendJson(res, 200, { ok: true, workspaceId: null, documents: [] }, origin);
+          return;
+        }
         const documents = await deps.listDocuments();
-        const scoped = workspaceId
-          ? documents.filter((document) => (
-              Boolean(document)
-              && typeof document === "object"
-              && (document as { workspaceId?: unknown }).workspaceId === workspaceId
-            ))
-          : documents;
-        sendJson(res, 200, { ok: true, documents: scoped }, origin);
+        const scoped = documents.filter((document) => (
+          Boolean(document)
+          && typeof document === "object"
+          && (document as { workspaceId?: unknown }).workspaceId === workspaceId
+        ));
+        sendJson(res, 200, { ok: true, workspaceId, documents: scoped }, origin);
         return;
       }
 
@@ -355,8 +365,12 @@ export function createWebAiBridgeServer(deps: CreateWebAiBridgeServerDeps): http
 
       if (req.method === "GET" && routeParts.length === 3 && routeParts[0] === "v1" && routeParts[1] === "documents") {
         const fileId = routeParts[2]!;
+        if (!workspaceId) {
+          sendJson(res, 409, { ok: false, error: "Select a SIGMA Workspace before reading a document." }, origin);
+          return;
+        }
         const snapshot = await deps.getDocument(fileId);
-        if (!snapshot || (workspaceId && snapshot.workspaceId !== workspaceId)) {
+        if (!snapshot || snapshot.workspaceId !== workspaceId) {
           sendJson(res, 404, { ok: false, error: "document not found in selected workspace" }, origin);
           return;
         }
@@ -370,7 +384,11 @@ export function createWebAiBridgeServer(deps: CreateWebAiBridgeServerDeps): http
           sendJson(res, 400, { ok: false, error: "fileId is required" }, origin);
           return;
         }
-        if (workspaceId) {
+        if (!workspaceId) {
+          sendJson(res, 409, { ok: false, error: "Select a SIGMA Workspace before reading proposals." }, origin);
+          return;
+        }
+        {
           const snapshot = await deps.getDocument(fileId);
           if (!snapshot || snapshot.workspaceId !== workspaceId) {
             sendJson(res, 404, { ok: false, error: "document not found in selected workspace" }, origin);
@@ -384,7 +402,7 @@ export function createWebAiBridgeServer(deps: CreateWebAiBridgeServerDeps): http
       if (req.method === "POST" && pathname === "/v1/agent/runs") {
         const body = RunRequestSchema.parse(await readBody(req));
         const snapshot = await deps.getDocument(body.fileId);
-        if (!snapshot || (workspaceId && snapshot.workspaceId !== workspaceId)) {
+        if (!workspaceId || !snapshot || snapshot.workspaceId !== workspaceId) {
           sendJson(res, 404, { ok: false, error: "document not found in selected workspace" }, origin);
           return;
         }
@@ -462,6 +480,10 @@ export function createWebAiBridgeServer(deps: CreateWebAiBridgeServerDeps): http
       }
 
       if (req.method === "POST" && routeParts.length === 4 && routeParts[0] === "v1" && routeParts[1] === "proposals" && routeParts[3] === "approve") {
+        if (!workspaceId) {
+          sendJson(res, 409, { ok: false, error: "Select a SIGMA Workspace before approving a proposal." }, origin);
+          return;
+        }
         const proposal = await deps.getProposal(routeParts[2]!);
         if (!proposal || (workspaceId && (await deps.getDocument(proposal.fileId))?.workspaceId !== workspaceId)) {
           sendJson(res, 404, { ok: false, error: "proposal not found in selected workspace" }, origin);
@@ -473,6 +495,10 @@ export function createWebAiBridgeServer(deps: CreateWebAiBridgeServerDeps): http
       }
 
       if (req.method === "POST" && routeParts.length === 4 && routeParts[0] === "v1" && routeParts[1] === "proposals" && routeParts[3] === "reject") {
+        if (!workspaceId) {
+          sendJson(res, 409, { ok: false, error: "Select a SIGMA Workspace before rejecting a proposal." }, origin);
+          return;
+        }
         const proposal = await deps.getProposal(routeParts[2]!);
         if (!proposal || (workspaceId && (await deps.getDocument(proposal.fileId))?.workspaceId !== workspaceId)) {
           sendJson(res, 404, { ok: false, error: "proposal not found in selected workspace" }, origin);
