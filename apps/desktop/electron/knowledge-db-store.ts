@@ -1,21 +1,16 @@
 import fs from "node:fs/promises";
 import path from "node:path";
+import { createHash } from "node:crypto";
 import { PDFDocument } from "pdf-lib";
 import { LocalVectorIndex, type VectorSearchResult } from "./local-vector-index";
 
 export type KnowledgeSemanticType =
-  | "problem"
-  | "example"
-  | "explanation"
-  | "column"
-  | "definition"
-  | "theorem"
-  | "answer"
-  | "figure"
-  | "unknown";
+  | "problem" | "example" | "explanation" | "column" | "definition"
+  | "theorem" | "answer" | "figure" | "unknown";
 
 export interface KnowledgePage {
   id: string;
+  sourceId: string;
   pageNumber: number;
   semanticType: KnowledgeSemanticType;
   title?: string;
@@ -24,161 +19,146 @@ export interface KnowledgePage {
 
 export interface KnowledgeSource {
   id: string;
+  workspaceId: string;
   name: string;
   originalPath: string;
   storedPath: string;
-  mimeType: string;
+  mimeType: "application/pdf";
   sizeBytes: number;
   pageCount: number;
   importedAt: string;
+  updatedAt: string;
+  contentHash?: string;
   pages: KnowledgePage[];
 }
 
 interface KnowledgeLibrary {
-  version: 1;
+  version: 2;
+  workspaceId: string;
   sources: KnowledgeSource[];
 }
 
+export interface KnowledgeRegion {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
 export class KnowledgeDbStore {
-  private readonly root: string;
-  private readonly sourcesDir: string;
-  private readonly libraryPath: string;
-  private readonly vectorIndex: LocalVectorIndex;
-  private readonly openedPagesDir: string;
+  private readonly dataDir: string;
 
   constructor(dataDir: string) {
-    this.root = path.join(dataDir, "knowledge-db");
-    this.sourcesDir = path.join(this.root, "sources");
-    this.libraryPath = path.join(this.root, "library.json");
-    this.vectorIndex = new LocalVectorIndex(this.root);
-    this.openedPagesDir = path.join(this.root, "opened-pages");
+    this.dataDir = dataDir;
   }
 
-  async listSources(): Promise<KnowledgeSource[]> {
-    return this.ensureIndexed();
+  async listSources(workspaceId: string): Promise<KnowledgeSource[]> {
+    const normalized = requireWorkspaceId(workspaceId);
+    return this.ensureIndexed(normalized);
   }
 
-  async addFiles(filePaths: string[]): Promise<KnowledgeSource[]> {
-    const library = await this.readLibrary();
+  async addFiles(workspaceId: string, filePaths: string[]): Promise<KnowledgeSource[]> {
+    const normalized = requireWorkspaceId(workspaceId);
+    const paths = this.paths(normalized);
+    const library = await this.readLibrary(normalized);
     const added: KnowledgeSource[] = [];
 
     for (const filePath of filePaths) {
-      const ext = path.extname(filePath).toLowerCase();
-      if (ext !== ".pdf") continue;
+      if (path.extname(filePath).toLowerCase() !== ".pdf") continue;
       const stat = await fs.stat(filePath);
       const bytes = await fs.readFile(filePath);
+      const contentHash = createHash("sha256").update(bytes).digest("hex");
+      if (library.sources.some((source) => source.contentHash === contentHash)) {
+        continue;
+      }
+
       const pdf = await PDFDocument.load(bytes, { ignoreEncryption: false });
       const id = `src_${cryptoRandomId()}`;
-      const storedPath = path.join(this.sourcesDir, `${id}.pdf`);
-      await fs.mkdir(this.sourcesDir, { recursive: true });
-      await fs.copyFile(filePath, storedPath);
-
+      const storedPath = path.join(paths.sourcesDir, `${id}.pdf`);
+      const now = new Date().toISOString();
       const pageCount = pdf.getPageCount();
       const pageTexts = await extractPdfPageTexts(bytes, pageCount);
       const source: KnowledgeSource = {
         id,
+        workspaceId: normalized,
         name: path.basename(filePath),
         originalPath: filePath,
         storedPath,
         mimeType: "application/pdf",
         sizeBytes: stat.size,
         pageCount,
-        importedAt: new Date().toISOString(),
+        importedAt: now,
+        updatedAt: now,
+        contentHash,
         pages: Array.from({ length: pageCount }, (_, index) => ({
           id: `${id}_p${index + 1}`,
+          sourceId: id,
           pageNumber: index + 1,
           semanticType: "unknown",
           text: pageTexts[index] || undefined,
         })),
       };
-      library.sources.unshift(source);
-      added.push(source);
-    }
 
-    await this.writeLibrary(library);
-    for (const source of added) {
-      await this.indexSource(source);
+      await fs.mkdir(paths.sourcesDir, { recursive: true });
+      try {
+        await fs.copyFile(filePath, storedPath);
+        await this.indexSource(normalized, source);
+        library.sources.unshift(source);
+        await this.writeLibrary(normalized, library);
+        added.push(source);
+      } catch (error) {
+        await fs.rm(storedPath, { force: true });
+        await this.vectorIndex(normalized).removeSource(source.id);
+        throw error;
+      }
     }
     return added;
   }
 
-  async search(query: string, limit = 12): Promise<Array<VectorSearchResult & { sourceName: string }>> {
-    await this.ensureIndexed();
-    const library = await this.readLibrary();
-    const chunkLimit = Math.min(Math.max(limit * 4, limit), 50);
-    const matches = await this.vectorIndex.search(query, chunkLimit);
+  async search(workspaceId: string, query: string, limit = 12): Promise<Array<VectorSearchResult & { sourceName: string }>> {
+    const normalized = requireWorkspaceId(workspaceId);
+    const trimmed = query.trim();
+    if (!trimmed) return [];
+    await this.ensureIndexed(normalized);
+    const library = await this.readLibrary(normalized);
+    const safeLimit = Math.max(1, Math.min(limit, 50));
+    const matches = await this.vectorIndex(normalized).search(trimmed, Math.min(50, safeLimit * 4));
     const bestByPage = new Map<string, (typeof matches)[number]>();
     for (const match of matches) {
-      const key = `${match.sourceId}:${match.pageNumber}`;
-      const current = bestByPage.get(key);
-      if (!current || match.score > current.score) bestByPage.set(key, match);
+      const current = bestByPage.get(`${match.sourceId}:${match.pageNumber}`);
+      if (!current || match.score > current.score) bestByPage.set(`${match.sourceId}:${match.pageNumber}`, match);
     }
     const sourceNames = new Map(library.sources.map((source) => [source.id, source.name]));
     return [...bestByPage.values()]
       .sort((a, b) => b.score - a.score)
-      .slice(0, Math.max(1, Math.min(limit, 50)))
-      .map((match) => ({
-        ...match,
-        sourceName: sourceNames.get(match.sourceId) ?? match.sourceId,
-      }));
+      .slice(0, safeLimit)
+      .map((match) => ({ ...match, sourceName: sourceNames.get(match.sourceId) ?? match.sourceId }));
   }
 
-  private async ensureIndexed(): Promise<KnowledgeSource[]> {
-    const library = await this.readLibrary();
-    let changed = false;
-    for (const source of library.sources) {
-      const needsText = source.pages.some((page) => page.text === undefined);
-      const needsIndex = !(await this.vectorIndex.hasSource(source.id));
-      if (!needsText && !needsIndex) continue;
-      try {
-        if (needsText) {
-          const bytes = await fs.readFile(source.storedPath);
-          const pageTexts = await extractPdfPageTexts(bytes, source.pageCount);
-          source.pages = source.pages.map((page, index) => ({
-            ...page,
-            text: pageTexts[index] || undefined,
-          }));
-          changed = true;
-        }
-        await this.vectorIndex.removeSource(source.id);
-        await this.indexSource(source);
-      } catch {
-        // Keep the source visible even if a legacy PDF can no longer be read.
-      }
-    }
-    if (changed) await this.writeLibrary(library);
-    return library.sources;
+  async getPage(workspaceId: string, sourceId: string, pageNumber: number): Promise<{ source: KnowledgeSource; page: KnowledgePage }> {
+    const normalized = requireWorkspaceId(workspaceId);
+    const source = await this.findSource(normalized, sourceId);
+    const page = source.pages.find((item) => item.pageNumber === pageNumber);
+    if (!page) throw new Error("knowledge page not found");
+    return { source, page };
   }
 
-  private async indexSource(source: KnowledgeSource): Promise<void> {
-    const records = source.pages.flatMap((page) =>
-      chunkText(page.text ?? "").map((text, chunkIndex) => ({
-        id: `${page.id}_c${chunkIndex}`,
-        sourceId: source.id,
-        pageNumber: page.pageNumber,
-        chunkIndex,
-        text,
-      })),
-    );
-    await this.vectorIndex.upsertMany(records);
-  }
-
-  async deleteSource(sourceId: string): Promise<boolean> {
-    const library = await this.readLibrary();
+  async deleteSource(workspaceId: string, sourceId: string): Promise<boolean> {
+    const normalized = requireWorkspaceId(workspaceId);
+    const paths = this.paths(normalized);
+    const library = await this.readLibrary(normalized);
     const source = library.sources.find((item) => item.id === sourceId);
     if (!source) return false;
+    await this.vectorIndex(normalized).removeSource(source.id);
     await fs.rm(source.storedPath, { force: true });
-    await this.vectorIndex.removeSource(source.id);
     library.sources = library.sources.filter((item) => item.id !== sourceId);
-    await this.writeLibrary(library);
+    await this.writeLibrary(normalized, library);
+    await fs.rm(path.join(paths.openedPagesDir, `${safeId(source.id)}-`), { force: true }).catch(() => {});
     return true;
   }
 
-  async getPagePdfBase64(sourceId: string, pageNumber: number): Promise<{ dataBase64: string; width: number; height: number }> {
-    const library = await this.readLibrary();
-    const source = library.sources.find((item) => item.id === sourceId);
-    if (!source) throw new Error("knowledge source not found");
-    if (!Number.isInteger(pageNumber) || pageNumber < 1 || pageNumber > source.pageCount) throw new Error("knowledge page not found");
+  async getPagePdfBase64(workspaceId: string, sourceId: string, pageNumber: number): Promise<{ dataBase64: string; width: number; height: number }> {
+    const { source } = await this.getPage(workspaceId, sourceId, pageNumber);
     const bytes = await fs.readFile(source.storedPath);
     const input = await PDFDocument.load(bytes);
     const page = input.getPage(pageNumber - 1);
@@ -187,40 +167,36 @@ export class KnowledgeDbStore {
     return { dataBase64: Buffer.from(bytes).toString("base64"), width, height };
   }
 
-  async extractRegion(sourceId: string, pageNumber: number, rect: { x: number; y: number; width: number; height: number }): Promise<string> {
-    const library = await this.readLibrary();
-    const source = library.sources.find((item) => item.id === sourceId);
-    if (!source) throw new Error("knowledge source not found");
+  async extractRegion(workspaceId: string, sourceId: string, pageNumber: number, rect: KnowledgeRegion): Promise<string> {
+    const normalized = requireWorkspaceId(workspaceId);
+    const { source } = await this.getPage(normalized, sourceId, pageNumber);
     const bytes = await fs.readFile(source.storedPath);
     const input = await PDFDocument.load(bytes);
     const sourcePage = input.getPage(pageNumber - 1);
     if (!sourcePage) throw new Error("knowledge page not found");
     const pageSize = sourcePage.getSize();
-    const x = Math.max(0, Math.min(rect.x, pageSize.width));
-    const y = Math.max(0, Math.min(rect.y, pageSize.height));
-    const width = Math.max(1, Math.min(rect.width, pageSize.width - x));
-    const height = Math.max(1, Math.min(rect.height, pageSize.height - y));
+    if (!(rect.width > 0) || !(rect.height > 0) || rect.x < 0 || rect.y < 0) throw new Error("invalid region request");
+    if (rect.x >= pageSize.width || rect.y >= pageSize.height) throw new Error("invalid region request");
+    const width = Math.min(rect.width, pageSize.width - rect.x);
+    const height = Math.min(rect.height, pageSize.height - rect.y);
+    if (!(width > 0) || !(height > 0)) throw new Error("invalid region request");
     const output = await PDFDocument.create();
     const copied = await output.copyPages(input, [pageNumber - 1]);
     const page = copied[0];
     if (!page) throw new Error("knowledge page not found");
-    page.setCropBox(x, y, width, height);
-    page.setMediaBox(x, y, width, height);
+    page.setCropBox(rect.x, rect.y, width, height);
+    page.setMediaBox(rect.x, rect.y, width, height);
     output.addPage(page);
-    await fs.mkdir(this.openedPagesDir, { recursive: true });
-    const safeSource = source.id.replace(/[^a-zA-Z0-9_-]/g, "_");
-    const outputPath = path.join(this.openedPagesDir, safeSource + "-p" + pageNumber + "-region.pdf");
+    const paths = this.paths(normalized);
+    await fs.mkdir(paths.openedPagesDir, { recursive: true });
+    const outputPath = path.join(paths.openedPagesDir, `${safeId(source.id)}-p${pageNumber}-region.pdf`);
     await fs.writeFile(outputPath, await output.save());
     return outputPath;
   }
 
-  async openPage(sourceId: string, pageNumber: number): Promise<string> {
-    const library = await this.readLibrary();
-    const source = library.sources.find((item) => item.id === sourceId);
-    if (!source) throw new Error("knowledge source not found");
-    if (!Number.isInteger(pageNumber) || pageNumber < 1 || pageNumber > source.pageCount) {
-      throw new Error("knowledge page not found");
-    }
+  async openPage(workspaceId: string, sourceId: string, pageNumber: number): Promise<string> {
+    const normalized = requireWorkspaceId(workspaceId);
+    const { source } = await this.getPage(normalized, sourceId, pageNumber);
     const bytes = await fs.readFile(source.storedPath);
     const input = await PDFDocument.load(bytes);
     const output = await PDFDocument.create();
@@ -228,24 +204,22 @@ export class KnowledgeDbStore {
     const page = copied[0];
     if (!page) throw new Error("knowledge page not found");
     output.addPage(page);
-    await fs.mkdir(this.openedPagesDir, { recursive: true });
-    const safeSource = source.id.replace(/[^a-zA-Z0-9_-]/g, "_");
-    const outputPath = path.join(this.openedPagesDir, safeSource + "-p" + pageNumber + ".pdf");
+    const paths = this.paths(normalized);
+    await fs.mkdir(paths.openedPagesDir, { recursive: true });
+    const outputPath = path.join(paths.openedPagesDir, `${safeId(source.id)}-p${pageNumber}.pdf`);
     await fs.writeFile(outputPath, await output.save());
     return outputPath;
   }
 
-  async extractPages(sourceId: string, pageNumbers: number[]): Promise<Uint8Array> {
-    return this.extractSelectedPages([{ sourceId, pageNumbers }]);
+  async extractPages(workspaceId: string, sourceId: string, pageNumbers: number[]): Promise<Uint8Array> {
+    return this.extractSelectedPages(workspaceId, [{ sourceId, pageNumbers }]);
   }
 
-  async extractSelectedPages(
-    selections: Array<{ sourceId: string; pageNumbers: number[] }>,
-  ): Promise<Uint8Array> {
-    const library = await this.readLibrary();
+  async extractSelectedPages(workspaceId: string, selections: Array<{ sourceId: string; pageNumbers: number[] }>): Promise<Uint8Array> {
+    const normalized = requireWorkspaceId(workspaceId);
+    const library = await this.readLibrary(normalized);
     const output = await PDFDocument.create();
     let copiedCount = 0;
-
     for (const selection of selections) {
       const source = library.sources.find((item) => item.id === selection.sourceId);
       if (!source) throw new Error("knowledge source not found");
@@ -259,52 +233,121 @@ export class KnowledgeDbStore {
       for (const page of copied) output.addPage(page);
       copiedCount += copied.length;
     }
-
     if (copiedCount === 0) throw new Error("no valid pages selected");
     return output.save();
   }
 
-  async updatePageSemanticType(
-    sourceId: string,
-    pageNumber: number,
-    semanticType: KnowledgeSemanticType,
-    title?: string,
-  ): Promise<KnowledgeSource> {
-    const library = await this.readLibrary();
+  async updatePageSemanticType(workspaceId: string, sourceId: string, pageNumber: number, semanticType: KnowledgeSemanticType, title?: string): Promise<KnowledgeSource> {
+    const normalized = requireWorkspaceId(workspaceId);
+    const library = await this.readLibrary(normalized);
     const source = library.sources.find((item) => item.id === sourceId);
     if (!source) throw new Error("knowledge source not found");
     const page = source.pages.find((item) => item.pageNumber === pageNumber);
     if (!page) throw new Error("knowledge page not found");
     page.semanticType = semanticType;
     if (title !== undefined) page.title = title;
-    await this.writeLibrary(library);
+    source.updatedAt = new Date().toISOString();
+    await this.writeLibrary(normalized, library);
     return source;
   }
 
-  private async readLibrary(): Promise<KnowledgeLibrary> {
-    await fs.mkdir(this.root, { recursive: true });
-    try {
-      const raw = await fs.readFile(this.libraryPath, "utf8");
-      const parsed = JSON.parse(raw) as KnowledgeLibrary;
-      if (parsed.version === 1 && Array.isArray(parsed.sources)) return parsed;
-    } catch {
-      // First launch or an unreadable old file: rebuild an empty derived index.
+  private async ensureIndexed(workspaceId: string): Promise<KnowledgeSource[]> {
+    const normalized = requireWorkspaceId(workspaceId);
+    const library = await this.readLibrary(normalized);
+    let changed = false;
+    for (const source of library.sources) {
+      const needsText = source.pages.some((page) => page.text === undefined);
+      const needsIndex = !(await this.vectorIndex(normalized).hasSource(source.id));
+      if (!needsText && !needsIndex) continue;
+      try {
+        if (needsText) {
+          const bytes = await fs.readFile(source.storedPath);
+          const pageTexts = await extractPdfPageTexts(bytes, source.pageCount);
+          source.pages = source.pages.map((page, index) => ({ ...page, text: pageTexts[index] || undefined }));
+          source.updatedAt = new Date().toISOString();
+          changed = true;
+        }
+        await this.vectorIndex(normalized).removeSource(source.id);
+        await this.indexSource(normalized, source);
+      } catch {
+        // The PDF remains the source of truth; an unreadable legacy source stays visible for repair.
+      }
     }
-    return { version: 1, sources: [] };
+    if (changed) await this.writeLibrary(normalized, library);
+    return library.sources;
   }
 
-  private async writeLibrary(library: KnowledgeLibrary): Promise<void> {
-    await fs.mkdir(this.root, { recursive: true });
-    const tmp = `${this.libraryPath}.tmp`;
-    await fs.writeFile(tmp, JSON.stringify(library, null, 2), "utf8");
-    await fs.rename(tmp, this.libraryPath);
+  private async indexSource(workspaceId: string, source: KnowledgeSource): Promise<void> {
+    const records = source.pages.flatMap((page) =>
+      chunkText(page.text ?? "").map((text, chunkIndex) => ({
+        id: `${page.id}_c${chunkIndex}`,
+        workspaceId,
+        sourceId: source.id,
+        pageNumber: page.pageNumber,
+        chunkIndex,
+        text,
+      })),
+    );
+    await this.vectorIndex(workspaceId).upsertMany(records);
   }
+
+  private async findSource(workspaceId: string, sourceId: string): Promise<KnowledgeSource> {
+    const library = await this.readLibrary(requireWorkspaceId(workspaceId));
+    const source = library.sources.find((item) => item.id === sourceId && item.workspaceId === workspaceId);
+    if (!source) throw new Error("knowledge source not found");
+    return source;
+  }
+
+  private async readLibrary(workspaceId: string): Promise<KnowledgeLibrary> {
+    const normalized = requireWorkspaceId(workspaceId);
+    const paths = this.paths(normalized);
+    await fs.mkdir(paths.root, { recursive: true });
+    try {
+      const raw = await fs.readFile(paths.libraryPath, "utf8");
+      const parsed = JSON.parse(raw) as Partial<KnowledgeLibrary>;
+      if (parsed.version === 2 && parsed.workspaceId === normalized && Array.isArray(parsed.sources)) return parsed as KnowledgeLibrary;
+    } catch {
+      // First launch or an unreadable/incompatible library: rebuild from managed PDFs if available.
+    }
+    return { version: 2, workspaceId: normalized, sources: [] };
+  }
+
+  private async writeLibrary(workspaceId: string, library: KnowledgeLibrary): Promise<void> {
+    const paths = this.paths(workspaceId);
+    await fs.mkdir(paths.root, { recursive: true });
+    const tmp = `${paths.libraryPath}.tmp`;
+    await fs.writeFile(tmp, JSON.stringify(library, null, 2), "utf8");
+    await fs.rename(tmp, paths.libraryPath);
+  }
+
+  private paths(workspaceId: string) {
+    const root = path.join(this.dataDir, "knowledge-db", "workspaces", safeId(workspaceId));
+    return {
+      root,
+      libraryPath: path.join(root, "library.json"),
+      sourcesDir: path.join(root, "sources"),
+      openedPagesDir: path.join(root, "opened-pages"),
+    };
+  }
+
+  private vectorIndex(workspaceId: string): LocalVectorIndex {
+    return new LocalVectorIndex(path.join(this.paths(workspaceId).root, "vector-index"));
+  }
+}
+
+function requireWorkspaceId(workspaceId: string): string {
+  const normalized = typeof workspaceId === "string" ? workspaceId.trim() : "";
+  if (!normalized) throw new Error("workspace not selected");
+  return normalized;
+}
+
+function safeId(value: string): string {
+  return value.replace(/[^a-zA-Z0-9_-]/g, "_").slice(0, 160);
 }
 
 function cryptoRandomId(): string {
   return `${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 10)}`;
 }
-
 
 async function extractPdfPageTexts(bytes: Uint8Array, pageCount: number): Promise<string[]> {
   try {
@@ -330,12 +373,10 @@ async function extractPdfPageTexts(bytes: Uint8Array, pageCount: number): Promis
   }
 }
 
-
 function chunkText(text: string, maxLength = 900, overlap = 140): string[] {
   const normalized = text.replace(/\s+/g, " ").trim();
   if (!normalized) return [];
   if (normalized.length <= maxLength) return [normalized];
-
   const chunks: string[] = [];
   let start = 0;
   while (start < normalized.length) {
