@@ -61,14 +61,6 @@ export function KnowledgeDbWorkspace({ open, onClose, onOpenAi, t }: Props) {
   }, [desktop, open]);
 
   useEffect(() => {
-    setSources([]);
-    setSearchResults([]);
-    setSelected({});
-    setRegion(null);
-    setQuery("");
-  }, [selectedWorkspaceId]);
-
-  useEffect(() => {
     if (!open || !knowledgeDb || !selectedWorkspaceId) return;
     let cancelled = false;
     void knowledgeDb.list({ workspaceId: selectedWorkspaceId }).then((value) => {
@@ -111,6 +103,11 @@ export function KnowledgeDbWorkspace({ open, onClose, onOpenAi, t }: Props) {
   if (!open) return null;
 
   function selectWorkspace(workspaceId: string): void {
+    setSources([]);
+    setSearchResults([]);
+    setSelected({});
+    setRegion(null);
+    setQuery("");
     setSelectedWorkspaceId(workspaceId || null);
   }
 
