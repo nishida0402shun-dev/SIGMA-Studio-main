@@ -19,7 +19,7 @@ export interface WebAiMcpGateway {
   start(): Promise<void>;
   stop(): Promise<void>;
   listTools(workspaceId: string | null): Promise<Tool[]>;
-  callTool(name: string, args: Record<string, unknown>, workspaceId: string): Promise<CallToolResult>;
+  callTool(name: string, args: Record<string, unknown>, workspaceId?: string | null): Promise<CallToolResult>;
 }
 
 export function createWebAiMcpGateway(options: WebAiMcpGatewayOptions): WebAiMcpGateway {
@@ -67,12 +67,11 @@ export function createWebAiMcpGateway(options: WebAiMcpGatewayOptions): WebAiMcp
       );
     },
     async callTool(name, args, workspaceId) {
-      if (!workspaceId.trim()) throw new Error("Workspaceを選択してからSIGMA Toolを実行してください。");
       if (!READ_ONLY_TOOLS.has(name)) throw new Error(`Web AIから利用できないToolです: ${name}`);
       const currentClient = await ensureStarted();
       const input = { ...args };
-      if (name === "list_local_documents" && input.workspaceId === undefined) input.workspaceId = workspaceId;
-      if (typeof input.fileId === "string") {
+      if (name === "list_local_documents" && input.workspaceId === undefined && workspaceId) input.workspaceId = workspaceId;
+      if (typeof input.fileId === "string" && workspaceId) {
         const overview = await currentClient.callTool({ name: "list_local_documents", arguments: { workspaceId } });
         if (!JSON.stringify(overview).includes(input.fileId)) throw new Error("指定されたfileIdは現在のWorkspaceに属していません。");
       }
