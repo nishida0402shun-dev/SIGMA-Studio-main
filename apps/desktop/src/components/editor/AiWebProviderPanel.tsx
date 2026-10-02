@@ -4,6 +4,7 @@ import { ChevronDown, ExternalLink, Globe, Monitor, RefreshCw } from "lucide-rea
 import { useEffect, useMemo, useRef, useState, type ElementType } from "react";
 
 import { AntigravityMark, ClaudeMark, OpenAiMark } from "@/components/branding/provider-logos";
+import { getDesktopBridge } from "@/lib/desktop-bridge";
 
 export type AiWebProvider = "chatgpt" | "claude" | "gemini";
 
@@ -32,6 +33,17 @@ export function AiWebProviderPanel({
 }: AiWebProviderPanelProps) {
   const webviewRef = useRef<HTMLElement | null>(null);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [preloadUrl, setPreloadUrl] = useState<string | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    void getDesktopBridge()?.webAi?.getPreloadUrl().then((url) => {
+      if (!cancelled) setPreloadUrl(url);
+    }).catch(() => undefined);
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   const selected = useMemo(
     () => PROVIDERS.find((item) => item.id === provider) ?? PROVIDERS[0],
     [provider],
@@ -137,6 +149,7 @@ export function AiWebProviderPanel({
                 webviewRef.current = node;
               }}
               src={selected.url}
+              preload={preloadUrl ?? undefined}
               partition="persist:sigma-studio-ai-web"
               allowpopups=""
               style={{ display: "flex", width: "100%", height: "100%", border: "0" }}
