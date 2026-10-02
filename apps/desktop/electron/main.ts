@@ -488,7 +488,8 @@ function createWindow() {
   });
 
   win.webContents.on("will-attach-webview", (event, webPreferences, params) => {
-    const expectedPreload = path.join(__dirname, "web-ai-preload.cjs");
+    const expectedPreloadPath = path.join(__dirname, "web-ai-preload.cjs");
+    const expectedPreloadUrl = pathToFileURL(expectedPreloadPath).toString();
     const requestedPreload = webPreferences.preload ?? "";
     let hostname = "";
     try {
@@ -498,7 +499,7 @@ function createWindow() {
       return;
     }
     const allowed = [...WEB_AI_ALLOWED_HOSTS].some((host) => hostname === host || hostname.endsWith(`.\${host}`));
-    if (requestedPreload !== expectedPreload || !allowed) {
+    if (requestedPreload !== expectedPreloadPath && requestedPreload !== expectedPreloadUrl || !allowed) {
       event.preventDefault();
       return;
     }
