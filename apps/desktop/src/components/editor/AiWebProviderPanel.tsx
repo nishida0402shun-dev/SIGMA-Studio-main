@@ -102,7 +102,7 @@ export function AiWebProviderPanel({
       webview.removeEventListener("will-navigate", onNavigate);
       webview.removeEventListener("ipc-message", onIpcMessage);
     };
-  }, [provider]);
+  }, [provider, preloadUrl]);
 
   useEffect(() => {
     if (!webviewReady) return;
