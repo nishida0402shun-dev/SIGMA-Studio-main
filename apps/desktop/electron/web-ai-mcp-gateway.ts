@@ -76,7 +76,7 @@ export function createWebAiMcpGateway(options: WebAiMcpGatewayOptions): WebAiMcp
         const overview = await currentClient.callTool({ name: "list_local_documents", arguments: { workspaceId } });
         if (!JSON.stringify(overview).includes(input.fileId)) throw new Error("指定されたfileIdは現在のWorkspaceに属していません。");
       }
-      return currentClient.callTool({ name, arguments: input });
+      return (await currentClient.callTool({ name, arguments: input })) as CallToolResult;
     },
   };
 }
