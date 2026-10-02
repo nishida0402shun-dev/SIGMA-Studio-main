@@ -1129,11 +1129,12 @@ export function AiEditPanel({
   const retrieveKnowledgeDbContext = useCallback(async (query: string): Promise<{ text: string; references: Array<{ sourceId: string; sourceName: string; pageNumber: number }> }> => {
     const desktop = getDesktopBridge();
     const normalizedQuery = query.trim();
-    if (!desktop?.knowledgeDb?.search || !normalizedQuery) {
+    const workspaceId = documentWorkspaceId?.trim();
+    if (!desktop?.knowledgeDb?.search || !workspaceId || !normalizedQuery) {
       return { text: "", references: [] };
     }
     try {
-      const sources = await desktop.knowledgeDb.list() as Array<{
+      const sources = await desktop.knowledgeDb.list({ workspaceId }) as Array<{
         id?: string;
         name?: string;
       }>;
@@ -1158,7 +1159,7 @@ export function AiEditPanel({
       const searchQueries = async (candidates: string[]) => {
         const queryResults = await Promise.all(
           candidates.map((candidate) =>
-            desktop.knowledgeDb!.search({ query: candidate, limit: 6 }) as Promise<Array<{
+            desktop.knowledgeDb!.search({ workspaceId, query: candidate, limit: 6 }) as Promise<Array<{
               sourceId?: string;
               pageNumber?: number;
               text?: string;
