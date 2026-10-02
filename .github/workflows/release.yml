@@ -161,6 +161,33 @@ jobs:
       - name: Build and publish installer
         working-directory: apps/desktop
         run: npx --no-install electron-builder --${{ matrix.platform }} --publish always --config electron-builder.config.cjs
+
+      - name: Install and launch Windows installer
+        if: matrix.platform == 'win'
+        shell: pwsh
+        working-directory: apps/desktop
+        run: |
+          $installer = Get-ChildItem -Path release -Filter '*.exe' | Where-Object { $_.Name -notmatch 'uninstaller' } | Select-Object -First 1
+          if (-not $installer) { throw "Windows installer artifact was not found." }
+          $installDir = Join-Path $env:RUNNER_TEMP 'sigma-studio-install'
+          if (Test-Path $installDir) { Remove-Item -Recurse -Force $installDir }
+          New-Item -ItemType Directory -Force -Path $installDir | Out-Null
+          $process = Start-Process -FilePath $installer.FullName -ArgumentList "/S", "/D=$installDir" -Wait -PassThru
+          if ($process.ExitCode -ne 0) { throw "Windows installer exited with code $($process.ExitCode)." }
+          $app = Join-Path $installDir 'Sigma Studio.exe'
+          if (-not (Test-Path $app)) {
+            $app = Get-ChildItem -Path $installDir -Filter '*.exe' -Recurse | Where-Object { $_.Name -notmatch 'unins|uninstall' } | Select-Object -First 1 | ForEach-Object FullName
+          }
+          if (-not $app -or -not (Test-Path $app)) { throw "Installed Sigma Studio executable was not found." }
+          $launched = Start-Process -FilePath $app -PassThru
+          Start-Sleep -Seconds 12
+          if ($launched.HasExited -and $launched.ExitCode -ne 0) {
+            throw "Sigma Studio exited during launch smoke test with code $($launched.ExitCode)."
+          }
+          if (-not $launched.HasExited) {
+            Stop-Process -Id $launched.Id -Force
+          }
+
       - name: Install and launch Windows installer
         if: matrix.platform == 'win'
         shell: pwsh
