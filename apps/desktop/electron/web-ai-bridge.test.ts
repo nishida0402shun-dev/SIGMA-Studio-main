@@ -61,6 +61,51 @@ describe("Web AI bridge", () => {
     expect((await ok.json()).ok).toBe(true);
   });
 
+  it("does not expose documents or MCP access without a selected workspace", async () => {
+    let mcpCalls = 0;
+    const server = createWebAiBridgeServer({
+      token: "test-token",
+      getDocument: async () => ({
+        fileId: "file_test",
+        revision: 1,
+        workspaceId: "workspace_test",
+        document: { docId: "doc_test" } as never,
+      }),
+      listDocuments: async () => [{ fileId: "file_test", workspaceId: "workspace_test" }],
+      listProposals: async () => [{ proposalId: "proposal_test" }],
+      getProposal: async () => ({ fileId: "file_test" }),
+      approveProposal: async () => ({ ok: true }),
+      rejectProposal: async () => ({ ok: true }),
+      startRun: async () => ({ ok: true }),
+      cancelRun: () => false,
+      mcpGateway: {
+        ...mcpGateway,
+        listTools: async () => { mcpCalls += 1; return []; },
+        callTool: async () => { mcpCalls += 1; return { content: [] }; },
+      },
+    });
+    servers.push(server);
+    const base = await listen(server);
+    const headers = { Authorization: "Bearer test-token" };
+
+    const documents = await fetch(`${base}/v1/documents`, { headers });
+    expect(documents.status).toBe(200);
+    expect((await documents.json()).documents).toEqual([]);
+
+    const tools = await fetch(`${base}/v1/mcp/tools`, { headers });
+    expect(tools.status).toBe(409);
+    const call = await fetch(`${base}/v1/mcp/call`, {
+      method: "POST",
+      headers: { ...headers, "Content-Type": "application/json" },
+      body: JSON.stringify({ name: "list_local_documents", arguments: {} }),
+    });
+    expect(call.status).toBe(409);
+    expect(mcpCalls).toBe(0);
+
+    const proposal = await fetch(`${base}/v1/proposals?fileId=file_test`, { headers });
+    expect(proposal.status).toBe(409);
+  });
+
   it("starts runs and exposes completion state", async () => {
     const server = createWebAiBridgeServer({
       token: "test-token",
@@ -70,7 +115,7 @@ describe("Web AI bridge", () => {
         workspaceId: "workspace_test",
         document: { docId: "doc_test" } as never,
       }),
-      listDocuments: async () => [{ fileId: "file_test", revision: 7 }],
+      listDocuments: async () => [{ fileId: "file_test", revision: 7, workspaceId: "workspace_test" }],
       listProposals: async () => [{ proposalId: "proposal_test", status: "pending" }],
        getProposal: async (proposalId) => proposalId === "proposal_test" ? { fileId: "file_test" } : null,
       approveProposal: async (proposalId) => ({ ok: true, proposalId }),
