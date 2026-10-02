@@ -2738,7 +2738,7 @@ export function AiEditPanel({
                     onRevertAppliedChange={onRevertAppliedChange}
                     onOpenSourceDocument={onOpenSourceDocument}
                     documentWorkspaceId={documentWorkspaceId}
-                    restorableProposal={restorableProposalsByTurnId?.get(turn.id)}
+                    restorable={restorableProposalsByTurnId?.get(turn.id)}
                     onRestoreProposal={onRestoreProposal}
                     proposal={proposal}
                     proposalDiff={proposalDiff}
