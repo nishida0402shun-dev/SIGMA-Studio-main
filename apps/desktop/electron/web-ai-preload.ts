@@ -51,6 +51,14 @@ function apiUrl(path: string): string {
   return `${bridgeUrl}${path}`;
 }
 
+function currentWebProvider(): "chatgpt" | "claude" | "antigravity" {
+  const host = window.location.hostname;
+  if (host === "claude.ai" || host.endsWith(".claude.ai")) return "claude";
+  if (host === "gemini.google.com" || host.endsWith(".gemini.google.com")) return "antigravity";
+  return "chatgpt";
+}
+
+
 interface WebAiApiResponse {
   ok?: boolean;
   error?: unknown;
@@ -157,17 +165,17 @@ async function registerSigmaWebAiTools(): Promise<void> {
     inputSchema: {
       type: "object",
       properties: {
-        provider: { type: "string", enum: ["chatgpt", "claude", "antigravity"] },
         fileId: { type: "string" },
         instruction: { type: "string" },
         model: { type: "string" },
         reasoningEffort: { type: "string" },
       },
-      required: ["provider", "fileId", "instruction"],
+      required: ["fileId", "instruction"],
     },
     annotations: { readOnlyHint: false, consequentialHint: false, untrustedContentHint: true },
     execute: async (input, context) => {
-      const created = await callApi("/v1/agent/runs", { method: "POST", body: JSON.stringify(asRecord(input)) });
+      const payload = { ...asRecord(input), provider: currentWebProvider() };
+      const created = await callApi("/v1/agent/runs", { method: "POST", body: JSON.stringify(payload) });
       return waitForRun(String(created.runId), context?.signal);
     },
   }, { signal: controller.signal });
