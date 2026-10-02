@@ -3,6 +3,14 @@ import type http from "node:http";
 import { afterEach, describe, expect, it } from "vitest";
 
 import { createWebAiBridgeServer } from "./web-ai-bridge";
+import type { WebAiMcpGateway } from "./web-ai-mcp-gateway";
+
+const mcpGateway: WebAiMcpGateway = {
+  start: async () => undefined,
+  stop: async () => undefined,
+  listTools: async () => [],
+  callTool: async () => ({ content: [] }),
+};
 
 async function listen(server: http.Server): Promise<string> {
   await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
@@ -32,6 +40,7 @@ describe("Web AI bridge", () => {
       rejectProposal: async () => null,
       startRun: async () => ({ status: "answer" }),
       cancelRun: () => false,
+       mcpGateway,
     });
     servers.push(server);
     const base = await listen(server);
@@ -61,6 +70,7 @@ describe("Web AI bridge", () => {
       }),
       listDocuments: async () => [{ fileId: "file_test", revision: 7 }],
       listProposals: async () => [{ proposalId: "proposal_test", status: "pending" }],
+       getProposal: async (proposalId) => proposalId === "proposal_test" ? { fileId: "file_test" } : null,
       approveProposal: async (proposalId) => ({ ok: true, proposalId }),
       rejectProposal: async (proposalId) => ({ ok: true, proposalId }),
       startRun: async (input, onEvent) => {
@@ -73,6 +83,7 @@ describe("Web AI bridge", () => {
         return { status: "answer", changedIds: [input.fileId] };
       },
       cancelRun: () => false,
+       mcpGateway,
     });
     servers.push(server);
     const base = await listen(server);
