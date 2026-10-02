@@ -206,7 +206,7 @@ export function KnowledgeDbWorkspace({ open, onClose, onOpenAi, t }: Props) {
       <style>{`.knowledge-db-backdrop {
   position: fixed;
   inset: 0;
-  z-index: 30;
+  z-index: 150;
   display: flex;
   align-items: stretch;
   justify-content: center;
@@ -251,6 +251,28 @@ export function KnowledgeDbWorkspace({ open, onClose, onOpenAi, t }: Props) {
   display: flex;
   align-items: center;
   gap: 8px;
+}
+
+.knowledge-db-add-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 34px;
+  padding: 6px 11px;
+  border: 1px solid rgb(100 116 139 / 0.3);
+  border-radius: 8px;
+  background: white;
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.knowledge-db-add-button:hover:not(:disabled) {
+  background: rgb(241 245 249 / 0.95);
+}
+
+.knowledge-db-add-button:disabled {
+  opacity: 0.45;
+  cursor: default;
 }
 
 .knowledge-db-actions button {
@@ -504,7 +526,6 @@ export function KnowledgeDbWorkspace({ open, onClose, onOpenAi, t }: Props) {
         <header className="knowledge-db-header">
           <div className="knowledge-db-title"><Database size={20} /><strong>{t("appMenu.knowledgeDb.title")}</strong></div>
           <div className="knowledge-db-actions">
-            <button type="button" onClick={() => void addSources()}><FilePlus2 size={16} />{t("appMenu.knowledgeDb.add")}</button>
             <button type="button" onClick={() => void extractPdf()} disabled={selectedPages.length === 0}><Download size={16} />{t("appMenu.knowledgeDb.extractPdf")}</button>
             <button type="button" onClick={() => void handoffAi()}><MessageSquare size={16} />{t("appMenu.knowledgeDb.handoffAi")}</button>
             <button type="button" className="knowledge-db-close" onClick={onClose} aria-label={t("appMenu.knowledgeDb.close")}><X size={18} /></button>
@@ -525,6 +546,7 @@ export function KnowledgeDbWorkspace({ open, onClose, onOpenAi, t }: Props) {
               ))}
             </select>
           </label>
+          <button type="button" className="knowledge-db-add-button" onClick={() => void addSources()} disabled={!selectedWorkspaceId} title={!selectedWorkspaceId ? "ワークスペースを選択してください" : undefined}><FilePlus2 size={16} />{t("appMenu.knowledgeDb.add")}</button>
           <label className="knowledge-db-search"><Search size={16} /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder={t("appMenu.knowledgeDb.searchPlaceholder")} /></label>
           <select value={typeFilter} onChange={(event) => setTypeFilter(event.target.value as KnowledgeSemanticType | "all")}>
             <option value="all">{t("appMenu.knowledgeDb.allTypes")}</option>
