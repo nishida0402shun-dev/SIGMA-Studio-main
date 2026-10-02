@@ -1074,64 +1074,6 @@ async function waitForPrintPreviewReady(win: BrowserWindow): Promise<PrintPrevie
   `, true);
 }
 
-const webAiWindows = new Set<BrowserWindow>();
-
-function openWebAiWindow(provider: "chatgpt" | "claude" | "antigravity", url: string): void {
-  if (!webAiBridgeInfo) {
-    console.warn("Web AI bridge is not ready.");
-    return;
-  }
-  const win = new BrowserWindow({
-    width: 1400,
-    height: 900,
-    minWidth: 900,
-    minHeight: 600,
-    title: provider === "chatgpt" ? "ChatGPT Web — Sigma Studio" : provider === "claude" ? "Claude Web — Sigma Studio" : "Gemini Web — Sigma Studio",
-    webPreferences: {
-      preload: path.join(__dirname, "web-ai-preload.cjs"),
-      nodeIntegration: false,
-      contextIsolation: true,
-      sandbox: true,
-      webSecurity: true,
-      partition: `persist:sigma-web-ai-${provider}`,
-      additionalArguments: [
-        `--sigma-web-ai-url=${webAiBridgeInfo.url}`,
-        `--sigma-web-ai-token=${webAiBridgeInfo.token}`,
-      ],
-    },
-  });
-  webAiWindows.add(win);
-  win.on("closed", () => webAiWindows.delete(win));
-  win.webContents.setWindowOpenHandler(({ url: targetUrl }) => {
-    try {
-      const parsed = new URL(targetUrl);
-      if (parsed.protocol === "https:" && !targetUrl.startsWith("javascript:")) {
-        return {
-          action: "allow",
-          overrideBrowserWindowOptions: {
-            webPreferences: {
-              preload: path.join(__dirname, "web-ai-preload.cjs"),
-              nodeIntegration: false,
-              contextIsolation: true,
-              sandbox: true,
-              webSecurity: true,
-              partition: `persist:sigma-web-ai-${provider}`,
-              additionalArguments: [
-                `--sigma-web-ai-url=${webAiBridgeInfo!.url}`,
-                `--sigma-web-ai-token=${webAiBridgeInfo!.token}`,
-              ],
-            },
-          },
-        };
-      }
-    } catch {
-      // deny malformed or non-HTTPS popup targets
-    }
-    return { action: "deny" };
-  });
-  void win.loadURL(url);
-}
-
 function buildMenu() {
   const isMac = process.platform === "darwin";
   const sendMenuAction = (action: string) => () => {
@@ -1250,14 +1192,6 @@ function buildMenu() {
           { type: "separator" as const },
           { role: "quit" as const },
         ]),
-      ],
-    },
-    {
-      label: "Web AI",
-      submenu: [
-        { label: "ChatGPT Web", click: () => openWebAiWindow("chatgpt", "https://chatgpt.com/") },
-        { label: "Claude Web", click: () => openWebAiWindow("claude", "https://claude.ai/") },
-        { label: "Gemini Web", click: () => openWebAiWindow("antigravity", "https://gemini.google.com/") },
       ],
     },
     {
