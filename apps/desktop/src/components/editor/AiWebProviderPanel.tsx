@@ -41,6 +41,7 @@ export function AiWebProviderPanel({
   const [menuOpen, setMenuOpen] = useState(false);
   const [preloadUrl, setPreloadUrl] = useState<string | null>(null);
   const [webMcpAvailable, setWebMcpAvailable] = useState<boolean | null>(null);
+  const [webviewReady, setWebviewReady] = useState(false);
   useEffect(() => {
     let cancelled = false;
     const promise = getDesktopBridge()?.webAi?.getPreloadUrl();
@@ -58,6 +59,8 @@ export function AiWebProviderPanel({
   );
 
   useEffect(() => {
+    setWebviewReady(false);
+    setWebMcpAvailable(null);
     const webview = webviewRef.current as (HTMLElement & {
       addEventListener: (type: string, listener: EventListener) => void;
       removeEventListener: (type: string, listener: EventListener) => void;
@@ -65,6 +68,11 @@ export function AiWebProviderPanel({
       getURL?: () => string;
     }) | null;
     if (!webview) return;
+
+    const onDomReady = () => {
+      setWebviewReady(true);
+    };
+    webview.addEventListener("dom-ready", onDomReady);
 
     const onIpcMessage = (event: Event) => {
       const payload = (event as Event & { channel?: string; args?: unknown[] }).args?.[0];
@@ -89,16 +97,22 @@ export function AiWebProviderPanel({
     };
     webview.addEventListener("will-navigate", onNavigate);
     return () => {
+      setWebviewReady(false);
+      webview.removeEventListener("dom-ready", onDomReady);
       webview.removeEventListener("will-navigate", onNavigate);
       webview.removeEventListener("ipc-message", onIpcMessage);
     };
   }, [provider]);
 
   useEffect(() => {
-    const webview = webviewRef.current as (HTMLElement & { send?: (channel: string, ...args: unknown[]) => Promise<void> }) | null;
-    if (!webview?.send) return;
+    if (!webviewReady) return;
+    const webview = webviewRef.current as (HTMLElement & {
+      send?: (channel: string, ...args: unknown[]) => Promise<void>;
+      isConnected?: boolean;
+    }) | null;
+    if (!webview?.send || webview.isConnected === false) return;
     void webview.send("sigma-web-ai-scope", workspaceId ?? null).catch(() => undefined);
-  }, [workspaceId, preloadUrl, provider]);
+  }, [workspaceId, webviewReady]);
 
   const reload = () => {
     const webview = webviewRef.current as (HTMLElement & { reload?: () => void }) | null;
