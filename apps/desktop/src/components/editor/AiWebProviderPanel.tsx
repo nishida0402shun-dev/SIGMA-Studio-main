@@ -1,4 +1,3 @@
-/* eslint-disable no-restricted-syntax -- Web AI embedded-surface copy is intentionally provider-local UI text. */
 "use client";
 
 import { ChevronDown, ExternalLink, Globe, Monitor, RefreshCw } from "lucide-react";
@@ -6,6 +5,7 @@ import { useEffect, useMemo, useRef, useState, type ElementType } from "react";
 
 import { ClaudeMark, GeminiMark, OpenAiMark } from "@/components/branding/provider-logos";
 import { getDesktopBridge } from "@/lib/desktop-bridge";
+import { useT } from "@/lib/i18n/react";
 
 export type AiWebProvider = "chatgpt" | "claude" | "gemini";
 
@@ -34,6 +34,7 @@ export function AiWebProviderPanel({
   onClose,
   workspaceId = null,
 }: AiWebProviderPanelProps) {
+  const t = useT("common");
   const webviewRef = useRef<HTMLElement | null>(null);
   const [menuOpen, setMenuOpen] = useState(false);
   const [preloadUrl, setPreloadUrl] = useState<string | null>(null);
@@ -160,9 +161,9 @@ export function AiWebProviderPanel({
       </header>
       <div className="ai-web-provider-note">
         <Globe size={12} />
-        <span>Web版AI。SIGMA StudioのCLIセッションとは独立した会話です。</span>
+        <span>{t("webAi.note")}</span>
         <span aria-label="SIGMA connection status">
-          {workspaceId ? "Workspace選択済み" : "Workspace未選択"} · Bridge {preloadUrl ? "接続" : "準備中"} · WebMCP {webMcpAvailable === true ? "接続" : webMcpAvailable === false ? "非対応/未接続" : "確認中"}
+          {workspaceId ? t("webAi.workspaceSelected") : t("webAi.workspaceUnselected")} · Bridge {preloadUrl ? t("webAi.bridgeConnected") : t("webAi.bridgePreparing")} · WebMCP {webMcpAvailable === true ? t("webAi.webMcpConnected") : webMcpAvailable === false ? t("webAi.webMcpUnavailable") : t("webAi.webMcpChecking")}
         </span>
       </div>
       <div className="ai-web-provider-surface">
@@ -181,7 +182,7 @@ export function AiWebProviderPanel({
             />
           );
         })() : (
-          <div className="ai-web-provider-loading">Web AIを準備しています…</div>
+          <div className="ai-web-provider-loading">{t("webAi.preparing")}</div>
         )}
       </div>
     </section>
