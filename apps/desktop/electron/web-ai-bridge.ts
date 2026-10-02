@@ -280,7 +280,7 @@ export function createWebAiBridgeServer(deps: CreateWebAiBridgeServerDeps): http
           ok: true,
           apiVersion: API_VERSION,
           providers: ["chatgpt", "claude", "antigravity"],
-          operations: ["readDocument", "runAgent", "listProposals", "approveProposal", "rejectProposal", "cancelRun"],
+          operations: ["getContext", "readDocument", "runAgent", "listProposals", "approveProposal", "rejectProposal", "cancelRun"],
           constraints: {
             maxInstructionLength: MAX_INSTRUCTION_LENGTH,
             localhostOnly: true,
