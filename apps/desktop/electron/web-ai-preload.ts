@@ -208,11 +208,22 @@ async function waitForModelContext(): Promise<WebMcpModelContext | null> {
   return null;
 }
 
+function reportWebAiStatus(webMcp: boolean, bridge: boolean): void {
+  try { ipcRenderer.sendToHost("sigma-web-ai-status", { webMcp, bridge, workspaceId: currentWorkspaceId }); } catch { /* webview host may be unavailable during teardown */ }
+}
+
 async function registerSigmaWebAiTools(): Promise<void> {
   if (!ORIGIN_ALLOWLIST.has(window.location.origin)) return;
+  if (!(await ensureBridgeConfig())) {
+    reportWebAiStatus(false, false);
+    return;
+  }
   const modelContext = await waitForModelContext();
-  if (!modelContext) return;
-  if (!(await ensureBridgeConfig())) return;
+  if (!modelContext) {
+    reportWebAiStatus(false, true);
+    return;
+  }
+  reportWebAiStatus(true, true);
 
   const controller = new AbortController();
 
@@ -311,6 +322,7 @@ async function registerSigmaWebAiTools(): Promise<void> {
 }
 
 void registerSigmaWebAiTools().catch((error) => {
+  reportWebAiStatus(false, Boolean(bridgeUrl && bridgeToken));
   console.warn("[sigma-web-ai] WebMCP tool registration failed", error);
 });
 
