@@ -3048,13 +3048,14 @@ registerTool(
     title: "Knowledge DBを検索",
     description: "登録PDFのページ内容を意味検索します。質問文をそのまま渡せ、完全一致のキーワード検索に限定されません。",
     inputSchema: {
+      workspaceId: z.string().min(1).max(256),
       query: z.string().min(1).max(2000),
       limit: z.number().int().min(1).max(20).optional(),
       runId: z.string().min(1).max(256).optional(),
     },
   },
-  async ({ query, limit, runId }) => withToolErrorHandling(async () => {
-    const results = await new KnowledgeDbStore(storeContext.dataDir).search(query, limit ?? 8);
+  async ({ workspaceId, query, limit, runId }) => withToolErrorHandling(async () => {
+    const results = await new KnowledgeDbStore(storeContext.dataDir).search(workspaceId, query, limit ?? 8);
     for (const result of results) {
       recordKnowledgeDbPageReference(runId, {
         sourceId: result.sourceId,
@@ -3072,16 +3073,14 @@ registerTool(
     title: "Knowledge DBのページを取得",
     description: "資料IDとページ番号を指定して、そのページの本文・分類・タイトルを取得します。検索結果の確認に使います。",
     inputSchema: {
+      workspaceId: z.string().min(1).max(256),
       sourceId: z.string().min(1),
       pageNumber: z.number().int().min(1),
       runId: z.string().min(1).max(256).optional(),
     },
   },
-  async ({ sourceId, pageNumber, runId }) => withToolErrorHandling(async () => {
-    const sources = await new KnowledgeDbStore(storeContext.dataDir).listSources();
-    const source = sources.find((item) => item.id === sourceId);
-    const page = source?.pages.find((item) => item.pageNumber === pageNumber);
-    if (!source || !page) throw new Error("Knowledge DB page not found");
+  async ({ workspaceId, sourceId, pageNumber, runId }) => withToolErrorHandling(async () => {
+    const { source, page } = await new KnowledgeDbStore(storeContext.dataDir).getPage(workspaceId, sourceId, pageNumber);
     recordKnowledgeDbPageReference(runId, {
       sourceId: source.id,
       sourceName: source.name,
@@ -3097,6 +3096,7 @@ registerTool(
     title: "Knowledge DBの指定範囲を取得",
     description: "PDFページ内の座標範囲を指定して、その範囲をPDFとして抽出します。ドラッグ選択から渡された範囲の再利用に使えます。",
     inputSchema: {
+      workspaceId: z.string().min(1).max(256),
       sourceId: z.string().min(1),
       pageNumber: z.number().int().min(1),
       x: z.number().min(0),
@@ -3106,9 +3106,9 @@ registerTool(
       runId: z.string().min(1).max(256).optional(),
     },
   },
-  async ({ sourceId, pageNumber, x, y, width, height, runId }) => withToolErrorHandling(async () => {
-    const filePath = await new KnowledgeDbStore(storeContext.dataDir).extractRegion(sourceId, pageNumber, { x, y, width, height });
-    const sources = await new KnowledgeDbStore(storeContext.dataDir).listSources();
+  async ({ workspaceId, sourceId, pageNumber, x, y, width, height, runId }) => withToolErrorHandling(async () => {
+    const filePath = await new KnowledgeDbStore(storeContext.dataDir).extractRegion(workspaceId, sourceId, pageNumber, { x, y, width, height });
+    const sources = await new KnowledgeDbStore(storeContext.dataDir).listSources(workspaceId);
     const source = sources.find((item) => item.id === sourceId);
     if (source) {
       recordKnowledgeDbPageReference(runId, {
