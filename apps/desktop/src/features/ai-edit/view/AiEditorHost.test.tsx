@@ -194,6 +194,15 @@ describe("AI editor host lifecycle", () => {
     expect(unmounts).toBe(0);
   });
 
+  it("exposes CLI/Web AI mode switching in the sidebar and keeps Web AI in the same host", () => {
+    render({ displayMode: "sidebar", inlineOpen: false, surface: resolveAiSurface({ displayMode: "sidebar", aiInlineOpen: false, aiSidebarOpen: true }) });
+    expect(host().querySelector(".ai-sidebar-mode-switch")).not.toBeNull();
+    const webButton = [...host().querySelectorAll<HTMLButtonElement>(".ai-sidebar-mode-switch button")]
+      .find((button) => button.textContent?.includes("Web AI"))!;
+    act(() => webButton.click());
+    expect(props.onContentModeChange).toHaveBeenCalledWith("web-ai");
+  });
+
   it("docks the panel in the workspace grid with the existing portal-to-grid mount behavior", () => {
     render();
     const { element, captured } = geometry();
