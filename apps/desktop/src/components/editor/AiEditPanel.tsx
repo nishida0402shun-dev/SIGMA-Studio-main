@@ -2685,6 +2685,7 @@ export function AiEditPanel({
           provider={webProvider}
           onProviderChange={setWebProvider}
           onClose={() => setAiSurface("cli")}
+          workspaceId={documentWorkspaceId}
         />
       ) : (
         <>     <ChatRoomHistory
