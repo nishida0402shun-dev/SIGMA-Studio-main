@@ -1,6 +1,6 @@
 "use client";
 
-import { X } from "lucide-react";
+import { ChevronDown, X } from "lucide-react";
 import { createPortal } from "react-dom";
 import type { ReactNode, RefObject } from "react";
 
@@ -13,6 +13,7 @@ import {
   type AiInlineAnchor,
 } from "@/components/editor/ai-inline-placement";
 import type { AiDisplayMode, AiSurfaceResolution } from "@/lib/ai/ai-surface";
+import { AiWebProviderPanel, type AiWebProvider } from "@/components/editor/AiWebProviderPanel";
 import { useAiInlineDrag } from "./use-ai-inline-drag";
 
 export interface AiEditorHostProps {
@@ -28,6 +29,11 @@ export interface AiEditorHostProps {
   closeLabel: string;
   onClose: () => void;
   children: ReactNode;
+  contentMode: "cli" | "web-ai";
+  onContentModeChange: (mode: "cli" | "web-ai") => void;
+  webAiProvider: AiWebProvider;
+  onWebAiProviderChange: (provider: AiWebProvider) => void;
+  workspaceId?: string | null;
 }
 
 /** AI panel の配置と操作面。提案・参照・文書の state は children の composition が所有する。 */
@@ -44,6 +50,11 @@ export function AiEditorHost({
   closeLabel,
   onClose,
   children,
+  contentMode,
+  onContentModeChange,
+  webAiProvider,
+  onWebAiProviderChange,
+  workspaceId = null,
 }: AiEditorHostProps) {
   const isInlineHost = displayMode === "inline";
   const hostVisible = surface.hostVisible || inlineClosing
@@ -100,8 +111,28 @@ export function AiEditorHost({
           : undefined}
       >
         {displayMode === "sidebar" && (
-          <div className="sidebar-panel-header">
-            <span>AI</span>
+          <div className="sidebar-panel-header ai-sidebar-header">
+            <div className="ai-sidebar-mode-switch" role="tablist" aria-label="AI mode">
+              <button
+                type="button"
+                role="tab"
+                aria-selected={contentMode === "cli"}
+                className={contentMode === "cli" ? "active" : ""}
+                onClick={() => onContentModeChange("cli")}
+              >
+                CLI
+              </button>
+              <button
+                type="button"
+                role="tab"
+                aria-selected={contentMode === "web-ai"}
+                className={contentMode === "web-ai" ? "active" : ""}
+                onClick={() => onContentModeChange("web-ai")}
+              >
+                Web AI
+                <ChevronDown size={12} aria-hidden="true" />
+              </button>
+            </div>
             <button
               type="button"
               className="panel-icon-button sidebar-close-button"
@@ -113,7 +144,14 @@ export function AiEditorHost({
             </button>
           </div>
         )}
-        {children}
+        {displayMode === "sidebar" && contentMode === "web-ai" ? (
+          <AiWebProviderPanel
+            provider={webAiProvider}
+            onProviderChange={onWebAiProviderChange}
+            workspaceId={workspaceId}
+            embedded
+          />
+        ) : children}
       </aside>
     </>
   );
