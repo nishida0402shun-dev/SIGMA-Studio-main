@@ -36,7 +36,8 @@ export function AiWebProviderPanel({
   const [preloadUrl, setPreloadUrl] = useState<string | null>(null);
   useEffect(() => {
     let cancelled = false;
-    void getDesktopBridge()?.webAi?.getPreloadUrl().then((url) => {
+    const promise = getDesktopBridge()?.webAi?.getPreloadUrl();
+    void promise?.then((url) => {
       if (!cancelled) setPreloadUrl(url);
     }).catch(() => undefined);
     return () => {
@@ -141,7 +142,7 @@ export function AiWebProviderPanel({
         <span>Web版AI。SIGMA StudioのCLIセッションとは独立した会話です。</span>
       </div>
       <div className="ai-web-provider-surface">
-        {(() => {
+        {preloadUrl ? (() => {
           const Webview = "webview" as unknown as ElementType;
           return (
             <Webview
@@ -149,13 +150,15 @@ export function AiWebProviderPanel({
                 webviewRef.current = node;
               }}
               src={selected.url}
-              preload={preloadUrl ?? undefined}
+              preload={preloadUrl}
               partition="persist:sigma-studio-ai-web"
               allowpopups=""
               style={{ display: "flex", width: "100%", height: "100%", border: "0" }}
             />
           );
-        })()}
+        })() : (
+          <div className="ai-web-provider-loading">Web AIを準備しています…</div>
+        )}
       </div>
     </section>
   );
