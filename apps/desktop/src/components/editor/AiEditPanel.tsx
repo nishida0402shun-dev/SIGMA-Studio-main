@@ -2688,89 +2688,91 @@ export function AiEditPanel({
           workspaceId={documentWorkspaceId}
         />
       ) : (
-        <>     <ChatRoomHistory
-        rooms={chatRooms}
-        activeRoomId={activeRoomId}
-        loading={historyLoading}
-        runSessions={runSessions}
-        onNewRoom={startNewChatRoom}
-        onSelectRoom={selectChatRoom}
-        onOpenSettings={onOpenAiSettings}
-      />
-      <div className="ai-chat-thread" ref={threadRef}>
-        {historyError && <p className="ai-chat-error">{historyError}</p>}
-        {!hasTurns ? (
-          <ChatEmptyState
-            reference={activeReference}
-            onSelectPreset={applyActionPreset}
+        <>
+          <ChatRoomHistory
+            rooms={chatRooms}
+            activeRoomId={activeRoomId}
+            loading={historyLoading}
+            runSessions={runSessions}
+            onNewRoom={startNewChatRoom}
+            onSelectRoom={selectChatRoom}
+            onOpenSettings={onOpenAiSettings}
           />
-        ) : (
-          visibleTurns.map((turn) => {
-            if (turn.role === "user") {
-              return (
-                <UserTurnView
-                  key={turn.id}
-                  turn={turn}
-                  turnRef={(element) => setUserTurnElement(turn.id, element)}
-                  onResend={resendQueuedTurn}
-                />
-              );
-            }
-            const exactPreview = previewGroups.find((preview) => (
-              preview.roomId === activeRoomId && preview.turnId === turn.id
-            ));
-            const proposal = exactPreview
-              ?? (turn.id === latestAssistantId && !activeRoomPreview?.turnId ? activeRoomPreview : null);
-            // 承認する前に「何が消えて何が足されるのか」を同じGitHub風差分で先出しする
-            // (承認後の適用済みカードと全く同じ見た目にすることで、「見た目で分かって
-            // 承認できる」体験にする)。キャッシュ経由なので、コンポーザーへの入力など
-            // 無関係な再レンダーではproposal/document/shapesが同じ限り再計算されない。
-            const proposalDiff = proposal ? getPendingProposalDiff(proposal) : undefined;
-            return (
-              <AssistantTurnView
-                key={turn.id}
-                turn={turn}
-                clockNow={clockNow}
-                sourceReferences={sourceReferencesByTurnId?.get(turn.id)}
-                shapePreview={insertedShapePreviewsByTurnId?.get(turn.id)}
-                appliedChange={appliedChangesByTurnId?.get(turn.id)}
-                onRevertAppliedChange={onRevertAppliedChange}
-                onOpenSourceDocument={onOpenSourceDocument}
-                documentWorkspaceId={documentWorkspaceId}
-        
-        </>\n      )}\n    </div>\n  );\n}e={restorableProposalsByTurnId?.get(turn.id)}
-                onRestoreProposal={onRestoreProposal}
-                proposal={proposal}
-                proposalDiff={proposalDiff}
-                proposalBusy={busy}
-                onApplyProposal={onApplyGroup}
-                onDismissProposal={onDismissGroup}
+          <div className="ai-chat-thread" ref={threadRef}>
+            {historyError && <p className="ai-chat-error">{historyError}</p>}
+            {!hasTurns ? (
+              <ChatEmptyState
+                reference={activeReference}
+                onSelectPreset={applyActionPreset}
               />
-            );
-          })
-        )}
-        {composerError && <p className="ai-chat-error">{composerError}</p>}
-        {threadTailSpacerHeight > 0 && (
-          <div
-            className="ai-chat-thread-tail-spacer"
-            style={{ height: threadTailSpacerHeight }}
-            aria-hidden="true"
+            ) : (
+              visibleTurns.map((turn) => {
+                if (turn.role === "user") {
+                  return (
+                    <UserTurnView
+                      key={turn.id}
+                      turn={turn}
+                      turnRef={(element) => setUserTurnElement(turn.id, element)}
+                      onResend={resendQueuedTurn}
+                    />
+                  );
+                }
+                const exactPreview = previewGroups.find((preview) => (
+                  preview.roomId === activeRoomId && preview.turnId === turn.id
+                ));
+                const proposal = exactPreview
+                  ?? (turn.id === latestAssistantId && !activeRoomPreview?.turnId ? activeRoomPreview : null);
+                // 承認する前に「何が消えて何が足されるのか」を同じGitHub風差分で先出しする
+                // (承認後の適用済みカードと全く同じ見た目にすることで、「見た目で分かって
+                // 承認できる」体験にする)。キャッシュ経由なので、コンポーザーへの入力など
+                // 無関係な再レンダーではproposal/document/shapesが同じ限り再計算されない。
+                const proposalDiff = proposal ? getPendingProposalDiff(proposal) : undefined;
+                return (
+                  <AssistantTurnView
+                    key={turn.id}
+                    turn={turn}
+                    clockNow={clockNow}
+                    sourceReferences={sourceReferencesByTurnId?.get(turn.id)}
+                    shapePreview={insertedShapePreviewsByTurnId?.get(turn.id)}
+                    appliedChange={appliedChangesByTurnId?.get(turn.id)}
+                    onRevertAppliedChange={onRevertAppliedChange}
+                    onOpenSourceDocument={onOpenSourceDocument}
+                    documentWorkspaceId={documentWorkspaceId}
+                    restorableProposal={restorableProposalsByTurnId?.get(turn.id)}
+                    onRestoreProposal={onRestoreProposal}
+                    proposal={proposal}
+                    proposalDiff={proposalDiff}
+                    proposalBusy={busy}
+                    onApplyProposal={onApplyGroup}
+                    onDismissProposal={onDismissGroup}
+                  />
+                );
+              })
+            )}
+            {composerError && <p className="ai-chat-error">{composerError}</p>}
+            {threadTailSpacerHeight > 0 && (
+              <div
+                className="ai-chat-thread-tail-spacer"
+                style={{ height: threadTailSpacerHeight }}
+                aria-hidden="true"
+              />
+            )}
+          </div>
+
+          <AiStaleProposalNotice
+            groups={staleProposalGroups}
+            onDiscard={onDiscardStaleProposals}
+            onRebase={onRebaseStaleProposals}
+            onForceApply={onForceApplyStaleProposals}
+            onReRequest={prepareStaleProposalReRequest}
           />
-        )}
-      </div>
 
-      <AiStaleProposalNotice
-        groups={staleProposalGroups}
-        onDiscard={onDiscardStaleProposals}
-        onRebase={onRebaseStaleProposals}
-        onForceApply={onForceApplyStaleProposals}
-        onReRequest={prepareStaleProposalReRequest}
-      />
-
-      {renderComposer("sidebar")}
+          {renderComposer("sidebar")}
+        </>
+      )}
     </div>
   );
-}
+
 
 /** AI会話の切り替え、新規作成、設定導線を共通モーダルで提供する履歴ナビゲーション。 */
 function ChatRoomHistory({
