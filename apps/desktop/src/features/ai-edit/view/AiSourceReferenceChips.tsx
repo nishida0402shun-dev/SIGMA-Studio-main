@@ -71,10 +71,13 @@ export function AiSourceReferenceChips({
   sourceReferences,
   className,
   onOpenDocument,
+  workspaceId,
 }: {
+
   sourceReferences: DesktopAiSourceReference[];
   className?: string;
   onOpenDocument?: (params: AiSourceReferenceOpenDocumentParams) => void;
+  workspaceId?: string | null;
 }) {
   const t = useT("ai");
   if (sourceReferences.length === 0) {
@@ -89,6 +92,7 @@ export function AiSourceReferenceChips({
           key={sourceReferenceKey(reference, index)}
           reference={reference}
           onOpenDocument={onOpenDocument}
+          workspaceId={workspaceId}
         />
       ))}
     </div>
@@ -101,6 +105,7 @@ function AiSourceReferenceChip({
 }: {
   reference: DesktopAiSourceReference;
   onOpenDocument?: (params: AiSourceReferenceOpenDocumentParams) => void;
+  workspaceId?: string | null;
 }) {
   const t = useT("ai");
   const label = sourceReferenceLabel(reference, t);
@@ -133,7 +138,9 @@ function AiSourceReferenceChip({
         className="ai-source-ref-chip ai-source-ref-chip--document"
         title={tooltip}
         onClick={() => {
+          if (!workspaceId?.trim()) return;
           void getDesktopBridge()?.knowledgeDb?.openPage({
+            workspaceId: workspaceId.trim(),
             sourceId: reference.sourceId,
             pageNumber: reference.pageNumber,
           });
