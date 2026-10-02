@@ -3,7 +3,7 @@
 import { ChevronDown, ExternalLink, Globe, Monitor, RefreshCw } from "lucide-react";
 import { useEffect, useMemo, useRef, useState, type ElementType } from "react";
 
-import { AntigravityMark, ClaudeMark, GeminiMark, OpenAiMark } from "@/components/branding/provider-logos";
+import { ClaudeMark, GeminiMark, OpenAiMark } from "@/components/branding/provider-logos";
 import { getDesktopBridge } from "@/lib/desktop-bridge";
 
 export type AiWebProvider = "chatgpt" | "claude" | "gemini";
