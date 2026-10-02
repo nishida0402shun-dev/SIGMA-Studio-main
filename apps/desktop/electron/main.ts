@@ -1814,7 +1814,7 @@ async function startWebAiBridgeServer(): Promise<void> {
     token,
     getDocument: async (fileId) => {
       const loaded = await localSigmaDocStore.loadDocumentWithRecovery(fileId);
-      return loaded.ok ? { fileId, revision: loaded.revision, document: loaded.document } : null;
+      return loaded.ok ? { fileId, revision: loaded.revision, workspaceId: (await localSigmaDocStore.listFiles()).find((file) => file.fileId === fileId)?.workspaceId ?? null, document: loaded.document } : null;
     },
     listDocuments: async () => localSigmaDocStore.listFiles(),
     listProposals: async (fileId) => localMcpProposalStore.listProposals({ fileId }),
