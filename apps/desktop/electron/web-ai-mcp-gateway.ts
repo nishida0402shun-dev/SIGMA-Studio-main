@@ -96,8 +96,6 @@ export function createWebAiMcpGateway(options: WebAiMcpGatewayOptions): WebAiMcp
       if (name === "list_local_documents") {
         input.workspaceId = workspaceId;
       }
-        throw new Error("MCP access is restricted to the selected Workspace.");
-      }
       if (typeof input.fileId === "string" && !hasExactWorkspaceFileId(
         await currentClient.callTool({ name: "list_local_documents", arguments: { workspaceId } }),
         input.fileId,
