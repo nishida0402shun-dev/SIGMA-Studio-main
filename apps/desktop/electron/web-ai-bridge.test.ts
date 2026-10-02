@@ -168,6 +168,6 @@ describe("Web AI bridge", () => {
     const documents = await fetch(`${base}/v1/documents`, {
       headers: { Authorization: "Bearer test-token", "X-Sigma-Workspace-Id": "workspace_test" },
     });
-    expect((await documents.json()).documents).toEqual([{ fileId: "file_test", revision: 7 }]);
+    expect((await documents.json()).documents).toEqual([{ fileId: "file_test", revision: 7, workspaceId: "workspace_test" }]);
   });
 });
