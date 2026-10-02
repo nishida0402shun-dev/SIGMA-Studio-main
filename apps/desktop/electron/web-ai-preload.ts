@@ -1,4 +1,3 @@
-/* eslint-disable no-restricted-syntax -- Electron preload protocol strings are not UI copy. */
 import { ipcRenderer } from "electron";
 
 interface WebMcpModelContext {
