@@ -67,6 +67,7 @@ export interface CreateWebAiBridgeServerDeps {
   getDocument: (fileId: string) => Promise<WebAiDocumentSnapshot | null>;
   listDocuments: () => Promise<unknown[]>;
   listProposals: (fileId: string) => Promise<unknown[]>;
+  getProposal: (proposalId: string) => Promise<{ fileId: string } | null>;
   approveProposal: (proposalId: string) => Promise<unknown>;
   rejectProposal: (proposalId: string) => Promise<unknown>;
   startRun: (input: WebAiRunInput, onEvent: (event: AiEditRunEvent) => void) => Promise<unknown>;
@@ -322,6 +323,13 @@ export function createWebAiBridgeServer(deps: CreateWebAiBridgeServerDeps): http
           sendJson(res, 400, { ok: false, error: "fileId is required" }, origin);
           return;
         }
+        if (workspaceId) {
+          const snapshot = await deps.getDocument(fileId);
+          if (!snapshot || snapshot.workspaceId !== workspaceId) {
+            sendJson(res, 404, { ok: false, error: "document not found in selected workspace" }, origin);
+            return;
+          }
+        }
         sendJson(res, 200, { ok: true, proposals: await deps.listProposals(fileId) }, origin);
         return;
       }
@@ -407,12 +415,22 @@ export function createWebAiBridgeServer(deps: CreateWebAiBridgeServerDeps): http
       }
 
       if (req.method === "POST" && routeParts.length === 4 && routeParts[0] === "v1" && routeParts[1] === "proposals" && routeParts[3] === "approve") {
+        const proposal = await deps.getProposal(routeParts[2]!);
+        if (!proposal || (workspaceId && (await deps.getDocument(proposal.fileId))?.workspaceId !== workspaceId)) {
+          sendJson(res, 404, { ok: false, error: "proposal not found in selected workspace" }, origin);
+          return;
+        }
         const result = await deps.approveProposal(routeParts[2]!);
         sendJson(res, 200, { ok: true, result }, origin);
         return;
       }
 
       if (req.method === "POST" && routeParts.length === 4 && routeParts[0] === "v1" && routeParts[1] === "proposals" && routeParts[3] === "reject") {
+        const proposal = await deps.getProposal(routeParts[2]!);
+        if (!proposal || (workspaceId && (await deps.getDocument(proposal.fileId))?.workspaceId !== workspaceId)) {
+          sendJson(res, 404, { ok: false, error: "proposal not found in selected workspace" }, origin);
+          return;
+        }
         const result = await deps.rejectProposal(routeParts[2]!);
         sendJson(res, 200, { ok: true, result }, origin);
         return;
