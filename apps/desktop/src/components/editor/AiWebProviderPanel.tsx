@@ -24,12 +24,14 @@ export interface AiWebProviderPanelProps {
   provider: AiWebProvider;
   onProviderChange: (provider: AiWebProvider) => void;
   onClose: () => void;
+  workspaceId?: string | null;
 }
 
 export function AiWebProviderPanel({
   provider,
   onProviderChange,
   onClose,
+  workspaceId = null,
 }: AiWebProviderPanelProps) {
   const webviewRef = useRef<HTMLElement | null>(null);
   const [menuOpen, setMenuOpen] = useState(false);
@@ -75,6 +77,12 @@ export function AiWebProviderPanel({
     webview.addEventListener("will-navigate", onNavigate);
     return () => webview.removeEventListener("will-navigate", onNavigate);
   }, [provider]);
+
+  useEffect(() => {
+    const webview = webviewRef.current as (HTMLElement & { send?: (channel: string, ...args: unknown[]) => Promise<void> }) | null;
+    if (!webview?.send) return;
+    void webview.send("sigma-web-ai-scope", workspaceId ?? null).catch(() => undefined);
+  }, [workspaceId, preloadUrl, provider]);
 
   const reload = () => {
     const webview = webviewRef.current as (HTMLElement & { reload?: () => void }) | null;
