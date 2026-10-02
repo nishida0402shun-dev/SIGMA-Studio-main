@@ -10,6 +10,14 @@ export interface RegisterKnowledgeDbIpcDeps {
   store: KnowledgeDbStore;
 }
 
+function requireWorkspaceId(payload: unknown): string {
+  const value = payload && typeof payload === "object" && "workspaceId" in payload && typeof payload.workspaceId === "string"
+    ? payload.workspaceId.trim()
+    : "";
+  if (!value) throw new Error("workspace not selected");
+  return value;
+}
+
 async function collectPdfFiles(paths: string[]): Promise<string[]> {
   const files: string[] = [];
   for (const candidate of paths) {
@@ -41,32 +49,36 @@ export function registerKnowledgeDbIpc(deps: RegisterKnowledgeDbIpcDeps): void {
     return { paths };
   });
 
-  ipcMain.handle("knowledge-db:list", async (event) => {
+  ipcMain.handle("knowledge-db:list", async (event, payload: unknown) => {
     if (event.sender !== getMainWindow()?.webContents) return [];
-    return store.listSources();
+    return store.listSources(requireWorkspaceId(payload));
   });
 
   ipcMain.handle("knowledge-db:import", async (event, filePaths: unknown) => {
     if (event.sender !== getMainWindow()?.webContents) return [];
-    if (!Array.isArray(filePaths) || !filePaths.every((value) => typeof value === "string")) {
-      throw new Error(te("invalid source paths"));
-    }
-    return store.addFiles(filePaths as string[]);
+    if (!payload || typeof payload !== "object") throw new Error(te("invalid source paths"));
+    const workspaceId = requireWorkspaceId(payload);
+    const filePaths = "paths" in payload && Array.isArray(payload.paths) ? payload.paths : [];
+    if (!filePaths.every((value) => typeof value === "string")) throw new Error(te("invalid source paths"));
+    return store.addFiles(workspaceId, filePaths as string[]);
   });
 
-  ipcMain.handle("knowledge-db:delete-source", async (event, sourceId: unknown) => {
+  ipcMain.handle("knowledge-db:delete-source", async (event, payload: unknown) => {
     if (event.sender !== getMainWindow()?.webContents) return { ok: false };
-    if (typeof sourceId !== "string" || !sourceId.trim()) throw new Error("invalid source id");
-    return { ok: await store.deleteSource(sourceId.trim()) };
+    const workspaceId = requireWorkspaceId(payload);
+    const sourceId = payload && typeof payload === "object" && "sourceId" in payload && typeof payload.sourceId === "string" ? payload.sourceId.trim() : "";
+    if (!sourceId) throw new Error("invalid source id");
+    return { ok: await store.deleteSource(workspaceId, sourceId) };
   });
 
   ipcMain.handle("knowledge-db:get-page-pdf", async (event, payload: unknown) => {
     if (event.sender !== getMainWindow()?.webContents) return null;
     if (!payload || typeof payload !== "object") throw new Error("invalid page request");
+    const workspaceId = requireWorkspaceId(payload);
     const sourceId = "sourceId" in payload && typeof payload.sourceId === "string" ? payload.sourceId : "";
     const pageNumber = "pageNumber" in payload && typeof payload.pageNumber === "number" ? payload.pageNumber : 0;
     if (!sourceId || !Number.isInteger(pageNumber) || pageNumber < 1) throw new Error("invalid page request");
-    return store.getPagePdfBase64(sourceId, pageNumber);
+    return store.getPagePdfBase64(workspaceId, sourceId, pageNumber);
   });
 
   ipcMain.handle("knowledge-db:extract-region", async (event, payload: unknown) => {
@@ -81,7 +93,7 @@ export function registerKnowledgeDbIpc(deps: RegisterKnowledgeDbIpcDeps): void {
     const width = "width" in rect && typeof rect.width === "number" ? rect.width : 0;
     const height = "height" in rect && typeof rect.height === "number" ? rect.height : 0;
     if (!(width > 0) || !(height > 0)) throw new Error("invalid region request");
-    const filePath = await store.extractRegion(sourceId, pageNumber, { x, y, width, height });
+    const filePath = await store.extractRegion(workspaceId, sourceId, pageNumber, { x, y, width, height });
     const error = await shell.openPath(filePath);
     return error ? { ok: false, error } : { ok: true, filePath };
   });
@@ -92,7 +104,7 @@ export function registerKnowledgeDbIpc(deps: RegisterKnowledgeDbIpcDeps): void {
     const sourceId = "sourceId" in payload && typeof payload.sourceId === "string" ? payload.sourceId : "";
     const pageNumber = "pageNumber" in payload && typeof payload.pageNumber === "number" ? payload.pageNumber : 0;
     if (!sourceId || !Number.isInteger(pageNumber) || pageNumber < 1) throw new Error("invalid page request");
-    const filePath = await store.openPage(sourceId, pageNumber);
+    const filePath = await store.openPage(workspaceId, sourceId, pageNumber);
     const error = await shell.openPath(filePath);
     return error ? { ok: false, error } : { ok: true, filePath };
   });
@@ -120,8 +132,9 @@ export function registerKnowledgeDbIpc(deps: RegisterKnowledgeDbIpcDeps): void {
       : sourceId && pages.length > 0
         ? [{ sourceId, pageNumbers: pages }]
         : [];
+    const workspaceId = requireWorkspaceId(payload);
     if (requestedSelections.length === 0) throw new Error("no pages selected");
-    const bytes = await store.extractSelectedPages(requestedSelections);
+    const bytes = await store.extractSelectedPages(workspaceId, requestedSelections);
     const mainWindow = getMainWindow();
     if (!mainWindow) return null;
     const save = await dialog.showSaveDialog(mainWindow, {
@@ -145,7 +158,8 @@ export function registerKnowledgeDbIpc(deps: RegisterKnowledgeDbIpcDeps): void {
       ? payload.limit
       : 12;
     if (!query.trim()) return [];
-    return store.search(query, limit);
+    const workspaceId = requireWorkspaceId(payload);
+    return store.search(workspaceId, query, limit);
   });
 
   ipcMain.handle("knowledge-db:set-page-type", async (event, payload: unknown) => {
@@ -157,6 +171,6 @@ export function registerKnowledgeDbIpc(deps: RegisterKnowledgeDbIpcDeps): void {
       ? payload.semanticType as KnowledgeSemanticType
       : "unknown";
     const title = "title" in payload && typeof payload.title === "string" ? payload.title : undefined;
-    return store.updatePageSemanticType(sourceId, pageNumber, semanticType, title);
+    return store.updatePageSemanticType(workspaceId, sourceId, pageNumber, semanticType, title);
   });
 }
