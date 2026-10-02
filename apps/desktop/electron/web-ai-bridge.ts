@@ -7,6 +7,7 @@ import { z } from "zod";
 
 import type { SigmaDocument } from "@/features/document";
 import type { AiEditRunEvent } from "@/lib/ai/ai-edit-runtime";
+import type { WebAiMcpGateway } from "./web-ai-mcp-gateway";
 
 const MAX_REQUEST_BODY_BYTES = 2 * 1024 * 1024;
 const MAX_INSTRUCTION_LENGTH = 20_000;
@@ -72,6 +73,7 @@ export interface CreateWebAiBridgeServerDeps {
   rejectProposal: (proposalId: string) => Promise<unknown>;
   startRun: (input: WebAiRunInput, onEvent: (event: AiEditRunEvent) => void) => Promise<unknown>;
   cancelRun: (runId: string) => boolean;
+  mcpGateway: WebAiMcpGateway;
 }
 
 export interface WebAiBridgeInfo {
@@ -280,7 +282,7 @@ export function createWebAiBridgeServer(deps: CreateWebAiBridgeServerDeps): http
           ok: true,
           apiVersion: API_VERSION,
           providers: ["chatgpt", "claude", "antigravity"],
-          operations: ["getContext", "readDocument", "runAgent", "listProposals", "approveProposal", "rejectProposal", "cancelRun"],
+          operations: ["getContext", "mcp.listTools", "mcp.callTool", "readDocument", "runAgent", "listProposals", "approveProposal", "rejectProposal", "cancelRun"],
           constraints: {
             maxInstructionLength: MAX_INSTRUCTION_LENGTH,
             localhostOnly: true,
@@ -288,6 +290,42 @@ export function createWebAiBridgeServer(deps: CreateWebAiBridgeServerDeps): http
             directDesktopIpc: false,
           },
         }, origin);
+        return;
+      }
+
+      if (req.method === "GET" && pathname === "/v1/mcp/tools") {
+        if (!workspaceId) {
+          sendJson(res, 400, { ok: false, error: "workspace is required" }, origin);
+          return;
+        }
+        const tools = await deps.mcpGateway.listTools(workspaceId);
+        sendJson(res, 200, { ok: true, workspaceId, tools }, origin);
+        return;
+      }
+
+      if (req.method === "POST" && pathname === "/v1/mcp/call") {
+        if (!workspaceId) {
+          sendJson(res, 400, { ok: false, error: "workspace is required" }, origin);
+          return;
+        }
+        const body = await readBody(req);
+        if (!body || typeof body !== "object" || Array.isArray(body)) {
+          sendJson(res, 400, { ok: false, error: "invalid request" }, origin);
+          return;
+        }
+        const record = body as Record<string, unknown>;
+        const name = typeof record.name === "string" ? record.name.trim() : "";
+        const args = record.arguments;
+        if (!name || (args !== undefined && (typeof args !== "object" || args === null || Array.isArray(args)))) {
+          sendJson(res, 400, { ok: false, error: "name and object arguments are required" }, origin);
+          return;
+        }
+        const result = await deps.mcpGateway.callTool(
+          name,
+          (args ?? {}) as Record<string, unknown>,
+          workspaceId,
+        );
+        sendJson(res, 200, { ok: true, workspaceId, result }, origin);
         return;
       }
 
