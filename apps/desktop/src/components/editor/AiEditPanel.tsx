@@ -2772,7 +2772,7 @@ export function AiEditPanel({
       )}
     </div>
   );
-
+}
 
 /** AI会話の切り替え、新規作成、設定導線を共通モーダルで提供する履歴ナビゲーション。 */
 function ChatRoomHistory({
