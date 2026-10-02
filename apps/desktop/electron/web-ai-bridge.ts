@@ -40,6 +40,7 @@ export type WebAiRunRequest = z.infer<typeof RunRequestSchema>;
 export interface WebAiDocumentSnapshot {
   fileId: string;
   revision: number;
+  workspaceId: string | null;
   document: SigmaDocument;
 }
 
@@ -122,6 +123,11 @@ function tokenEquals(expected: string, actual: string): boolean {
   const a = Buffer.from(expected, "utf8");
   const b = Buffer.from(actual, "utf8");
   return a.length === b.length && crypto.timingSafeEqual(a, b);
+}
+
+function requestedWorkspaceId(req: http.IncomingMessage): string | null {
+  const value = req.headers["x-sigma-workspace-id"];
+  return typeof value === "string" && value.trim() ? value.trim() : null;
 }
 
 function isAuthorized(req: http.IncomingMessage, token: string): boolean {
@@ -261,6 +267,7 @@ export function createWebAiBridgeServer(deps: CreateWebAiBridgeServerDeps): http
 
       const parsedUrl = new URL(req.url ?? "/", "http://127.0.0.1");
       const pathname = parsedUrl.pathname;
+      const workspaceId = requestedWorkspaceId(req);
 
       if (req.method === "GET" && pathname === "/v1/health") {
         sendJson(res, 200, { ok: true, apiVersion: API_VERSION }, origin);
@@ -284,7 +291,15 @@ export function createWebAiBridgeServer(deps: CreateWebAiBridgeServerDeps): http
       }
 
       if (req.method === "GET" && pathname === "/v1/documents") {
-        sendJson(res, 200, { ok: true, documents: await deps.listDocuments() }, origin);
+        const documents = await deps.listDocuments();
+        const scoped = workspaceId
+          ? documents.filter((document) => (
+              Boolean(document)
+              && typeof document === "object"
+              && (document as { workspaceId?: unknown }).workspaceId === workspaceId
+            ))
+          : documents;
+        sendJson(res, 200, { ok: true, documents: scoped }, origin);
         return;
       }
 
@@ -293,8 +308,8 @@ export function createWebAiBridgeServer(deps: CreateWebAiBridgeServerDeps): http
       if (req.method === "GET" && routeParts.length === 3 && routeParts[0] === "v1" && routeParts[1] === "documents") {
         const fileId = routeParts[2]!;
         const snapshot = await deps.getDocument(fileId);
-        if (!snapshot) {
-          sendJson(res, 404, { ok: false, error: "document not found" }, origin);
+        if (!snapshot || (workspaceId && snapshot.workspaceId !== workspaceId)) {
+          sendJson(res, 404, { ok: false, error: "document not found in selected workspace" }, origin);
           return;
         }
         sendJson(res, 200, { ok: true, ...snapshot }, origin);
@@ -314,8 +329,8 @@ export function createWebAiBridgeServer(deps: CreateWebAiBridgeServerDeps): http
       if (req.method === "POST" && pathname === "/v1/agent/runs") {
         const body = RunRequestSchema.parse(await readBody(req));
         const snapshot = await deps.getDocument(body.fileId);
-        if (!snapshot) {
-          sendJson(res, 404, { ok: false, error: "document not found" }, origin);
+        if (!snapshot || (workspaceId && snapshot.workspaceId !== workspaceId)) {
+          sendJson(res, 404, { ok: false, error: "document not found in selected workspace" }, origin);
           return;
         }
 
