@@ -66,6 +66,12 @@ const desktopAPI = {
     },
   },
 
+  webAi: {
+    getPreloadUrl(): Promise<string> {
+      return ipcRenderer.invoke("web-ai:get-preload-url");
+    },
+  },
+
   shell: {
     openExternal(url: string): Promise<{ ok: boolean; error?: string }> {
       return ipcRenderer.invoke("shell:open-external", url);
