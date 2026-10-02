@@ -352,6 +352,7 @@ export const settings = {
     title: "AI settings",
     navAria: "AI settings navigation",
     connection: "Connection & behavior",
+    webAi: "Web AI",
     scopeGlobal: "Global · used by every workspace",
     scopeWorkspace: "Workspace · used by this workspace",
     instructions: "Instructions for the AI",
