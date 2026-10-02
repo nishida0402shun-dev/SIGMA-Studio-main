@@ -41,6 +41,11 @@ beforeEach(() => {
     editorCanvasRef: { current: scroller },
     closeLabel: "AIチャットを閉じる",
     onClose: vi.fn(),
+    contentMode: "cli",
+    onContentModeChange: vi.fn(),
+    webAiProvider: "chatgpt",
+    onWebAiProviderChange: vi.fn(),
+    workspaceId: "workspace-1",
   };
 });
 
