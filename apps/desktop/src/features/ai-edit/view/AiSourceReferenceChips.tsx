@@ -102,6 +102,7 @@ export function AiSourceReferenceChips({
 function AiSourceReferenceChip({
   reference,
   onOpenDocument,
+  workspaceId,
 }: {
   reference: DesktopAiSourceReference;
   onOpenDocument?: (params: AiSourceReferenceOpenDocumentParams) => void;
