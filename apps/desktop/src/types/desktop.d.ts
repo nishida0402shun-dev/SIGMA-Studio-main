@@ -868,12 +868,11 @@ export interface DesktopWorkspacePreviewAPI {
 
 export interface DesktopKnowledgeDbAPI {
   chooseSources(): Promise<{ paths: string[] } | null>;
-  list(payload: { workspaceId: string }): Promise<unknown[]>;
-  search(payload: { workspaceId: string; query: string; limit?: number }): Promise<unknown[]>;
-  importSources(payload: { workspaceId: string; paths: string[] }): Promise<unknown[]>;
+  list(): Promise<unknown[]>
+  search(payload: { query: string; limit?: number }): Promise<unknown[]>;
+  importSources(payload: { paths: string[] }): Promise<unknown[]>;
 
   extractPages(payload: {
-    workspaceId: string;
     sourceId?: string;
     pageNumbers?: number[];
     selections?: Array<{ sourceId: string; pageNumbers: number[] }>;
