@@ -99,11 +99,9 @@ export function AiSourceReferenceChips({
 function AiSourceReferenceChip({
   reference,
   onOpenDocument,
-  workspaceId,
 }: {
   reference: DesktopAiSourceReference;
   onOpenDocument?: (params: AiSourceReferenceOpenDocumentParams) => void;
-  workspaceId?: string | null;
 }) {
   const t = useT("ai");
   const label = sourceReferenceLabel(reference, t);
