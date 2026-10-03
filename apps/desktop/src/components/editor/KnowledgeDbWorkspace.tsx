@@ -26,7 +26,7 @@ interface ResearchSession {
 
 const TYPES: KnowledgeSemanticType[] = ["problem", "example", "explanation", "column", "definition", "theorem", "answer", "figure"];
 
-function IndexStatusBadge({ knowledgeDb }: { knowledgeDb: NonNullable<ReturnType<typeof getDesktopBridge>>["knowledgeDb"] | undefined }): JSX.Element | null {
+function IndexStatusBadge({ knowledgeDb }: { knowledgeDb: NonNullable<ReturnType<typeof getDesktopBridge>>["knowledgeDb"] | undefined }): React.ReactElement | null {
   const [status, setStatus] = useState<{ state: string; total: number; completed: number; error?: string } | null>(null);
   const [structureStatus, setStructureStatus] = useState<{ available: boolean; engine: string | null; source: string; error?: string } | null>(null);
   useEffect(() => {
@@ -257,8 +257,8 @@ export function KnowledgeDbWorkspace({ open, onClose, onOpenAi, t }: Props) {
     const context = selectedPages.flatMap(({ sourceId, pageNumber }) => {
       const source = sources.find((item) => item.id === sourceId);
       const page = source?.pages.find((item) => item.pageNumber === pageNumber);
-      if (!source) return [];
-      const structuredText = (page as typeof page & { structureBlocks?: Array<{ type?: string; text?: string }> }).structureBlocks
+      if (!source || !page) return [];
+      const structuredText = (page as { structureBlocks?: Array<{ type?: string; text?: string }> }).structureBlocks
         ?.map((block) => block.text?.trim() ? `[${block.type || "text"}] ${block.text.trim()}` : "")
         .filter(Boolean)
         .join("\\n") || "";
