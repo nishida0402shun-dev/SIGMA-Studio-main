@@ -28,11 +28,17 @@ const TYPES: KnowledgeSemanticType[] = ["problem", "example", "explanation", "co
 
 function IndexStatusBadge({ knowledgeDb }: { knowledgeDb: NonNullable<ReturnType<typeof getDesktopBridge>>["knowledgeDb"] | undefined }): JSX.Element | null {
   const [status, setStatus] = useState<{ state: string; total: number; completed: number; error?: string } | null>(null);
+  const [structureStatus, setStructureStatus] = useState<{ available: boolean; engine: string | null; source: string; error?: string } | null>(null);
   useEffect(() => {
     if (!knowledgeDb) return;
     let cancelled = false;
     const refresh = () => void knowledgeDb.getIndexStatus().then((value) => {
       if (!cancelled && value && typeof value === "object") setStatus(value as typeof status);
+    });
+    void knowledgeDb.getStructureParserStatus().then((value) => {
+      if (!cancelled && value && typeof value === "object") setStructureStatus(value as typeof structureStatus);
+    }).catch(() => {
+      if (!cancelled) setStructureStatus(null);
     });
     void knowledgeDb.startIndexing().then(refresh);
     refresh();
@@ -42,7 +48,19 @@ function IndexStatusBadge({ knowledgeDb }: { knowledgeDb: NonNullable<ReturnType
   if (!status || (status.state === "completed" && status.total === 0)) return null;
   if (status.state === "running") return <span className="knowledge-db-index-status">Indexing {status.completed}/{status.total}</span>;
   if (status.state === "failed") return <button type="button" className="knowledge-db-index-status error" onClick={() => void knowledgeDb?.startIndexing()}>Index retry</button>;
-  return <span className="knowledge-db-index-status">Index complete</span>;
+  return (
+    <>
+      <span className="knowledge-db-index-status">Index complete</span>
+      {structureStatus && (
+        <span
+          className="knowledge-db-index-status"
+          title={structureStatus.available ? "PP-StructureV3: PDFのOCR・表・図・数式などの構造解析が利用可能" : structureStatus.error || "PP-StructureV3が利用できません"}
+        >
+          {structureStatus.available ? "Structure OCR ready" : "Structure OCR unavailable"}
+        </span>
+      )}
+    </>
+  );
 }
 
 function semanticTypeLabel(t: Translate<"chrome">, type: KnowledgeSemanticType): string {
@@ -239,14 +257,20 @@ export function KnowledgeDbWorkspace({ open, onClose, onOpenAi, t }: Props) {
     const context = selectedPages.flatMap(({ sourceId, pageNumber }) => {
       const source = sources.find((item) => item.id === sourceId);
       const page = source?.pages.find((item) => item.pageNumber === pageNumber);
-      if (!source || !page?.text?.trim()) return [];
+      if (!source) return [];
+      const structuredText = (page as typeof page & { structureBlocks?: Array<{ type?: string; text?: string }> }).structureBlocks
+        ?.map((block) => block.text?.trim() ? `[${block.type || "text"}] ${block.text.trim()}` : "")
+        .filter(Boolean)
+        .join("\\n") || "";
+      const pageText = page.text?.trim() || structuredText;
+      if (!pageText) return [];
       return [{
         sourceId,
         pageId: page.id,
         sourceName: source.name,
         pageNumber: page.pageNumber,
         semanticType: page.semanticType,
-        text: [action ? `【AI操作: ${action}】` : "", page.text.trim()].filter(Boolean).join("\\n"),
+        text: [action ? `【AI操作: ${action}】` : "", pageText].filter(Boolean).join("\\n"),
       } satisfies KnowledgeDbAiContext];
     });
     onOpenAi(context);
