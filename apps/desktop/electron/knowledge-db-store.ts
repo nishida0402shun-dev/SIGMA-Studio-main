@@ -147,7 +147,8 @@ export class KnowledgeDbStore {
   async search(query: string, limit = 12): Promise<Array<VectorSearchResult & { sourceName: string }>> {
     const trimmed = query.trim();
     if (!trimmed) return [];
-    await this.ensureIndexed();
+    if (this.indexPromise) await this.indexPromise;
+    else await this.ensureIndexed();
     const library = await this.readLibrary();
     const safeLimit = Math.max(1, Math.min(limit, 50));
     const matches = await this.vectorIndex().search(trimmed, Math.min(50, safeLimit * 5));
