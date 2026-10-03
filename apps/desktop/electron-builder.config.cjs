@@ -22,6 +22,7 @@ const requireMacSigning = process.env.SIGMA_STUDIO_REQUIRE_MAC_SIGNING === "true
 const buildWindowsStorePackage = process.env.SIGMA_STUDIO_WINDOWS_STORE === "true";
 // eslint-disable-next-line @typescript-eslint/no-require-imports -- electron-builder config is intentionally CommonJS.
 const packageVersion = require("./package.json").version;
+const ocrRuntimeFrom = "ocr-runtime/${os}/${arch}";
 const isBetaBuild = /-beta\./.test(packageVersion);
 
 const windowsStoreIdentityName = (process.env.WINDOWS_STORE_IDENTITY_NAME || "").trim();
@@ -92,7 +93,10 @@ module.exports = {
     "!node_modules/**/*.map",
     "!node_modules/**/*.tsbuildinfo",
   ],
-  extraResources: [{ from: "../../THIRD_PARTY_NOTICES.md", to: "THIRD_PARTY_NOTICES.md" }],
+  extraResources: [
+    { from: "../../THIRD_PARTY_NOTICES.md", to: "THIRD_PARTY_NOTICES.md" },
+    { from: ocrRuntimeFrom, to: "ocr-runtime", filter: ["**/*"] },
+  ],
   extraMetadata: {
     main: "dist-electron/main.cjs",
   },
