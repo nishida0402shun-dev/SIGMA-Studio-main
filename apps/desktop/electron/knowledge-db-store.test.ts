@@ -132,6 +132,7 @@ describe("Knowledge DB analysis lifecycle", () => {
     const store = new KnowledgeDbStore(dataDir);
     const [source] = await store.addFiles([sourcePath]);
     expect(source).toBeTruthy();
+    await store.search("warmup", 1);
 
     const libraryPath = path.join(dataDir, "knowledge-db", "library.json");
     const library = JSON.parse(await fs.readFile(libraryPath, "utf8")) as any;
