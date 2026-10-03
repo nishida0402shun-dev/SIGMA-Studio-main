@@ -624,8 +624,8 @@ export class KnowledgeDbStore {
       const parsed = JSON.parse(await fs.readFile(paths.libraryPath, "utf8")) as Partial<KnowledgeLibrary>;
       if (parsed.version === 3 && Array.isArray(parsed.sources)) {
         const sources = parsed.sources.map((source) => {
-          const legacy = source as KnowledgeSource & { workspaceId?: unknown };
-          const { workspaceId: _workspaceId, ...globalSource } = legacy;
+          const globalSource = { ...(source as KnowledgeSource & { workspaceId?: unknown }) };
+          delete globalSource.workspaceId;
           return globalSource as KnowledgeSource;
         });
         return { version: 3, sources };
