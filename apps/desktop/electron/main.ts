@@ -1625,6 +1625,8 @@ function registerIpc() {
     store: researchSessionStore,
   });
 
+  knowledgeDbStore.startBackgroundIndexing();
+
   registerMaterialsIpc({
     localMaterialStore,
     localTemplateStore,
