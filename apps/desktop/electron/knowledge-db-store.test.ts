@@ -262,7 +262,15 @@ describe("Knowledge DB analysis lifecycle", () => {
     await store.search("warmup", 1);
 
     const libraryPath = path.join(dataDir, "knowledge-db", "library.json");
-    const library = JSON.parse(await fs.readFile(libraryPath, "utf8")) as any;
+    const library = JSON.parse(await fs.readFile(libraryPath, "utf8")) as {
+      sources: Array<{
+        pages: Array<{
+          text?: string;
+          analysisStatus?: string;
+          analysisVersion?: number;
+        }>;
+      }>;
+    };
     const longText = "数学Ⅱ 三角関数の定理について説明します。".repeat(80);
     for (const page of library.sources[0].pages) {
       page.text = longText;
