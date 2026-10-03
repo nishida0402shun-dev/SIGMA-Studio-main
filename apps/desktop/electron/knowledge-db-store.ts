@@ -136,9 +136,8 @@ export class KnowledgeDbStore {
     return { source, page };
   }
 
-  async deleteSource(workspaceId: string, sourceId: string): Promise<boolean> {
-    const normalized = requireWorkspaceId(workspaceId);
-    const paths = this.paths(normalized);
+  async deleteSource(sourceId: string): Promise<boolean> {
+    const paths = this.paths();
     const library = await this.readLibrary();
     const source = library.sources.find((item) => item.id === sourceId);
     if (!source) return false;
@@ -179,7 +178,7 @@ export class KnowledgeDbStore {
     page.setCropBox(rect.x, rect.y, width, height);
     page.setMediaBox(rect.x, rect.y, width, height);
     output.addPage(page);
-    const paths = this.paths(normalized);
+    const paths = this.paths();
     await fs.mkdir(paths.openedPagesDir, { recursive: true });
     const outputPath = path.join(paths.openedPagesDir, `${safeId(source.id)}-p${pageNumber}-region.pdf`);
     await fs.writeFile(outputPath, await output.save());
@@ -202,12 +201,11 @@ export class KnowledgeDbStore {
     return outputPath;
   }
 
-  async extractPages(workspaceId: string, sourceId: string, pageNumbers: number[]): Promise<Uint8Array> {
-    return this.extractSelectedPages(workspaceId, [{ sourceId, pageNumbers }]);
+  async extractPages(sourceId: string, pageNumbers: number[]): Promise<Uint8Array> {
+    return this.extractSelectedPages([{ sourceId, pageNumbers }]);
   }
 
-  async extractSelectedPages(workspaceId: string, selections: Array<{ sourceId: string; pageNumbers: number[] }>): Promise<Uint8Array> {
-    const normalized = requireWorkspaceId(workspaceId);
+  async extractSelectedPages(selections: Array<{ sourceId: string; pageNumbers: number[] }>): Promise<Uint8Array> {
     const library = await this.readLibrary();
     const output = await PDFDocument.create();
     let copiedCount = 0;
@@ -228,8 +226,7 @@ export class KnowledgeDbStore {
     return output.save();
   }
 
-  async updatePageSemanticType(workspaceId: string, sourceId: string, pageNumber: number, semanticType: KnowledgeSemanticType, title?: string): Promise<KnowledgeSource> {
-    const normalized = requireWorkspaceId(workspaceId);
+  async updatePageSemanticType(sourceId: string, pageNumber: number, semanticType: KnowledgeSemanticType, title?: string): Promise<KnowledgeSource> {
     const library = await this.readLibrary();
     const source = library.sources.find((item) => item.id === sourceId);
     if (!source) throw new Error("knowledge source not found");
