@@ -17,7 +17,7 @@ const BRIDGE_DIR_NAME = "ai-run-context";
 const BRIDGE_FILE_NAME = "web-ai-bridge.json";
 const API_VERSION = "1";
 
-const KNOWLEDGE_DB_MCP_TOOLS = new Set(["knowledge_db_list_sources","knowledge_db_search","knowledge_db_get_context","knowledge_db_get_page","knowledge_db_get_region"]);\n\nconst WEB_AI_ORIGINS = new Set([
+const KNOWLEDGE_DB_MCP_TOOLS = new Set(["knowledge_db_list_sources","knowledge_db_search","knowledge_db_get_context","knowledge_db_get_page","knowledge_db_get_region","knowledge_db_get_related_sources"]);\n\nconst WEB_AI_ORIGINS = new Set([
   "https://chatgpt.com",
   "https://chat.openai.com",
   "https://claude.ai",
