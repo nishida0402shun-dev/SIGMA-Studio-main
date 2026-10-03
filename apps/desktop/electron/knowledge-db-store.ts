@@ -1,6 +1,6 @@
 import fs from "node:fs/promises";
 import path from "node:path";
-import { createHash } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { PDFDocument } from "pdf-lib";
 import { LocalVectorIndex, type VectorSearchResult } from "./local-vector-index";
 import { KnowledgeStructureParser, type KnowledgeStructureBlock, type StructureParserStatus } from "./knowledge-db-structure-parser";
@@ -110,7 +110,7 @@ export class KnowledgeDbStore {
       }
 
       const pdf = await PDFDocument.load(bytes, { ignoreEncryption: false });
-      const id = `src_${cryptoRandomId()}`;
+      const id = `src_${randomUUID()}`;
       const storedPath = path.join(paths.sourcesDir, `${id}.pdf`);
       const now = new Date().toISOString();
       const pageCount = pdf.getPageCount();
