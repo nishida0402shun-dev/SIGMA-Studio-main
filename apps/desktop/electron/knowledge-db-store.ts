@@ -408,6 +408,13 @@ export class KnowledgeDbStore {
       if (!needsText && !needsAnalysis && !needsTaxonomy && !needsIndex) { continue; }
       this.indexStatus = { ...this.indexStatus, currentSourceId: source.id };
       try {
+        if (needsAnalysis) {
+          source.pages = source.pages.map((page) => page.text
+            ? { ...page, analysisStatus: "processing", analysisError: undefined }
+            : page);
+          changed = true;
+          await this.writeLibrary(library);
+        }
         if (needsText || needsAnalysis || needsTaxonomy) {
           const bytes = await fs.readFile(source.storedPath);
           const pageTexts = needsText ? await extractPdfPageTexts(bytes, source.pageCount) : source.pages.map((page) => page.text ?? "");
