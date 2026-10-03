@@ -260,7 +260,7 @@ async function registerSigmaWebAiTools(): Promise<void> {
 
   await modelContext.registerTool({
     name: "sigma_mcp_list_tools",
-    description: "List the MCP tools exposed by Sigma Studio for the selected Workspace. Knowledge DB classification review submission is a controlled write operation; other exposed tools are read-only.",
+    description: "List the MCP tools exposed by Sigma Studio for the selected Workspace. Some tools may perform changes and require user approval in SIGMA Studio.",
     inputSchema: { type: "object", properties: {} },
     annotations: { readOnlyHint: true, untrustedContentHint: false },
     execute: async () => callApi("/v1/mcp/tools"),
@@ -268,13 +268,13 @@ async function registerSigmaWebAiTools(): Promise<void> {
 
   await modelContext.registerTool({
     name: "sigma_mcp_call_tool",
-    description: "Call an allowlisted SIGMA MCP tool returned by sigma_mcp_list_tools. Most tools are read-only; Knowledge DB classification review submission is the only controlled classification write operation.",
+    description: "Call a SIGMA MCP tool returned by sigma_mcp_list_tools. Read operations run normally; write or consequential operations require explicit user approval in SIGMA Studio.",
     inputSchema: {
       type: "object",
       properties: { name: { type: "string" }, arguments: { type: "object" } },
       required: ["name"],
     },
-    annotations: { readOnlyHint: true, untrustedContentHint: true },
+    annotations: { readOnlyHint: false, consequentialHint: false, untrustedContentHint: true },
     execute: async (input) => callApi("/v1/mcp/call", {
       method: "POST",
       body: JSON.stringify({
