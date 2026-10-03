@@ -3092,7 +3092,7 @@ registerTool(
       ok: true,
       query,
       context,
-      instructions: "回答では根拠として使った項目のcitationを保持してください。例: [SIGMA:sourceId:p17]",
+      instructions: "回答では根拠として使った項目のcitationをMarkdownリンクのまま保持してください。例: [資料名 p17](sigma://knowledge-db/sourceId/p/17)。このリンクをクリックするとSIGMAで該当ページを開けます。",
     };
   }),
 );
