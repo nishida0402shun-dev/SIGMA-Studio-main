@@ -508,10 +508,15 @@ export class KnowledgeDbStore {
           source.pages = source.pages.map((page, index) => {
             const nativeText = pageTexts[index]?.trim() ?? "";
             const structured = structureByPage.get(page.pageNumber);
-            const text = nativeText || structured?.text || "";
             const blocks = structured?.blocks ?? [];
+            const extractedContent = [nativeText, structured?.text ?? "", ...blocks.map((block) => block.text)]
+              .map((value) => value.trim())
+              .filter(Boolean)
+              .join("\n");
+            const text = extractedContent;
             const analysis = analyzeKnowledgePage(text, blocks);
-            const classifiedTaxonomy = classifyKnowledgeTaxonomy(text, analysis.keywords);\n            const taxonomy = classifiedTaxonomy.length ? classifiedTaxonomy : [{ nodeId: "other", path: ["その他"], score: 0, confidence: 0 }];
+            const classifiedTaxonomy = classifyKnowledgeTaxonomy(text, analysis.keywords);
+            const taxonomy = classifiedTaxonomy.length ? classifiedTaxonomy : [{ nodeId: "other", path: ["その他"], score: 0, confidence: 0 }];
             return {
               ...page,
               text: text || undefined,
