@@ -6,11 +6,14 @@ import { spawn, type ChildProcess } from "node:child_process";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { createWebAiMcpGateway } from "./web-ai-mcp-gateway";
+import { createWebAiBridgeServer } from "./web-ai-bridge";
 
 describe("Web AI MCP gateway live server path", () => {
   let userDataPath: string;
   let serverProcess: ChildProcess | null = null;
   let gateway: ReturnType<typeof createWebAiMcpGateway>;
+  let bridge: import("node:http").Server | null = null;
+  let bridgeBase = "";
   const mcpServerPath = path.join(process.cwd(), "dist-mcp", "sigma-doc-mcp-server.cjs");
 
   beforeAll(async () => {
@@ -43,6 +46,10 @@ describe("Web AI MCP gateway live server path", () => {
   }, 90_000);
 
   afterAll(async () => {
+    if (bridge) {
+      await new Promise<void>((resolve, reject) => bridge!.close((error) => error ? reject(error) : resolve()));
+      bridge = null;
+    }
     await gateway?.stop();
     if (serverProcess && serverProcess.exitCode === null) {
       serverProcess.kill("SIGTERM");
@@ -81,6 +88,56 @@ describe("Web AI MCP gateway live server path", () => {
     await expect(
       gateway.callTool("knowledge_db_get_classification_review_context", { sourceId: "missing", pageNumber: 1 }, null),
     ).rejects.toThrow();
+  });
+
+  it("routes a real HTTP Bridge request into the real MCP server", async () => {
+    bridge = createWebAiBridgeServer({
+      token: "live-test-token",
+      getDocument: async () => null,
+      listDocuments: async () => [],
+      listProposals: async () => [],
+      getProposal: async () => null,
+      approveProposal: async () => null,
+      rejectProposal: async () => null,
+      startRun: async () => ({ status: "answer" }),
+      cancelRun: () => false,
+      mcpGateway: gateway,
+    });
+    await new Promise<void>((resolve, reject) => {
+      bridge!.once("error", reject);
+      bridge!.listen(0, "127.0.0.1", resolve);
+    });
+    const address = bridge.address();
+    if (!address || typeof address === "string") throw new Error("bridge did not bind");
+    bridgeBase = `http://127.0.0.1:${address.port}`;
+
+    const toolsResponse = await fetch(`${bridgeBase}/v1/mcp/tools`, {
+      headers: {
+        Authorization: "Bearer live-test-token",
+        Origin: "https://chatgpt.com",
+      },
+    });
+    expect(toolsResponse.status).toBe(200);
+    const toolsBody = await toolsResponse.json();
+    expect(toolsBody.ok).toBe(true);
+    expect(toolsBody.tools.some((tool: { name?: string }) => tool.name === "knowledge_db_search")).toBe(true);
+
+    const callResponse = await fetch(`${bridgeBase}/v1/mcp/call`, {
+      method: "POST",
+      headers: {
+        Authorization: "Bearer live-test-token",
+        Origin: "https://chatgpt.com",
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        name: "knowledge_db_search",
+        arguments: { query: "SIGMA live bridge connectivity", limit: 1 },
+      }),
+    });
+    expect(callResponse.status).toBe(200);
+    const callBody = await callResponse.json();
+    expect(callBody.ok).toBe(true);
+    expect(callBody.result).toBeTruthy();
   });
 
   it("allows global Knowledge DB tools without a selected Workspace", async () => {
