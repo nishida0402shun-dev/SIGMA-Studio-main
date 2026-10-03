@@ -58,6 +58,9 @@ describe("Web AI MCP gateway live server path", () => {
     expect(names.has("read_local_document")).toBe(true);
     expect(names.has("knowledge_db_search")).toBe(true);
     expect(names.has("knowledge_db_get_context")).toBe(true);
+    expect(names.has("knowledge_db_list_classification_reviews")).toBe(true);
+    expect(names.has("knowledge_db_get_classification_review_context")).toBe(true);
+    expect(names.has("knowledge_db_submit_classification_review")).toBe(true);
     expect(names.has("create_local_document")).toBe(false);
     expect(names.size).toBeGreaterThan(5);
 
@@ -65,7 +68,19 @@ describe("Web AI MCP gateway live server path", () => {
     const globalNames = new Set(globalTools.map((tool) => tool.name));
     expect(globalNames.has("knowledge_db_search")).toBe(true);
     expect(globalNames.has("knowledge_db_get_context")).toBe(true);
+    expect(globalNames.has("knowledge_db_list_classification_reviews")).toBe(true);
+    expect(globalNames.has("knowledge_db_get_classification_review_context")).toBe(true);
+    expect(globalNames.has("knowledge_db_submit_classification_review")).toBe(true);
     expect(globalNames.has("list_local_documents")).toBe(false);
+  });
+
+  it("allows the classification review workflow without a selected Workspace", async () => {
+    await expect(
+      gateway.callTool("knowledge_db_list_classification_reviews", { status: "pending", limit: 1 }, null),
+    ).resolves.toBeTruthy();
+    await expect(
+      gateway.callTool("knowledge_db_get_classification_review_context", { sourceId: "missing", pageNumber: 1 }, null),
+    ).rejects.toThrow();
   });
 
   it("allows global Knowledge DB tools without a selected Workspace", async () => {
