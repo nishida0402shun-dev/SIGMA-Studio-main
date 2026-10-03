@@ -89,6 +89,55 @@ describe("KnowledgeDbStore", () => {
     expect(results[0]?.score).toBeGreaterThan(results[1]?.score ?? -1);
   });
 
+
+  it("attaches structure-aware citation regions to search/context results", async () => {
+    const dataDir = await fs.mkdtemp(path.join(os.tmpdir(), "sigma-knowledge-db-citation-"));
+    tempDirs.push(dataDir);
+    const store = new KnowledgeDbStore(dataDir);
+    const sourceId = "src_citation";
+    const libraryPath = path.join(dataDir, "knowledge-db", "library.json");
+    await fs.mkdir(path.dirname(libraryPath), { recursive: true });
+    const library = {
+      version: 3,
+      sources: [{
+        id: sourceId,
+        name: "citation.pdf",
+        originalPath: "",
+        storedPath: "",
+        mimeType: "application/pdf",
+        sizeBytes: 0,
+        pageCount: 1,
+        importedAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        extractionStatus: "complete",
+        pages: [{
+          id: sourceId + "_p1",
+          sourceId,
+          pageNumber: 1,
+          semanticType: "theorem",
+          text: "三角関数の定理を確認する。",
+          extractionStatus: "text",
+          analysisStatus: "analyzed",
+          structureBlocks: [
+            { type: "title", text: "三角関数の定理", bbox: [10, 20, 300, 50], confidence: 0.99 },
+            { type: "formula", text: "sin²x + cos²x = 1", bbox: [40, 80, 240, 120], confidence: 0.98 },
+          ],
+        }],
+      }],
+    };
+    await fs.writeFile(libraryPath, JSON.stringify(library), "utf8");
+    const index = new LocalVectorIndex(path.join(dataDir, "knowledge-db", "vector-index"));
+    await index.upsertMany([{ id: sourceId + "_p1_c0", sourceId, pageNumber: 1, chunkIndex: 0, text: "三角関数の定理を確認する。" }]);
+
+    const results = await store.search("三角関数の定理", 1);
+    expect(results[0]?.citationRegions?.length).toBeGreaterThan(0);
+    expect(results[0]?.citationRegions?.[0]?.bbox).toEqual([10, 20, 300, 50]);
+
+    const context = await store.getContext("三角関数の定理", 1);
+    expect(context[0]?.citationRegions?.some((region) => region.type === "title")).toBe(true);
+    expect(context[0]?.citationRef).toEqual({ sourceId, pageId: sourceId + "_p1", pageNumber: 1 });
+  });
+
   it("extracts selected pages from multiple imported PDFs into one PDF", async () => {
     const dataDir = await fs.mkdtemp(path.join(os.tmpdir(), "sigma-knowledge-db-data-"));
     tempDirs.push(dataDir);
