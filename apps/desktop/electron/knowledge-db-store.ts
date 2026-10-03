@@ -4,7 +4,7 @@ import { createHash, randomUUID } from "node:crypto";
 import { PDFDocument } from "pdf-lib";
 import { LocalVectorIndex, type VectorSearchResult } from "./local-vector-index";
 import { KnowledgeStructureParser, type KnowledgeStructureBlock, type StructureParserStatus } from "./knowledge-db-structure-parser";
-import { analyzeKnowledgePage } from "./knowledge-analysis-engine";
+import { analyzeKnowledgePage, KNOWLEDGE_ANALYSIS_VERSION } from "./knowledge-analysis-engine";
 import { classifyKnowledgeTaxonomy, KNOWLEDGE_TAXONOMY_VERSION } from "./knowledge-taxonomy";
 
 export type KnowledgeSemanticType =
@@ -23,6 +23,9 @@ export interface KnowledgePage {
   structureBlocks?: KnowledgeStructureBlock[];
   keywords?: string[];
   analysisSignals?: string[];
+  analysisStatus?: "pending" | "processing" | "analyzed" | "stale" | "failed";
+  analysisVersion?: number;
+  analysisError?: string;
   taxonomyNodeIds?: string[];
   taxonomyPaths?: string[][];
   taxonomyConfidence?: number;
@@ -142,6 +145,8 @@ export class KnowledgeDbStore {
           semanticType: "unknown",
           extractionStatus: "ocr-needed",
           wordCount: 0,
+          analysisStatus: "pending",
+          analysisVersion: 0,
         })),
       };
 
@@ -184,10 +189,12 @@ export class KnowledgeDbStore {
         const lexical = lexicalScore(match.text, queryTokens);
         const page = pages.get(`${match.sourceId}:${match.pageNumber}`);
         const metadata = page ? metadataScore(page, trimmed, queryTokens) : 0;
+        const matchReasons = page ? retrievalMatchReasons(page, trimmed, queryTokens, match.score, lexical, metadata) : [];
         return {
           ...match,
           score: match.score * 0.65 + lexical * 0.20 + metadata * 0.15,
-          ...(page ? { semanticType: page.semanticType, title: page.title, keywords: page.keywords, analysisSignals: page.analysisSignals } : {}),
+          matchReasons,
+          ...(page ? { semanticType: page.semanticType, title: page.title, keywords: page.keywords, analysisSignals: page.analysisSignals, taxonomyPaths: page.taxonomyPaths } : {}),
         };
       })
       .sort((a, b) => b.score - a.score)
@@ -195,13 +202,17 @@ export class KnowledgeDbStore {
       .map((match) => ({ ...match, sourceName: sourceNames.get(match.sourceId) ?? match.sourceId }));
   }
 
-  async getContext(query: string, limit = 8, sourceIds?: string[]): Promise<KnowledgeContextItem[]> {
+  async getContext(query: string, limit = 8, sourceIds?: string[], maxChars = 16000): Promise<KnowledgeContextItem[]> {
     const allowed = sourceIds?.length ? new Set(sourceIds) : null;
     const results = (await this.search(query, Math.min(50, Math.max(limit * 3, limit))))
       .filter((result) => !allowed || allowed.has(result.sourceId))
       .slice(0, Math.max(1, Math.min(limit, 20)));
     const items: KnowledgeContextItem[] = [];
+    const seenPages = new Set<string>();
+    let usedChars = 0;
     for (const result of results) {
+      const pageKey = `${result.sourceId}:${result.pageNumber}`;
+      if (seenPages.has(pageKey)) continue;
       const { source, page } = await this.getPage(result.sourceId, result.pageNumber);
       const structureText = page.structureBlocks?.map((block) => `[${block.type}] ${block.text}`).join("\n") ?? "";
       const analysisText = [
@@ -224,7 +235,18 @@ export class KnowledgeDbStore {
         score: result.score,
         text: text.slice(0, 5000),
         citation: `[${source.name} p${page.pageNumber}](sigma://knowledge-db/${encodeURIComponent(source.id)}/p/${page.pageNumber})`,
-      });
+        matchReasons: result.matchReasons,
+      };
+      const remaining = Math.max(0, maxChars - usedChars);
+      if (remaining <= 0) break;
+      const boundedText = item.text.slice(0, remaining);
+      if (!boundedText.trim()) break;
+      item.text = boundedText;
+      item.contextChars = boundedText.length;
+      items.push(item);
+      seenPages.add(pageKey);
+      usedChars += boundedText.length;
+      if (usedChars >= maxChars) break;
     }
     return items;
   }
@@ -370,7 +392,7 @@ export class KnowledgeDbStore {
     for (const source of library.sources) {
       const indexed = await this.vectorIndex().hasSource(source.id);
       const needsText = source.pages.some((page) => page.text === undefined);
-      const needsAnalysis = source.pages.some((page) => Boolean(page.text) && page.analysisSignals === undefined);
+      const needsAnalysis = source.pages.some((page) => Boolean(page.text) && (page.analysisVersion !== KNOWLEDGE_ANALYSIS_VERSION || page.analysisStatus !== "analyzed"));
       const needsTaxonomy = source.pages.some((page) => Boolean(page.text) && page.taxonomyVersion !== KNOWLEDGE_TAXONOMY_VERSION);
       if (needsText || needsAnalysis || needsTaxonomy || source.pages.some((page) => page.extractionStatus === "ocr-needed") || !indexed) {
         pending.push(source);
@@ -380,7 +402,7 @@ export class KnowledgeDbStore {
     let changed = false;
     for (const source of library.sources) {
       const needsText = source.pages.some((page) => page.text === undefined);
-      const needsAnalysis = source.pages.some((page) => Boolean(page.text) && (!page.keywords || page.keywords.length === 0 || !page.analysisSignals));
+      const needsAnalysis = source.pages.some((page) => Boolean(page.text) && (page.analysisVersion !== KNOWLEDGE_ANALYSIS_VERSION || page.analysisStatus !== "analyzed"));
       const needsTaxonomy = source.pages.some((page) => Boolean(page.text) && page.taxonomyVersion !== KNOWLEDGE_TAXONOMY_VERSION);
       const needsIndex = !(await this.vectorIndex().hasSource(source.id));
       if (!needsText && !needsAnalysis && !needsTaxonomy && !needsIndex) { continue; }
@@ -415,6 +437,9 @@ export class KnowledgeDbStore {
               ...(page.title || !analysis.title ? {} : { title: analysis.title }),
               keywords: analysis.keywords,
               analysisSignals: analysis.signals,
+              analysisStatus: "analyzed",
+              analysisVersion: KNOWLEDGE_ANALYSIS_VERSION,
+              analysisError: undefined,
               ...(taxonomy.length ? { taxonomyNodeIds: taxonomy.map((item) => item.nodeId), taxonomyPaths: taxonomy.map((item) => item.path), taxonomyConfidence: taxonomy[0]?.score ?? 0 } : { taxonomyNodeIds: [], taxonomyPaths: [], taxonomyConfidence: 0 }),
               taxonomyVersion: KNOWLEDGE_TAXONOMY_VERSION,
               extractionStatus: text ? "text" : "ocr-needed",
@@ -431,7 +456,11 @@ export class KnowledgeDbStore {
         source.indexedAt = new Date().toISOString();
         source.indexError = undefined;
       } catch (error) {
-        source.indexError = error instanceof Error ? error.message : String(error);
+        const message = error instanceof Error ? error.message : String(error);
+        source.indexError = message;
+        source.pages = source.pages.map((page) => page.text
+          ? { ...page, analysisStatus: "failed", analysisError: message }
+          : page);
         changed = true;
       }
       this.indexStatus = { ...this.indexStatus, completed: this.indexStatus.completed + 1 };
@@ -569,6 +598,8 @@ export interface KnowledgeContextItem {
   score: number;
   text: string;
   citation: string;
+  matchReasons?: string[];
+  contextChars?: number;
 }
 
 function countWords(text: string): number {
@@ -602,6 +633,26 @@ function metadataScore(page: KnowledgePage, query: string, queryTokens: string[]
     score = Math.max(score, 1);
   }
   return Math.min(1, score);
+}
+
+function retrievalMatchReasons(
+  page: KnowledgePage,
+  query: string,
+  queryTokens: string[],
+  vector: number,
+  lexical: number,
+  metadata: number,
+): string[] {
+  const reasons: string[] = [];
+  if (vector >= 0.65) reasons.push("意味類似度が高い");
+  if (lexical > 0) reasons.push(`本文一致 ${Math.round(lexical * 100)}%`);
+  if (page.title && queryTokens.some((token) => page.title!.toLocaleLowerCase().includes(token))) reasons.push("タイトル一致");
+  if ((page.keywords ?? []).some((keyword) => queryTokens.some((token) => keyword.toLocaleLowerCase().includes(token)))) reasons.push("キーワード一致");
+  const semanticType = semanticTypeFromQuery(query);
+  if (semanticType && page.semanticType === semanticType) reasons.push(`分類一致: ${semanticType}`);
+  if (page.taxonomyPaths?.length) reasons.push(`分類: ${page.taxonomyPaths[0]!.join(" → ")}`);
+  if (metadata >= 0.8 && reasons.length === 0) reasons.push("解析メタデータ一致");
+  return reasons.slice(0, 5);
 }
 
 function semanticTypeFromQuery(query: string): KnowledgeSemanticType | undefined {
