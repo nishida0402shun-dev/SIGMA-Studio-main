@@ -4,6 +4,7 @@ import { createHash, randomUUID } from "node:crypto";
 import { PDFDocument } from "pdf-lib";
 import { LocalVectorIndex, type VectorSearchResult } from "./local-vector-index";
 import { KnowledgeStructureParser, type KnowledgeStructureBlock, type StructureParserStatus } from "./knowledge-db-structure-parser";
+import { analyzeKnowledgePage } from "./knowledge-analysis-engine";
 
 export type KnowledgeSemanticType =
   | "problem" | "example" | "explanation" | "column" | "definition"
@@ -187,7 +188,9 @@ export class KnowledgeDbStore {
     for (const result of results) {
       const { source, page } = await this.getPage(result.sourceId, result.pageNumber);
       const structureText = page.structureBlocks?.map((block) => `[${block.type}] ${block.text}`).join("\n") ?? "";
-      const text = result.text.trim() || page.text?.trim() || structureText;
+      const text = [page.title ? `[title] ${page.title}` : "", result.text.trim() || page.text?.trim() || structureText]
+        .filter(Boolean)
+        .join("\n");
       if (!text) continue;
       items.push({
         id: result.id,
@@ -375,12 +378,16 @@ export class KnowledgeDbStore {
             const nativeText = pageTexts[index]?.trim() ?? "";
             const structured = structureByPage.get(page.pageNumber);
             const text = nativeText || structured?.text || "";
+            const blocks = structured?.blocks ?? [];
+            const analysis = analyzeKnowledgePage(text, blocks);
             return {
               ...page,
               text: text || undefined,
+              semanticType: page.semanticType === "unknown" ? analysis.semanticType : page.semanticType,
+              ...(page.title || !analysis.title ? {} : { title: analysis.title }),
               extractionStatus: text ? "text" : "ocr-needed",
               wordCount: text ? countWords(text) : 0,
-              ...(structured?.blocks?.length ? { structureBlocks: structured.blocks } : {}),
+              ...(blocks.length ? { structureBlocks: blocks } : {}),
             };
           });
           source.extractionStatus = source.pages.every((page) => page.text) ? "complete" : "ocr-needed";
