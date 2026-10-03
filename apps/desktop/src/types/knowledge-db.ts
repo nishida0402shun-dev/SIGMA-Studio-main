@@ -9,6 +9,8 @@ export type KnowledgeSemanticType =
   | "figure"
   | "unknown";
 
+export type KnowledgeAnalysisStatus = "pending" | "processing" | "analyzed" | "stale" | "failed";
+
 export interface KnowledgePage {
   id: string;
   pageNumber: number;
@@ -21,6 +23,9 @@ export interface KnowledgePage {
   taxonomyPaths?: string[][];
   taxonomyConfidence?: number;
   taxonomyVersion?: number;
+  analysisStatus?: KnowledgeAnalysisStatus;
+  analysisVersion?: number;
+  analysisError?: string;
 }
 
 export interface KnowledgeSource {
@@ -52,5 +57,9 @@ export interface KnowledgeDbAiContext {
   sourceName: string;
   pageNumber: number;
   semanticType: KnowledgeSemanticType;
+  taxonomyPaths?: string[][];
+  score: number;
   text: string;
+  citation: string;
+  matchReasons?: string[];
 }
