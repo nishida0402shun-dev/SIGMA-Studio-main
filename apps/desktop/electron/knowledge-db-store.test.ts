@@ -171,6 +171,8 @@ it("imports non-PDF files into the global Knowledge DB and indexes their text", 
   const indexed = (await store.listSources()).find((item) => item.id === source?.id);
   expect(indexed?.pages[0]?.text).toContain("正弦定理");
   expect(indexed?.pages[0]?.analysisStatus).toBe("analyzed");
+  expect(indexed?.pages[0]?.taxonomyPaths?.length).toBeGreaterThan(0);
+  expect(indexed?.pages[0]?.taxonomyPaths?.some((taxonomyPath) => taxonomyPath.includes("図形と計量"))).toBe(true);
   expect((await store.search("正弦定理", 5)).some((item) => item.sourceId === source?.id)).toBe(true);
 });
 
