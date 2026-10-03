@@ -399,6 +399,10 @@ export class KnowledgeDbStore {
 
   async openPage(sourceId: string, pageNumber: number): Promise<string> {
     const { source } = await this.getPage(sourceId, pageNumber);
+    if (source.mimeType !== "application/pdf") {
+      if (pageNumber !== 1) throw new Error("non-PDF sources have only one openable page");
+      return source.storedPath;
+    }
     const bytes = await fs.readFile(source.storedPath);
     const input = await PDFDocument.load(bytes);
     const output = await PDFDocument.create();
