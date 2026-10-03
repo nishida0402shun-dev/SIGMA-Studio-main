@@ -171,10 +171,15 @@ export class KnowledgeDbStore {
     }
     const queryTokens = tokenizeForSearch(trimmed);
     const sourceNames = new Map(library.sources.map((source) => [source.id, source.name]));
+    const pages = new Map(
+      library.sources.flatMap((source) => source.pages.map((page) => [`${source.id}:${page.pageNumber}`, page] as const)),
+    );
     return [...bestByPage.values()]
       .map((match) => {
         const lexical = lexicalScore(match.text, queryTokens);
-        return { ...match, score: match.score * 0.75 + lexical * 0.25 };
+        const page = pages.get(`${match.sourceId}:${match.pageNumber}`);
+        const metadata = page ? metadataScore(page, trimmed, queryTokens) : 0;
+        return { ...match, score: match.score * 0.65 + lexical * 0.20 + metadata * 0.15 };
       })
       .sort((a, b) => b.score - a.score)
       .slice(0, safeLimit)
@@ -560,6 +565,39 @@ function lexicalScore(text: string, queryTokens: string[]): number {
   const normalized = text.normalize("NFKC").toLocaleLowerCase();
   const hits = queryTokens.filter((token) => normalized.includes(token)).length;
   return Math.min(1, hits / queryTokens.length);
+}
+
+function metadataScore(page: KnowledgePage, query: string, queryTokens: string[]): number {
+  if (queryTokens.length === 0) return 0;
+  const title = page.title?.normalize("NFKC").toLocaleLowerCase() ?? "";
+  const keywords = (page.keywords ?? []).map((keyword) => keyword.normalize("NFKC").toLocaleLowerCase());
+  const keywordHits = queryTokens.filter((token) => keywords.some((keyword) => keyword === token || keyword.includes(token))).length;
+  const titleHits = queryTokens.filter((token) => title.includes(token)).length;
+  let score = Math.max(
+    keywordHits / queryTokens.length,
+    titleHits / queryTokens.length,
+  );
+
+  const semanticType = semanticTypeFromQuery(query);
+  if (semanticType && page.semanticType === semanticType) {
+    score = Math.max(score, 1);
+  }
+  return Math.min(1, score);
+}
+
+function semanticTypeFromQuery(query: string): KnowledgeSemanticType | undefined {
+  const normalized = query.normalize("NFKC").toLocaleLowerCase();
+  const rules: Array<[KnowledgeSemanticType, RegExp]> = [
+    ["problem", /(?:問題|練習問題|演習|設問|例題|practice|exercise|problem|question)/u],
+    ["example", /(?:例|具体例|example|worked example)/u],
+    ["definition", /(?:定義|definition|defined as)/u],
+    ["theorem", /(?:定理|命題|補題|系|theorem|proposition|lemma|corollary)/u],
+    ["answer", /(?:解答|答え|解説付き解答|answer|solution)/u],
+    ["column", /(?:コラム|column|note|豆知識)/u],
+    ["explanation", /(?:解説|説明|考え方|ポイント|概説|explanation|overview|discussion)/u],
+    ["figure", /(?:図|画像|figure|diagram|illustration)/u],
+  ];
+  return rules.find(([, pattern]) => pattern.test(normalized))?.[0];
 }
 
 function chunkText(text: string, maxLength = 900, overlap = 140): string[] {
