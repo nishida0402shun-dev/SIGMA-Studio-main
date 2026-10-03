@@ -279,3 +279,38 @@ describe("Knowledge DB analysis lifecycle", () => {
     expect(context[0]?.matchReasons?.length).toBeGreaterThan(0);
   });
 });
+
+describe("Knowledge DB classification review", () => {
+  it("confirms matching AI classification and preserves the local taxonomy on conflict", async () => {
+    const dataDir = await fs.mkdtemp(path.join(os.tmpdir(), "sigma-knowledge-db-review-"));
+    tempDirs.push(dataDir);
+    const filePath = path.join(dataDir, "review.md");
+    await fs.writeFile(filePath, "# 三角関数\n\n数学Ⅱの三角関数について説明する。", "utf8");
+    const store = new KnowledgeDbStore(dataDir);
+    const [source] = await store.addFiles([filePath]);
+    await store.search("三角関数", 5);
+    const page = (await store.listSources()).find((item) => item.id === source?.id)?.pages[0];
+    expect(page?.taxonomyPaths?.[0]).toEqual(["数学Ⅱ", "三角関数"]);
+
+    const confirmed = await store.applyClassificationReview({
+      sourceId: source!.id,
+      pageNumber: 1,
+      paths: [["数学Ⅱ", "三角関数"]],
+      confidence: 0.94,
+      reason: "本文に数学Ⅱと三角関数が明記されている。",
+      evidence: ["数学Ⅱの三角関数について説明する。"],
+    });
+    expect(confirmed.status).toBe("confirmed");
+
+    const conflict = await store.applyClassificationReview({
+      sourceId: source!.id,
+      pageNumber: 1,
+      paths: [["物理", "力学"]],
+      confidence: 0.91,
+    });
+    expect(conflict.status).toBe("needs-review");
+    const after = (await store.listSources()).find((item) => item.id === source?.id)?.pages[0];
+    expect(after?.taxonomyPaths?.[0]).toEqual(["数学Ⅱ", "三角関数"]);
+    expect(after?.classificationReviewStatus).toBe("needs-review");
+  });
+});
