@@ -1775,7 +1775,7 @@ async function startWebAiBridgeServer(): Promise<void> {
         defaultId: 0,
         cancelId: 0,
         noLink: true,
-      } as const;
+      };
       const result = owner
         ? await dialog.showMessageBox(owner, messageBoxOptions)
         : await dialog.showMessageBox(messageBoxOptions);
