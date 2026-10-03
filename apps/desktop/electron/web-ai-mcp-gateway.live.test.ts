@@ -56,12 +56,20 @@ describe("Web AI MCP gateway live server path", () => {
 
     expect(names.has("list_local_documents")).toBe(true);
     expect(names.has("read_local_document")).toBe(true);
+    expect(names.has("knowledge_db_search")).toBe(true);
+    expect(names.has("knowledge_db_get_context")).toBe(true);
     expect(names.has("create_local_document")).toBe(false);
     expect(names.size).toBeGreaterThan(5);
+
+    const globalTools = await gateway.listTools(null);
+    const globalNames = new Set(globalTools.map((tool) => tool.name));
+    expect(globalNames.has("knowledge_db_search")).toBe(true);
+    expect(globalNames.has("knowledge_db_get_context")).toBe(true);
+    expect(globalNames.has("list_local_documents")).toBe(false);
   });
 
-  it("rejects an unselected or foreign workspace before MCP dispatch", async () => {
-    await expect(gateway.listTools(null)).resolves.toEqual([]);
+  it("allows global Knowledge DB tools without a selected Workspace", async () => {
+    await expect(gateway.callTool("knowledge_db_search", { query: "test", limit: 1 }, null)).resolves.toBeTruthy();
     await expect(gateway.callTool("list_local_documents", {}, null)).rejects.toThrow(/Workspace/);
     await expect(
       gateway.callTool("list_local_documents", { workspaceId: "workspace_foreign" }, "workspace_selected"),
