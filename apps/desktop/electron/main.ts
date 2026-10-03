@@ -1759,14 +1759,14 @@ async function startWebAiBridgeServer(): Promise<void> {
     mcpServerPath: resolveMcpServerScriptPath(),
     userDataPath: USER_DATA_PATH,
     requestPermission: async ({ toolName, permissionClass, tool, arguments: toolArguments }) => {
-      const owner = mainWindow && !mainWindow.isDestroyed() ? mainWindow : undefined;
+      const owner = mainWindow && !mainWindow.isDestroyed() ? mainWindow : null;
       const level = permissionClass === "consequential" ? "高リスク操作" : "変更操作";
       const description = tool.description?.trim() || "説明なし";
       const serializedArguments = JSON.stringify(toolArguments, null, 2);
       const details = serializedArguments.length > 1800
         ? `${serializedArguments.slice(0, 1800)}…`
         : serializedArguments;
-      const result = await dialog.showMessageBox(owner, {
+      const result = await dialog.showMessageBox(owner ?? undefined, {
         type: permissionClass === "consequential" ? "warning" : "question",
         title: "SIGMA Studio: AI操作の許可",
         message: `Web AI が ${level} を要求しています。`,
