@@ -214,7 +214,7 @@ describe("Knowledge DB analysis lifecycle", () => {
     await store.search("warmup", 1);
 
     const libraryPath = path.join(dataDir, "knowledge-db", "library.json");
-    const library = JSON.parse(await fs.readFile(libraryPath, "utf8")) as any;
+    const library = JSON.parse(await fs.readFile(libraryPath, "utf8")) as { sources: Array<{ pages: Array<Record<string, unknown>> }> };
     library.sources[0].pages[0].text = "数学Ⅱ 三角関数 定理";
     library.sources[0].pages[0].analysisStatus = "stale";
     library.sources[0].pages[0].analysisVersion = 0;
