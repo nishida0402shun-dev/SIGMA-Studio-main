@@ -237,7 +237,14 @@ export class KnowledgeDbStore {
           ...match,
           score: match.score * 0.65 + lexical * 0.20 + metadata * 0.15,
           matchReasons,
-          ...(page ? { semanticType: page.semanticType, title: page.title, keywords: page.keywords, analysisSignals: page.analysisSignals, taxonomyPaths: page.taxonomyPaths } : {}),
+          ...(page ? {
+            semanticType: page.semanticType,
+            title: page.title,
+            keywords: page.keywords,
+            analysisSignals: page.analysisSignals,
+            taxonomyPaths: page.taxonomyPaths,
+            citationRegions: selectCitationRegions(page, match.text),
+          } : {}),
         };
       })
       .sort((a, b) => b.score - a.score)
@@ -281,6 +288,7 @@ export class KnowledgeDbStore {
         text: text.slice(0, 5000),
         citation: `[${source.name} p${page.pageNumber}](sigma://knowledge-db/${encodeURIComponent(source.id)}/p/${page.pageNumber})`,
         matchReasons: result.matchReasons,
+        citationRegions: selectCitationRegions(page, result.text),
         citationRef: { sourceId: source.id, pageId: page.id, pageNumber: page.pageNumber },
       };
       const remaining = Math.max(0, maxChars - usedChars);
@@ -655,6 +663,12 @@ export interface KnowledgeContextItem {
   citation: string;
   matchReasons?: string[];
   contextChars?: number;
+  citationRegions?: Array<{
+    type: KnowledgeStructureBlockType;
+    text: string;
+    bbox?: [number, number, number, number];
+    confidence?: number;
+  }>;
   citationRef?: {
     sourceId: string;
     pageId: string;
@@ -693,6 +707,35 @@ function metadataScore(page: KnowledgePage, query: string, queryTokens: string[]
     score = Math.max(score, 1);
   }
   return Math.min(1, score);
+}
+
+function selectCitationRegions(page: KnowledgePage, matchedText: string): Array<{
+  type: KnowledgeStructureBlockType;
+  text: string;
+  bbox?: [number, number, number, number];
+  confidence?: number;
+}> {
+  const blocks = page.structureBlocks ?? [];
+  if (blocks.length === 0) return [];
+  const normalizedMatch = matchedText.normalize("NFKC").replace(/\s+/gu, "").toLocaleLowerCase();
+  const scored = blocks.map((block, index) => {
+    const normalizedBlock = block.text.normalize("NFKC").replace(/\s+/gu, "").toLocaleLowerCase();
+    const overlap = normalizedMatch && normalizedBlock
+      ? (normalizedBlock.includes(normalizedMatch) ? 1 : normalizedMatch.includes(normalizedBlock) ? 0.8 : 0)
+      : 0;
+    const semanticBoost = /^(table|figure|formula|title|caption)$/u.test(block.type) ? 0.1 : 0;
+    return { block, score: overlap + semanticBoost, index };
+  });
+  return scored
+    .filter(({ block }) => block.text.trim())
+    .sort((a, b) => b.score - a.score || a.index - b.index)
+    .slice(0, 3)
+    .map(({ block }) => ({
+      type: block.type,
+      text: block.text.slice(0, 500),
+      ...(block.bbox ? { bbox: block.bbox } : {}),
+      ...(block.confidence === undefined ? {} : { confidence: block.confidence }),
+    }));
 }
 
 function retrievalMatchReasons(
