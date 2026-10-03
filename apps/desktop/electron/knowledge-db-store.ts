@@ -364,7 +364,7 @@ export class KnowledgeDbStore {
     for (const source of library.sources) {
       const indexed = await this.vectorIndex().hasSource(source.id);
       const needsText = source.pages.some((page) => page.text === undefined);
-      const needsAnalysis = source.pages.some((page) => Boolean(page.text) && (!page.keywords || page.keywords.length === 0 || !page.analysisSignals));
+      const needsAnalysis = source.pages.some((page) => Boolean(page.text) && page.analysisSignals === undefined);
       if (needsText || needsAnalysis || source.pages.some((page) => page.extractionStatus === "ocr-needed") || !indexed) {
         pending.push(source);
       }
@@ -404,8 +404,8 @@ export class KnowledgeDbStore {
               text: text || undefined,
               semanticType: page.semanticType === "unknown" ? analysis.semanticType : page.semanticType,
               ...(page.title || !analysis.title ? {} : { title: analysis.title }),
-              ...(analysis.keywords.length ? { keywords: analysis.keywords } : {}),
-              ...(analysis.signals.length ? { analysisSignals: analysis.signals } : {}),
+              keywords: analysis.keywords,
+              analysisSignals: analysis.signals,
               extractionStatus: text ? "text" : "ocr-needed",
               wordCount: text ? countWords(text) : 0,
               ...(blocks.length ? { structureBlocks: blocks } : {}),
