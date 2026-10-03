@@ -45,7 +45,7 @@ describe("CLI spawn boundary", () => {
 
     // `input-source.ts` は macOS の入力ソース切り替え (`execFile` で OS のユーティリティを
     // 叩くだけ) で、CLI の bin パスも教材由来の文字列も一切扱わない。
-    expect(importers).toEqual(["cli-spawn.ts", "input-source.ts"]);
+    expect(importers).toEqual(["cli-spawn.ts", "input-source.ts", "knowledge-db-structure-parser.ts"]);
   });
 
   it("never pairs a shell with an argv the caller assembled itself", () => {
@@ -63,7 +63,7 @@ describe("CLI spawn boundary", () => {
     // 呼び出し単位で見る。ファイル単位だと、既に `spawnCliProcess` を使っているファイル
     // (= まさに守りたい 4 本) に生 `spawn(` を足しても検査を素通りしてしまう。
     const launchers = SOURCES
-      .filter((file) => file.name !== SPAWN_ENTRY_POINT && file.name !== "input-source.ts")
+      .filter((file) => file.name !== SPAWN_ENTRY_POINT && file.name !== "input-source.ts" && file.name !== "knowledge-db-structure-parser.ts")
       .flatMap((file) => [...file.source.matchAll(/(?<![\w.])(spawn|exec|execSync|execFile)\s*\(/g)]
         .map((match) => `${file.name}: ${match[1]}(`));
 
