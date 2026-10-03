@@ -6,7 +6,6 @@ import { Database, Download, ExternalLink, FilePlus2, FileText, MessageSquare, S
 import { KnowledgePdfPageViewer, type KnowledgeRegion } from "./KnowledgePdfPageViewer";
 import { getDesktopBridge } from "@/lib/desktop-bridge";
 import type { KnowledgeDbAiContext, KnowledgeSearchResult, KnowledgeSemanticType, KnowledgeSource } from "@/types/knowledge-db";
-import type { DesktopWorkspaceSummary } from "@/types/desktop";
 import type { Translate } from "@/lib/i18n";
 
 interface Props {
@@ -35,8 +34,6 @@ function semanticTypeLabel(t: Translate<"chrome">, type: KnowledgeSemanticType):
 
 export function KnowledgeDbWorkspace({ open, onClose, onOpenAi, t }: Props) {
   const [sources, setSources] = useState<KnowledgeSource[]>([]);
-  const [workspaces, setWorkspaces] = useState<DesktopWorkspaceSummary[]>([]);
-  const [selectedWorkspaceId, setSelectedWorkspaceId] = useState<string | null>(null);
   const [query, setQuery] = useState("");
   const [selected, setSelected] = useState<Record<string, Set<number>>>({});
   const [typeFilter, setTypeFilter] = useState<KnowledgeSemanticType | "all">("all");
@@ -47,33 +44,19 @@ export function KnowledgeDbWorkspace({ open, onClose, onOpenAi, t }: Props) {
   const knowledgeDb = desktop?.knowledgeDb;
 
   useEffect(() => {
-    if (!open || !desktop?.storage) return;
+    if (!open || !knowledgeDb) return;
     let cancelled = false;
-    void desktop.storage.getWorkspaceOverview(null).then((result) => {
-      if (cancelled || !result || typeof result !== "object" || !("state" in result) || result.state !== "ready") return;
-      const overview = "overview" in result && result.overview && typeof result.overview === "object"
-        ? result.overview
-        : null;
-      const rawWorkspaces = overview && "workspaces" in overview ? overview.workspaces : [];
-      setWorkspaces(Array.isArray(rawWorkspaces) ? rawWorkspaces as DesktopWorkspaceSummary[] : []);
-    });
-    return () => { cancelled = true; };
-  }, [desktop, open]);
-
-  useEffect(() => {
-    if (!open || !knowledgeDb || !selectedWorkspaceId) return;
-    let cancelled = false;
-    void knowledgeDb.list({ workspaceId: selectedWorkspaceId }).then((value) => {
+    void knowledgeDb.list().then((value) => {
       if (!cancelled && Array.isArray(value)) setSources(value as KnowledgeSource[]);
     });
     return () => { cancelled = true; };
-  }, [knowledgeDb, open, selectedWorkspaceId]);
+  }, [knowledgeDb, open]);
 
   useEffect(() => {
-    if (!knowledgeDb || !selectedWorkspaceId || !query.trim()) return;
+    if (!knowledgeDb || !query.trim()) return;
     let cancelled = false;
     const timer = window.setTimeout(() => {
-      void knowledgeDb.search({ workspaceId: selectedWorkspaceId, query, limit: 30 }).then((value) => {
+      void knowledgeDb.search({ query, limit: 30 }).then((value) => {
         if (!cancelled) setSearchResults((Array.isArray(value) ? value : []) as KnowledgeSearchResult[]);
       });
     }, 120);
@@ -81,7 +64,7 @@ export function KnowledgeDbWorkspace({ open, onClose, onOpenAi, t }: Props) {
       cancelled = true;
       window.clearTimeout(timer);
     };
-  }, [knowledgeDb, query, selectedWorkspaceId]);
+  }, [knowledgeDb, query]);
 
   const visible = useMemo(() => {
     const normalized = query.trim().toLocaleLowerCase();
@@ -102,29 +85,16 @@ export function KnowledgeDbWorkspace({ open, onClose, onOpenAi, t }: Props) {
 
   if (!open) return null;
 
-  function selectWorkspace(workspaceId: string): void {
-    setSources([]);
-    setSearchResults([]);
-    setSelected({});
-    setRegion(null);
-    setQuery("");
-    setSelectedWorkspaceId(workspaceId || null);
-  }
-
   async function addSources(): Promise<void> {
-    if (!selectedWorkspaceId) {
-      window.alert("先にワークスペースを選択してください。");
-      return;
-    }
     if (!knowledgeDb) return;
     const picked = await knowledgeDb.chooseSources();
     if (!picked?.paths?.length) return;
-    const added = await knowledgeDb.importSources({ workspaceId: selectedWorkspaceId, paths: picked.paths });
+    const added = await knowledgeDb.importSources({ paths: picked.paths });
     setSources((current) => [...(added as KnowledgeSource[]), ...current]);
   }
 
   async function extractPdf(): Promise<void> {
-    if (!knowledgeDb || !selectedWorkspaceId || selectedPages.length === 0) return;
+    if (!knowledgeDb || selectedPages.length === 0) return;
     const grouped = new Map<string, number[]>();
     for (const item of selectedPages) {
       grouped.set(item.sourceId, [...(grouped.get(item.sourceId) ?? []), item.pageNumber]);
@@ -133,14 +103,13 @@ export function KnowledgeDbWorkspace({ open, onClose, onOpenAi, t }: Props) {
       sourceId,
       pageNumbers,
     }));
-    await knowledgeDb.extractPages({ workspaceId: selectedWorkspaceId, selections });
+    await knowledgeDb.extractPages({ selections });
   }
 
   async function updateSelectedPageType(semanticType: KnowledgeSemanticType): Promise<void> {
-    if (!knowledgeDb || !selectedWorkspaceId || selectedPages.length === 0) return;
+    if (!knowledgeDb || selectedPages.length === 0) return;
     const target = selectedPages[0];
     const result = await knowledgeDb.setPageType({
-      workspaceId: selectedWorkspaceId,
       sourceId: target.sourceId,
       pageNumber: target.pageNumber,
       semanticType,
@@ -160,15 +129,15 @@ export function KnowledgeDbWorkspace({ open, onClose, onOpenAi, t }: Props) {
   async function openSelectedPage(): Promise<void> {
     if (!knowledgeDb || !selectedWorkspaceId || selectedPages.length === 0) return;
     const target = selectedPages[0];
-    const result = await knowledgeDb.openPage({ workspaceId: selectedWorkspaceId!, ...target });
+    const result = await knowledgeDb.openPage({ ...target });
     if (!result.ok) console.warn("Knowledge DB page open failed:", result.error);
   }
 
   async function deleteSource(sourceId: string): Promise<void> {
-    if (!knowledgeDb || !selectedWorkspaceId) return;
+    if (!knowledgeDb) return;
     const source = sources.find((item) => item.id === sourceId);
     if (!source || !window.confirm(`Knowledge DBから「${source.name}」を削除しますか？`)) return;
-    const result = await knowledgeDb.deleteSource({ workspaceId: selectedWorkspaceId!, sourceId });
+    const result = await knowledgeDb.deleteSource({ sourceId });
     if (!result.ok) return;
     setSources((current) => current.filter((item) => item.id !== sourceId));
     setSelected((current) => {
@@ -200,7 +169,7 @@ export function KnowledgeDbWorkspace({ open, onClose, onOpenAi, t }: Props) {
   async function extractRegionPdf(): Promise<void> {
     if (!knowledgeDb || !selectedWorkspaceId || selectedPages.length === 0 || !region) return;
     const target = selectedPages[0];
-    const result = await knowledgeDb.extractRegion({ workspaceId: selectedWorkspaceId, sourceId: target.sourceId, pageNumber: target.pageNumber, rect: region });
+    const result = await knowledgeDb.extractRegion({ sourceId: target.sourceId, pageNumber: target.pageNumber, rect: region });
     if (!result.ok) console.warn("Knowledge DB region extraction failed:", result.error);
     setContextMenu(null);
   }
@@ -536,21 +505,7 @@ export function KnowledgeDbWorkspace({ open, onClose, onOpenAi, t }: Props) {
           </div>
         </header>
         <div className="knowledge-db-toolbar">
-          <label className="knowledge-db-search" style={{ flex: "0 1 280px" }}>
-            <span style={{ fontSize: 12, whiteSpace: "nowrap" }}>Workspace</span>
-            <select
-              aria-label="Knowledge DB workspace"
-              value={selectedWorkspaceId ?? ""}
-              onChange={(event) => selectWorkspace(event.target.value)}
-              style={{ minHeight: 30, flex: 1 }}
-            >
-              <option value="">ワークスペースを選択</option>
-              {workspaces.map((workspace) => (
-                <option key={workspace.id} value={workspace.id}>{workspace.name}</option>
-              ))}
-            </select>
-          </label>
-          <button type="button" className="knowledge-db-add-button" onClick={() => void addSources()} title={!selectedWorkspaceId ? "ワークスペースを選択してからファイルを追加します" : undefined}><FilePlus2 size={16} />{t("appMenu.knowledgeDb.add")}</button>
+          <button type="button" className="knowledge-db-add-button" onClick={() => void addSources()} ><FilePlus2 size={16} />{t("appMenu.knowledgeDb.add")}</button>
           <label className="knowledge-db-search"><Search size={16} /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder={t("appMenu.knowledgeDb.searchPlaceholder")} /></label>
           <select value={typeFilter} onChange={(event) => setTypeFilter(event.target.value as KnowledgeSemanticType | "all")}>
             <option value="all">{t("appMenu.knowledgeDb.allTypes")}</option>
@@ -559,12 +514,7 @@ export function KnowledgeDbWorkspace({ open, onClose, onOpenAi, t }: Props) {
           <span>{t("appMenu.knowledgeDb.resultCount", { count: visible.length })}</span>
         </div>
         <div className="knowledge-db-content">
-          {!selectedWorkspaceId ? (
-            <div className="knowledge-db-empty" style={{ gridColumn: "1 / -1", display: "grid", placeItems: "center", padding: 40 }}>
-              ワークスペースを選択すると、そのワークスペースのKnowledge DBだけを表示します。
-            </div>
-          ) : null}
-          {selectedWorkspaceId ? <div className="knowledge-db-results">
+          <div className="knowledge-db-results">
             {visible.map(({ source, page, score }) => {
               const checked = selected[source.id]?.has(page.pageNumber) ?? false;
               return (
@@ -590,8 +540,8 @@ export function KnowledgeDbWorkspace({ open, onClose, onOpenAi, t }: Props) {
               );
             })}
             {visible.length === 0 && <div className="knowledge-db-empty">{t("appMenu.knowledgeDb.empty")}</div>}
-          </div> : null}
-          {selectedWorkspaceId && <aside className="knowledge-db-detail">
+          </div>
+          <aside className="knowledge-db-detail">
             <strong>{t("appMenu.knowledgeDb.selected")}</strong>
             <span>{t("appMenu.knowledgeDb.selectedPages", { count: selectedPages.length })}</span>
             {selectedPages.length > 0 && (
@@ -638,7 +588,7 @@ export function KnowledgeDbWorkspace({ open, onClose, onOpenAi, t }: Props) {
                 </div>
               ))}
             </div>
-          </aside>}
+          </aside>
         </div>
       </section>
       {contextMenu && selectedPages.length > 0 && (
