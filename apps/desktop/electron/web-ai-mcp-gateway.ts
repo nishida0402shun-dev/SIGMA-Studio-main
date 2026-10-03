@@ -96,10 +96,11 @@ export function createWebAiMcpGateway(options: WebAiMcpGatewayOptions): WebAiMcp
       const tool = availableTools.tools.find((candidate) => candidate.name === name);
       if (!tool) throw new Error(`Web AI cannot use this Tool: ${name}`);
       const input = { ...args };
-      if (!await permissionGate.check(tool, input, READ_ONLY_TOOLS)) throw new Error("Web AI Tool request was denied.");
       if (KNOWLEDGE_DB_TOOLS.has(name)) {
+        if (!await permissionGate.check(tool, input, READ_ONLY_TOOLS)) throw new Error("Web AI Tool request was denied.");
         delete input.workspaceId;
-        return (await currentClient.callTool({ name, arguments: input })) as CallToolResult;
+        if (!await permissionGate.check(tool, input, READ_ONLY_TOOLS)) throw new Error("Web AI Tool request was denied.");
+      return (await currentClient.callTool({ name, arguments: input })) as CallToolResult;
       }
       if (typeof input.workspaceId === "string" && input.workspaceId !== workspaceId) {
         throw new Error("MCP access is restricted to the selected Workspace.");
