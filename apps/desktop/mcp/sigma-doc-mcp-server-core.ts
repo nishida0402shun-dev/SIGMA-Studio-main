@@ -3038,7 +3038,7 @@ registerTool(
       name: source.name,
       pageCount: source.pageCount,
       importedAt: source.importedAt,
-      pages: source.pages.map((page) => ({ id: page.id, pageNumber: page.pageNumber, semanticType: page.semanticType, title: page.title, keywords: page.keywords, analysisSignals: page.analysisSignals, taxonomyNodeIds: page.taxonomyNodeIds, taxonomyPaths: page.taxonomyPaths, taxonomyConfidence: page.taxonomyConfidence })),
+      pages: source.pages.map((page) => ({ id: page.id, pageNumber: page.pageNumber, semanticType: page.semanticType, title: page.title, keywords: page.keywords, analysisSignals: page.analysisSignals, taxonomyNodeIds: page.taxonomyNodeIds, taxonomyPaths: page.taxonomyPaths, taxonomyConfidence: page.taxonomyConfidence, analysisStatus: page.analysisStatus, analysisVersion: page.analysisVersion, analysisError: page.analysisError })),
     })) };
   }),
 );
@@ -3071,16 +3071,17 @@ registerTool(
   "knowledge_db_get_context",
   {
     title: "Knowledge DBからAI Contextを取得",
-    description: "質問に関連する資料ページの抜粋を、出典ページIDとSIGMA引用マーカー付きのContext Packとして取得します。",
+    description: "質問に関連する資料ページを重複除去・文字数予算でまとめたContext Packとして取得します。各項目に検索理由、教科→科目→単元分類、SIGMA引用マーカーを含みます。",
     inputSchema: {
       query: z.string().min(1).max(2000),
       limit: z.number().int().min(1).max(12).optional(),
+      maxChars: z.number().int().min(2000).max(50000).optional().describe("AIへ渡すContext本文の最大文字数。既定16000。"),
       sourceIds: z.array(z.string().min(1)).max(20).optional(),
       runId: z.string().min(1).max(256).optional(),
     },
   },
-  async ({ query, limit, sourceIds, runId }) => withToolErrorHandling(async () => {
-    const context = await new KnowledgeDbStore(storeContext.dataDir).getContext(query, limit ?? 8, sourceIds);
+  async ({ query, limit, maxChars, sourceIds, runId }) => withToolErrorHandling(async () => {
+    const context = await new KnowledgeDbStore(storeContext.dataDir).getContext(query, limit ?? 8, sourceIds, maxChars ?? 16000);
     for (const item of context) {
       recordKnowledgeDbPageReference(runId, {
         sourceId: item.sourceId,
