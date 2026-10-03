@@ -46,6 +46,19 @@ export function registerKnowledgeDbIpc(deps: RegisterKnowledgeDbIpcDeps): void {
     return store.getIndexStatus();
   });
 
+  ipcMain.handle("knowledge-db:analysis-status", async (event) => {
+    if (event.sender !== getMainWindow()?.webContents) return null;
+    return store.getAnalysisStatus();
+  });
+
+  ipcMain.handle("knowledge-db:reanalyze", async (event, payload: unknown) => {
+    if (event.sender !== getMainWindow()?.webContents) return null;
+    const sourceIds = payload && typeof payload === "object" && "sourceIds" in payload && Array.isArray(payload.sourceIds)
+      ? payload.sourceIds.filter((value): value is string => typeof value === "string" && value.trim().length > 0)
+      : undefined;
+    return store.reanalyze(sourceIds);
+  });
+
   ipcMain.handle("knowledge-db:index-start", async (event) => {
     if (event.sender !== getMainWindow()?.webContents) return { state: "idle", total: 0, completed: 0 };
     return store.startBackgroundIndexing();
