@@ -3,7 +3,7 @@ import os from "node:os";
 import path from "node:path";
 import { PDFDocument } from "pdf-lib";
 import { afterEach, describe, expect, it } from "vitest";
-import { KnowledgeDbStore } from "./knowledge-db-store";
+import { KnowledgeDbStore, type KnowledgePage } from "./knowledge-db-store";
 import { LocalVectorIndex } from "./local-vector-index";
 
 const tempDirs: string[] = [];
@@ -214,7 +214,7 @@ describe("Knowledge DB analysis lifecycle", () => {
     await store.search("warmup", 1);
 
     const libraryPath = path.join(dataDir, "knowledge-db", "library.json");
-    const library = JSON.parse(await fs.readFile(libraryPath, "utf8")) as { sources: Array<{ pages: Array<Record<string, unknown>> }> };
+    const library = JSON.parse(await fs.readFile(libraryPath, "utf8")) as { sources: Array<{ pages: KnowledgePage[] }> };
     library.sources[0].pages[0].text = "数学Ⅱ 三角関数 定理";
     library.sources[0].pages[0].analysisStatus = "stale";
     library.sources[0].pages[0].analysisVersion = 0;
