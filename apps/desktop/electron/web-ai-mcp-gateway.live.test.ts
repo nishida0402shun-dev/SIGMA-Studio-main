@@ -14,6 +14,7 @@ describe("Web AI MCP gateway live server path", () => {
   let gateway: ReturnType<typeof createWebAiMcpGateway>;
   let bridge: import("node:http").Server | null = null;
   let bridgeBase = "";
+  const requestedWrites: string[] = [];
   const mcpServerPath = path.join(process.cwd(), "dist-mcp", "sigma-doc-mcp-server.cjs");
 
   beforeAll(async () => {
@@ -42,7 +43,14 @@ describe("Web AI MCP gateway live server path", () => {
     }
     await stat(mcpServerPath);
 
-    gateway = createWebAiMcpGateway({ mcpServerPath, userDataPath });
+    gateway = createWebAiMcpGateway({
+      mcpServerPath,
+      userDataPath,
+      requestPermission: async ({ toolName }) => {
+        requestedWrites.push(toolName);
+        return true;
+      },
+    });
   }, 90_000);
 
   afterAll(async () => {
@@ -57,7 +65,7 @@ describe("Web AI MCP gateway live server path", () => {
     await rm(userDataPath, { recursive: true, force: true });
   });
 
-  it("connects to the real MCP server and receives its read-only tool contract", async () => {
+  it("connects to the real MCP server and exposes read and writable tool contracts", async () => {
     const tools = await gateway.listTools("workspace_live_test");
     const names = new Set(tools.map((tool) => tool.name));
 
@@ -68,7 +76,7 @@ describe("Web AI MCP gateway live server path", () => {
     expect(names.has("knowledge_db_list_classification_reviews")).toBe(true);
     expect(names.has("knowledge_db_get_classification_review_context")).toBe(true);
     expect(names.has("knowledge_db_submit_classification_review")).toBe(true);
-    expect(names.has("create_local_document")).toBe(false);
+    expect(names.has("create_local_document")).toBe(true);
     expect(names.size).toBeGreaterThan(5);
 
     const globalTools = await gateway.listTools(null);
@@ -138,6 +146,17 @@ describe("Web AI MCP gateway live server path", () => {
     const callBody = await callResponse.json();
     expect(callBody.ok).toBe(true);
     expect(callBody.result).toBeTruthy();
+  });
+
+  it("requires approval for a writable global Knowledge DB operation", async () => {
+    await expect(
+      gateway.callTool(
+        "knowledge_db_submit_classification_review",
+        { sourceId: "missing", pageNumber: 1, paths: [["その他"]], confidence: 0.5 },
+        null,
+      ),
+    ).rejects.toThrow();
+    expect(requestedWrites).toContain("knowledge_db_submit_classification_review");
   });
 
   it("allows global Knowledge DB tools without a selected Workspace", async () => {
