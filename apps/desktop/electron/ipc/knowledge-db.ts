@@ -41,6 +41,16 @@ export function registerKnowledgeDbIpc(deps: RegisterKnowledgeDbIpcDeps): void {
     return { paths };
   });
 
+  ipcMain.handle("knowledge-db:index-status", async (event) => {
+    if (event.sender !== getMainWindow()?.webContents) return { state: "idle", total: 0, completed: 0 };
+    return store.getIndexStatus();
+  });
+
+  ipcMain.handle("knowledge-db:index-start", async (event) => {
+    if (event.sender !== getMainWindow()?.webContents) return { state: "idle", total: 0, completed: 0 };
+    return store.startBackgroundIndexing();
+  });
+
   ipcMain.handle("knowledge-db:list", async (event, payload: unknown) => {
     if (event.sender !== getMainWindow()?.webContents) return [];
     return store.listSources();
