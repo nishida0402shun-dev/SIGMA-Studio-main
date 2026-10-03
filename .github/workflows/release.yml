@@ -119,6 +119,19 @@ jobs:
           echo "channel=${channel}" >> "${GITHUB_OUTPUT}"
           echo "SIGMA_STUDIO_BETA_BUILD=$([[ "${channel}" == "beta" ]] && echo true || echo false)" >> "${GITHUB_ENV}"
 
+      - name: Set up Python for bundled OCR runtime
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Build bundled PP-StructureV3 runtime
+        shell: bash
+        working-directory: apps/desktop
+        run: npm run ocr:runtime:build
+        env:
+          SIGMA_OCR_PLATFORM: ${{ matrix.platform }}
+          SIGMA_OCR_ARCH: ${{ matrix.platform == 'mac' && 'arm64' || 'x64' }}
+
       # The release tag and all workspace versions must agree.
       - name: Validate release version
         shell: bash
