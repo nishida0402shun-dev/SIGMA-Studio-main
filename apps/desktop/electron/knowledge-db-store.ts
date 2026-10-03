@@ -331,7 +331,13 @@ export class KnowledgeDbStore {
 
   private async ensureIndexed(): Promise<KnowledgeSource[]> {
     const library = await this.readLibrary();
-    const pending = library.sources.filter((source) => source.pages.some((page) => page.text === undefined) || source.pages.some((page) => page.extractionStatus === "ocr-needed") || !(await this.vectorIndex().hasSource(source.id)));
+    const pending: KnowledgeSource[] = [];
+    for (const source of library.sources) {
+      const indexed = await this.vectorIndex().hasSource(source.id);
+      if (source.pages.some((page) => page.text === undefined) || source.pages.some((page) => page.extractionStatus === "ocr-needed") || !indexed) {
+        pending.push(source);
+      }
+    }
     this.indexStatus = { state: pending.length ? "running" : "completed", total: pending.length, completed: 0, startedAt: pending.length ? new Date().toISOString() : this.indexStatus.startedAt };
     let changed = false;
     for (const source of library.sources) {
