@@ -204,3 +204,59 @@ export const KNOWLEDGE_TAXONOMY: KnowledgeTaxonomyNode[] = [
   { id: "civics", name: "公民" },
   { id: "other", name: "その他" },
 ];
+
+
+export interface KnowledgeTaxonomyMatch {
+  nodeId: string;
+  path: string[];
+  score: number;
+}
+
+function normalizeTaxonomyText(value: string): string {
+  return value.normalize("NFKC").toLocaleLowerCase();
+}
+
+function walkTaxonomy(
+  nodes: KnowledgeTaxonomyNode[],
+  parentPath: string[],
+  output: Array<{ node: KnowledgeTaxonomyNode; path: string[] }>,
+): void {
+  for (const node of nodes) {
+    const path = [...parentPath, node.name];
+    output.push({ node, path });
+    if (node.children) walkTaxonomy(node.children, path, output);
+  }
+}
+
+/**
+ * Deterministic taxonomy classification. It returns multiple matches so
+ * cross-unit/fusion problems can reference more than one branch.
+ */
+export function classifyKnowledgeTaxonomy(text: string, keywords: string[] = []): KnowledgeTaxonomyMatch[] {
+  const normalized = normalizeTaxonomyText([text, ...keywords].join("\n"));
+  if (!normalized.trim()) return [];
+
+  const candidates: KnowledgeTaxonomyMatch[] = [];
+  const flattened: Array<{ node: KnowledgeTaxonomyNode; path: string[] }> = [];
+  walkTaxonomy(KNOWLEDGE_TAXONOMY, [], flattened);
+
+  for (const { node, path } of flattened) {
+    const terms = [node.name, ...(node.aliases ?? [])].map(normalizeTaxonomyText).filter((term) => term.length >= 2);
+    if (!terms.length) continue;
+    let score = 0;
+    for (const term of terms) {
+      if (normalized.includes(term)) {
+        score = Math.max(score, term.length >= 5 ? 1 : 0.82);
+      }
+    }
+    if (score > 0) {
+      // Prefer the deepest matched node; parents remain available as context.
+      score += Math.min(0.25, path.length * 0.04);
+      candidates.push({ nodeId: node.id, path, score: Math.min(1, score) });
+    }
+  }
+
+  return candidates
+    .sort((a, b) => b.score - a.score || b.path.length - a.path.length)
+    .slice(0, 4);
+}
