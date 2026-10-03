@@ -10,14 +10,14 @@ export interface RegisterKnowledgeDbIpcDeps {
   store: KnowledgeDbStore;
 }
 
-async function collectPdfFiles(paths: string[]): Promise<string[]> {
+async function collectSourceFiles(paths: string[]): Promise<string[]> {
   const files: string[] = [];
   for (const candidate of paths) {
     const stat = await fs.stat(candidate);
     if (stat.isDirectory()) {
       const entries = await fs.readdir(candidate, { withFileTypes: true });
-      files.push(...await collectPdfFiles(entries.map((entry) => path.join(candidate, entry.name))));
-    } else if (path.extname(candidate).toLowerCase() === ".pdf") {
+      files.push(...await collectSourceFiles(entries.map((entry) => path.join(candidate, entry.name))));
+    } else if (stat.isFile()) {
       files.push(candidate);
     }
   }
@@ -33,11 +33,10 @@ export function registerKnowledgeDbIpc(deps: RegisterKnowledgeDbIpcDeps): void {
     if (!mainWindow) return null;
     const result = await dialog.showOpenDialog(mainWindow, {
       title: "Add to DB",
-      filters: [{ name: "PDF", extensions: ["pdf"] }],
       properties: ["openFile", "openDirectory", "multiSelections"],
     });
     if (result.canceled) return null;
-    const paths = await collectPdfFiles(result.filePaths);
+    const paths = await collectSourceFiles(result.filePaths);
     return { paths };
   });
 
