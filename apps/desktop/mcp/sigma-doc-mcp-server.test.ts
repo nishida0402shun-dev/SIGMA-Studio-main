@@ -54,7 +54,20 @@ import { parseSigmaDocument } from "@/lib/sigma-doc-schema";
 import type { DesktopMcpEditProposalSummary } from "@/types/desktop";
 import type { SigmaBlock, SigmaDocument } from "@/types/sigma-doc";
 
-const DOCUMENTED_KNOWLEDGE_DB_TOOL_NAMES = ["knowledge_db_get_page", "knowledge_db_get_region", "knowledge_db_list_sources", "knowledge_db_search"] as const;
+const DOCUMENTED_KNOWLEDGE_DB_TOOL_NAMES = [
+  "knowledge_db_get_analysis_status",
+  "knowledge_db_reanalyze",
+  "knowledge_db_list_classification_reviews",
+  "knowledge_db_get_classification_review_context",
+  "knowledge_db_submit_classification_review",
+  "knowledge_db_get_context",
+  "knowledge_db_get_related_sources",
+  "knowledge_db_route_query",
+  "knowledge_db_get_page",
+  "knowledge_db_get_region",
+  "knowledge_db_list_sources",
+  "knowledge_db_search",
+] as const;
 
 const ENV_KEYS = [
   "SIGMA_STUDIO_DATA_DIR",
