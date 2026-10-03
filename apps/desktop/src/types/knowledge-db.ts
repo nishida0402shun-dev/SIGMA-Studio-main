@@ -15,6 +15,8 @@ export interface KnowledgePage {
   semanticType: KnowledgeSemanticType;
   title?: string;
   text?: string;
+  keywords?: string[];
+  analysisSignals?: string[];
 }
 
 export interface KnowledgeSource {
