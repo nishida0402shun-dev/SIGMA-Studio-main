@@ -127,7 +127,7 @@ export function KnowledgeDbWorkspace({ open, onClose, onOpenAi, t }: Props) {
   }
 
   async function openSelectedPage(): Promise<void> {
-    if (!knowledgeDb || !selectedWorkspaceId || selectedPages.length === 0) return;
+    if (!knowledgeDb || selectedPages.length === 0) return;
     const target = selectedPages[0];
     const result = await knowledgeDb.openPage({ ...target });
     if (!result.ok) console.warn("Knowledge DB page open failed:", result.error);
@@ -167,7 +167,7 @@ export function KnowledgeDbWorkspace({ open, onClose, onOpenAi, t }: Props) {
   }
 
   async function extractRegionPdf(): Promise<void> {
-    if (!knowledgeDb || !selectedWorkspaceId || selectedPages.length === 0 || !region) return;
+    if (!knowledgeDb || selectedPages.length === 0 || !region) return;
     const target = selectedPages[0];
     const result = await knowledgeDb.extractRegion({ sourceId: target.sourceId, pageNumber: target.pageNumber, rect: region });
     if (!result.ok) console.warn("Knowledge DB region extraction failed:", result.error);
@@ -556,7 +556,7 @@ export function KnowledgeDbWorkspace({ open, onClose, onOpenAi, t }: Props) {
                   <KnowledgePdfPageViewer
                     sourceId={selectedPages[0]!.sourceId}
                     pageNumber={selectedPages[0]!.pageNumber}
-                    getPagePdf={(payload) => knowledgeDb?.getPagePdf({ workspaceId: selectedWorkspaceId!, ...payload }) ?? Promise.resolve(null)}
+                    getPagePdf={(payload) => knowledgeDb?.getPagePdf(payload) ?? Promise.resolve(null)}
                     onRegionSelected={(nextRegion) => setRegion(nextRegion)}
                   />
                 </div>
