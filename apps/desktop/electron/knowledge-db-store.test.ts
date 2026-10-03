@@ -122,3 +122,55 @@ describe("global library", () => {
     await expect(store.getPage(source!.id, 1)).resolves.toBeTruthy();
   });
 });
+
+
+describe("Knowledge DB analysis lifecycle", () => {
+  it("marks indexed pages with the current analysis version", async () => {
+    const dataDir = await fs.mkdtemp(path.join(os.tmpdir(), "sigma-knowledge-db-analysis-"));
+    tempDirs.push(dataDir);
+    const sourcePath = await createPdf("analysis.pdf", 1);
+    const store = new KnowledgeDbStore(dataDir);
+    const [source] = await store.addFiles([sourcePath]);
+    expect(source).toBeTruthy();
+
+    const libraryPath = path.join(dataDir, "knowledge-db", "library.json");
+    const library = JSON.parse(await fs.readFile(libraryPath, "utf8")) as any;
+    library.sources[0].pages[0].text = "数学Ⅱ 三角関数 定理";
+    library.sources[0].pages[0].analysisStatus = "stale";
+    library.sources[0].pages[0].analysisVersion = 0;
+    await fs.writeFile(libraryPath, JSON.stringify(library), "utf8");
+
+    await store.search("三角関数", 1);
+    const refreshed = await store.listSources();
+    const page = refreshed[0]!.pages[0]!;
+    expect(page.analysisStatus).toBe("analyzed");
+    expect(page.analysisVersion).toBeGreaterThan(0);
+    expect(page.taxonomyPaths?.some((path) => path.includes("数学Ⅱ"))).toBe(true);
+  });
+
+  it("assembles deduplicated context within the requested character budget and exposes reasons", async () => {
+    const dataDir = await fs.mkdtemp(path.join(os.tmpdir(), "sigma-knowledge-db-context-"));
+    tempDirs.push(dataDir);
+    const sourcePath = await createPdf("context.pdf", 2);
+    const store = new KnowledgeDbStore(dataDir);
+    const [source] = await store.addFiles([sourcePath]);
+    expect(source).toBeTruthy();
+
+    const libraryPath = path.join(dataDir, "knowledge-db", "library.json");
+    const library = JSON.parse(await fs.readFile(libraryPath, "utf8")) as any;
+    const longText = "数学Ⅱ 三角関数の定理について説明します。".repeat(80);
+    for (const page of library.sources[0].pages) {
+      page.text = longText;
+      page.analysisStatus = "stale";
+      page.analysisVersion = 0;
+    }
+    await fs.writeFile(libraryPath, JSON.stringify(library), "utf8");
+
+    const context = await store.getContext("数学Ⅱ 三角関数 定理", 8, undefined, 600);
+    expect(context.length).toBeGreaterThan(0);
+    expect(context.reduce((sum, item) => sum + item.text.length, 0)).toBeLessThanOrEqual(600);
+    expect(new Set(context.map((item) => `${item.sourceId}:${item.pageNumber}`)).size).toBe(context.length);
+    expect(context[0]?.citation).toContain("sigma://knowledge-db/");
+    expect(context[0]?.matchReasons?.length).toBeGreaterThan(0);
+  });
+});
