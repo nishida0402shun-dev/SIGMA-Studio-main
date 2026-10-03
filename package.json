@@ -1,6 +1,6 @@
 {
   "name": "sigma-studio-workspace",
-  "version": "0.469.45",
+  "version": "0.469.46",
   "private": true,
   "workspaces": [
     "apps/desktop",
