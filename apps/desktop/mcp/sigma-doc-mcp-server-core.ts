@@ -3028,11 +3028,11 @@ registerTool(
   "knowledge_db_list_sources",
   {
     title: "Knowledge DBの資料一覧",
-    description: "登録済みPDF資料とページ数・ページ分類を取得します。Knowledge DBを使った回答では、必要に応じてこのツールで資料候補を確認してください。",
-    inputSchema: { workspaceId: z.string().min(1).max(256) },
+    description: "SIGMA全体で共有されるKnowledge DBのPDF資料とページ情報を取得します。Workspaceには依存しません。",
+    inputSchema: {},
   },
-  async ({ workspaceId }) => withToolErrorHandling(async () => {
-    const sources = await new KnowledgeDbStore(storeContext.dataDir).listSources(workspaceId);
+  async () => withToolErrorHandling(async () => {
+    const sources = await new KnowledgeDbStore(storeContext.dataDir).listSources();
     return { ok: true, sources: sources.map((source) => ({
       id: source.id,
       name: source.name,
@@ -3047,16 +3047,15 @@ registerTool(
   "knowledge_db_search",
   {
     title: "Knowledge DBを検索",
-    description: "登録PDFのページ内容を意味検索します。質問文をそのまま渡せ、完全一致のキーワード検索に限定されません。",
+    description: "SIGMA全体で共有されるKnowledge DBを意味検索・キーワード補助検索します。質問文をそのまま渡せます。",
     inputSchema: {
-      workspaceId: z.string().min(1).max(256),
       query: z.string().min(1).max(2000),
       limit: z.number().int().min(1).max(20).optional(),
       runId: z.string().min(1).max(256).optional(),
     },
   },
-  async ({ workspaceId, query, limit, runId }) => withToolErrorHandling(async () => {
-    const results = await new KnowledgeDbStore(storeContext.dataDir).search(workspaceId, query, limit ?? 8);
+  async ({ query, limit, runId }) => withToolErrorHandling(async () => {
+    const results = await new KnowledgeDbStore(storeContext.dataDir).search(query, limit ?? 8);
     for (const result of results) {
       recordKnowledgeDbPageReference(runId, {
         sourceId: result.sourceId,
@@ -3069,19 +3068,47 @@ registerTool(
 );
 
 registerTool(
+  "knowledge_db_get_context",
+  {
+    title: "Knowledge DBからAI Contextを取得",
+    description: "質問に関連する資料ページの抜粋を、出典ページIDとSIGMA引用マーカー付きのContext Packとして取得します。",
+    inputSchema: {
+      query: z.string().min(1).max(2000),
+      limit: z.number().int().min(1).max(12).optional(),
+      runId: z.string().min(1).max(256).optional(),
+    },
+  },
+  async ({ query, limit, runId }) => withToolErrorHandling(async () => {
+    const context = await new KnowledgeDbStore(storeContext.dataDir).getContext(query, limit ?? 8);
+    for (const item of context) {
+      recordKnowledgeDbPageReference(runId, {
+        sourceId: item.sourceId,
+        sourceName: item.sourceName,
+        pageNumber: item.pageNumber,
+      });
+    }
+    return {
+      ok: true,
+      query,
+      context,
+      instructions: "回答では根拠として使った項目のcitationを保持してください。例: [SIGMA:sourceId:p17]",
+    };
+  }),
+);
+
+registerTool(
   "knowledge_db_get_page",
   {
     title: "Knowledge DBのページを取得",
-    description: "資料IDとページ番号を指定して、そのページの本文・分類・タイトルを取得します。検索結果の確認に使います。",
+    description: "資料IDとページ番号を指定して、そのページの本文・分類・タイトルを取得します。Workspaceには依存しません。",
     inputSchema: {
-      workspaceId: z.string().min(1).max(256),
       sourceId: z.string().min(1),
       pageNumber: z.number().int().min(1),
       runId: z.string().min(1).max(256).optional(),
     },
   },
-  async ({ workspaceId, sourceId, pageNumber, runId }) => withToolErrorHandling(async () => {
-    const { source, page } = await new KnowledgeDbStore(storeContext.dataDir).getPage(workspaceId, sourceId, pageNumber);
+  async ({ sourceId, pageNumber, runId }) => withToolErrorHandling(async () => {
+    const { source, page } = await new KnowledgeDbStore(storeContext.dataDir).getPage(sourceId, pageNumber);
     recordKnowledgeDbPageReference(runId, {
       sourceId: source.id,
       sourceName: source.name,
