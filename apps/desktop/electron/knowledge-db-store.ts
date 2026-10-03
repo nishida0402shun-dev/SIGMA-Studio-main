@@ -242,8 +242,7 @@ export class KnowledgeDbStore {
     return source;
   }
 
-  private async ensureIndexed(workspaceId: string): Promise<KnowledgeSource[]> {
-    const normalized = requireWorkspaceId(workspaceId);
+  private async ensureIndexed(): Promise<KnowledgeSource[]> {
     const library = await this.readLibrary();
     let changed = false;
     for (const source of library.sources) {
@@ -260,9 +259,7 @@ export class KnowledgeDbStore {
         }
         await this.vectorIndex().removeSource(source.id);
         await this.indexSource(source);
-      } catch {
-        // The PDF remains the source of truth; an unreadable legacy source stays visible for repair.
-      }
+      } catch {}
     }
     if (changed) await this.writeLibrary(library);
     return library.sources;
@@ -278,7 +275,7 @@ export class KnowledgeDbStore {
         text,
       })),
     );
-    await this.vectorIndex(workspaceId).upsertMany(records);
+    await this.vectorIndex().upsertMany(records);
   }
 
   private async findSource(sourceId: string): Promise<KnowledgeSource> {
@@ -288,18 +285,34 @@ export class KnowledgeDbStore {
     return source;
   }
 
-  private async readLibrary(workspaceId: string): Promise<KnowledgeLibrary> {
-    const normalized = requireWorkspaceId(workspaceId);
-    const paths = this.paths(normalized);
+  private async readLibrary(): Promise<KnowledgeLibrary> {
+    const paths = this.paths();
     await fs.mkdir(paths.root, { recursive: true });
     try {
-      const raw = await fs.readFile(paths.libraryPath, "utf8");
-      const parsed = JSON.parse(raw) as Partial<KnowledgeLibrary>;
-      if (parsed.version === 2 && parsed.workspaceId === normalized && Array.isArray(parsed.sources)) return parsed as KnowledgeLibrary;
-    } catch {
-      // First launch or an unreadable/incompatible library: rebuild from managed PDFs if available.
+      const parsed = JSON.parse(await fs.readFile(paths.libraryPath, "utf8")) as Partial<KnowledgeLibrary>;
+      if (parsed.version === 3 && Array.isArray(parsed.sources)) return parsed as KnowledgeLibrary;
+    } catch {}
+    const library: KnowledgeLibrary = { version: 3, sources: [] };
+    const legacyRoot = path.join(this.dataDir, "knowledge-db", "workspaces");
+    const entries = await fs.readdir(legacyRoot, { withFileTypes: true }).catch(() => []);
+    await fs.mkdir(paths.sourcesDir, { recursive: true });
+    for (const entry of entries) {
+      if (!entry.isDirectory()) continue;
+      let parsed: any;
+      try { parsed = JSON.parse(await fs.readFile(path.join(legacyRoot, entry.name, "library.json"), "utf8")); } catch { continue; }
+      if (!Array.isArray(parsed.sources)) continue;
+      for (const legacy of parsed.sources) {
+        let bytes: Uint8Array;
+        try { bytes = await fs.readFile(legacy.storedPath); } catch { continue; }
+        const hash = legacy.contentHash || createHash("sha256").update(bytes).digest("hex");
+        if (library.sources.some((source) => source.contentHash === hash)) continue;
+        const id = library.sources.some((source) => source.id === legacy.id) ? "src_" + cryptoRandomId() : legacy.id;
+        const storedPath = path.join(paths.sourcesDir, id + ".pdf");
+        await fs.copyFile(legacy.storedPath, storedPath);
+        library.sources.push({ ...legacy, id, storedPath, contentHash: hash, pages: legacy.pages.map((page: KnowledgePage) => ({ ...page, id: id + "_p" + page.pageNumber, sourceId: id })) });
+      }
     }
-    return { version: 2, workspaceId: normalized, sources: [] };
+    return library;
   }
 
   private async writeLibrary(library: KnowledgeLibrary): Promise<void> {
@@ -312,25 +325,12 @@ export class KnowledgeDbStore {
 
   private paths() {
     const root = path.join(this.dataDir, "knowledge-db");
-    return {
-      root,
-      libraryPath: path.join(root, "library.json"),
-      sourcesDir: path.join(root, "sources"),
-      openedPagesDir: path.join(root, "opened-pages"),
-    };
+    return { root, libraryPath: path.join(root, "library.json"), sourcesDir: path.join(root, "sources"), openedPagesDir: path.join(root, "opened-pages") };
   }
 
   private vectorIndex(): LocalVectorIndex {
     return new LocalVectorIndex(path.join(this.paths().root, "vector-index"));
   }
-}
-
-function safeId(value: string): string {
-  return value.replace(/[^a-zA-Z0-9_-]/g, "_").slice(0, 160);
-}
-
-function cryptoRandomId(): string {
-  return `${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 10)}`;
 }
 
 async function extractPdfPageTexts(bytes: Uint8Array, pageCount: number): Promise<string[]> {
