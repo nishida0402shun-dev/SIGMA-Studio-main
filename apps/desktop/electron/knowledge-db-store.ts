@@ -2,6 +2,7 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import { createHash, randomUUID } from "node:crypto";
 import { PDFDocument } from "pdf-lib";
+import JSZip from "jszip";
 import { LocalVectorIndex, type VectorSearchResult } from "./local-vector-index";
 import { KnowledgeStructureParser, type KnowledgeStructureBlock, type KnowledgeStructureBlockType, type StructureParserStatus } from "./knowledge-db-structure-parser";
 import { analyzeKnowledgePage, KNOWLEDGE_ANALYSIS_VERSION } from "./knowledge-analysis-engine";
@@ -48,7 +49,7 @@ export interface KnowledgeSource {
   name: string;
   originalPath: string;
   storedPath: string;
-  mimeType: "application/pdf";
+  mimeType: string;
   sizeBytes: number;
   pageCount: number;
   importedAt: string;
@@ -166,28 +167,27 @@ export class KnowledgeDbStore {
     const added: KnowledgeSource[] = [];
 
     for (const filePath of filePaths) {
-      if (path.extname(filePath).toLowerCase() !== ".pdf") continue;
       const stat = await fs.stat(filePath);
+      if (!stat.isFile()) continue;
       const bytes = await fs.readFile(filePath);
       const contentHash = createHash("sha256").update(bytes).digest("hex");
       if (library.sources.some((source) => source.contentHash === contentHash)) {
         continue;
       }
 
-      const pdf = await PDFDocument.load(bytes, { ignoreEncryption: false });
+      const extension = path.extname(filePath).toLowerCase();
+      const pdf = extension === ".pdf" ? await PDFDocument.load(bytes, { ignoreEncryption: false }) : null;
       const id = `src_${randomUUID()}`;
       const storedPath = path.join(paths.sourcesDir, `${id}.pdf`);
       const now = new Date().toISOString();
-      const pageCount = pdf.getPageCount();
-
       const source: KnowledgeSource = {
         id,
         name: path.basename(filePath),
         originalPath: filePath,
         storedPath,
-        mimeType: "application/pdf",
+        mimeType: mimeTypeForExtension(extension),
         sizeBytes: stat.size,
-        pageCount,
+        pageCount: pdf?.getPageCount() ?? 1,
         importedAt: now,
         updatedAt: now,
         contentHash,
@@ -482,9 +482,11 @@ export class KnowledgeDbStore {
         }
         if (needsText || needsAnalysis || needsTaxonomy) {
           const bytes = await fs.readFile(source.storedPath);
-          const pageTexts = needsText ? await extractPdfPageTexts(bytes, source.pageCount) : source.pages.map((page) => page.text ?? "");
+          const pageTexts = needsText
+            ? await extractKnowledgeFilePageTexts(source.name, bytes, source.pageCount)
+            : source.pages.map((page) => page.text ?? "");
           let structureResults: Awaited<ReturnType<KnowledgeStructureParser["parsePdf"]>> = [];
-          if (pageTexts.some((text) => !text.trim())) {
+          if (source.mimeType === "application/pdf" && pageTexts.some((text) => !text.trim())) {
             const parserStatus = await this.getStructureParserStatus();
             if (parserStatus.available) {
               try {
@@ -697,6 +699,45 @@ function countWords(text: string): number {
 
 function tokenizeForSearch(text: string): string[] {
   return text.normalize("NFKC").toLocaleLowerCase().match(/[\\p{L}\\p{N}][\\p{P}\\p{L}\\p{N}_-]*/gu) ?? [];
+}
+
+async function extractKnowledgeFilePageTexts(fileName: string, bytes: Uint8Array, pageCount: number): Promise<string[]> {
+  const extension = path.extname(fileName).toLowerCase();
+  if (extension === ".pdf") return extractPdfPageTexts(bytes, pageCount);
+  const textExtensions = new Set([".txt", ".md", ".markdown", ".csv", ".tsv", ".json", ".xml", ".html", ".htm", ".css", ".js", ".jsx", ".ts", ".tsx", ".yml", ".yaml", ".toml", ".ini", ".log", ".sql", ".tex", ".bib", ".svg"]);
+  if (textExtensions.has(extension)) {
+    const text = new TextDecoder("utf-8", { fatal: false }).decode(bytes).replace(/\\u0000/gu, "").trim();
+    return [text];
+  }
+  if (extension === ".docx" || extension === ".xlsx" || extension === ".pptx") {
+    const zip = await JSZip.loadAsync(bytes);
+    const names = Object.keys(zip.files).filter((name) => /\\.(?:xml|rels)$/u.test(name));
+    const chunks: string[] = [];
+    for (const name of names) {
+      const entry = zip.files[name];
+      if (!entry || entry.dir) continue;
+      const xml = await entry.async("string");
+      const text = xml.replace(/<[^>]+>/gu, " ").replace(/&amp;/gu, "&").replace(/&lt;/gu, "<").replace(/&gt;/gu, ">").replace(/\\s+/gu, " ").trim();
+      if (text) chunks.push(text);
+    }
+    return [chunks.join("\\n")];
+  }
+  const looksBinary = bytes.slice(0, Math.min(bytes.length, 4096)).some((byte) => byte === 0);
+  if (!looksBinary) {
+    const text = new TextDecoder("utf-8", { fatal: false }).decode(bytes).replace(/\\u0000/gu, "").trim();
+    if (text) return [text];
+  }
+  return [`[ファイル] ${fileName}\\n[拡張子] ${extension || "(なし)"}\\n[サイズ] ${bytes.byteLength} bytes`];
+}
+
+function mimeTypeForExtension(extension: string): string {
+  const types: Record<string, string> = {
+    ".pdf": "application/pdf", ".txt": "text/plain", ".md": "text/markdown", ".csv": "text/csv", ".json": "application/json",
+    ".html": "text/html", ".htm": "text/html", ".xml": "application/xml", ".svg": "image/svg+xml", ".docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    ".xlsx": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", ".pptx": "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+    ".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".gif": "image/gif", ".webp": "image/webp",
+  };
+  return types[extension] ?? "application/octet-stream";
 }
 
 function lexicalScore(text: string, queryTokens: string[]): number {
