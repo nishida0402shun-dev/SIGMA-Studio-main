@@ -2,7 +2,7 @@ import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
 import type { CallToolResult, Tool } from "@modelcontextprotocol/sdk/types.js";
 
-const READ_ONLY_TOOLS = new Set([
+const KNOWLEDGE_DB_TOOLS = new Set(["knowledge_db_list_sources","knowledge_db_search","knowledge_db_get_context","knowledge_db_get_page","knowledge_db_get_region"]);\n\nconst READ_ONLY_TOOLS = new Set([
   "get_local_app_status","list_edit_proposals","get_edit_proposal","list_all_pending_proposals","list_local_documents",
   "read_local_document","get_edit_context","get_document_outline","get_block","get_blocks","search_document","search_library",
   "validate_local_document","list_materials","get_material","render_block_context","render_page","get_selected_block",
@@ -75,20 +75,25 @@ export function createWebAiMcpGateway(options: WebAiMcpGatewayOptions): WebAiMcp
       if (currentTransport) await currentTransport.close().catch(() => undefined);
     },
     async listTools(workspaceId) {
-      if (!workspaceId) return [];
       const currentClient = await ensureStarted();
       const result = await currentClient.listTools();
-      return result.tools.filter((tool) => READ_ONLY_TOOLS.has(tool.name)).map((tool) =>
-        tool.name === "list_local_documents" && isRecord(tool.inputSchema)
+      return result.tools.filter((tool) => READ_ONLY_TOOLS.has(tool.name) && (Boolean(workspaceId) || KNOWLEDGE_DB_TOOLS.has(tool.name))).map((tool) =>
+        tool.name === "list_local_documents" && isRecord(tool.inputSchema) && workspaceId
           ? { ...tool, description: `${tool.description ?? ""} Current SIGMA Workspace: ${workspaceId}.` }
           : tool,
       );
     },
     async callTool(name, args, workspaceId) {
-      if (!workspaceId) throw new Error("Select a SIGMA Workspace before using MCP.");
       if (!READ_ONLY_TOOLS.has(name)) throw new Error(`Web AI cannot use this Tool: ${name}`);
+      if (!workspaceId && !KNOWLEDGE_DB_TOOLS.has(name)) {
+        throw new Error("Select a SIGMA Workspace before using this Tool.");
+      }
       const currentClient = await ensureStarted();
       const input = { ...args };
+      if (KNOWLEDGE_DB_TOOLS.has(name)) {
+        delete input.workspaceId;
+        return (await currentClient.callTool({ name, arguments: input })) as CallToolResult;
+      }
       if (typeof input.workspaceId === "string" && input.workspaceId !== workspaceId) {
         throw new Error("MCP access is restricted to the selected Workspace.");
       }
@@ -98,7 +103,7 @@ export function createWebAiMcpGateway(options: WebAiMcpGatewayOptions): WebAiMcp
       if (typeof input.fileId === "string" && !hasExactWorkspaceFileId(
         await currentClient.callTool({ name: "list_local_documents", arguments: { workspaceId } }),
         input.fileId,
-        workspaceId,
+        workspaceId!,
       )) {
         throw new Error("The specified fileId does not belong to the selected Workspace.");
       }
