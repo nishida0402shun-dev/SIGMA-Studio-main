@@ -381,6 +381,85 @@ async function registerSigmaWebAiTools(): Promise<void> {
   }, { signal: controller.signal });
 
   await modelContext.registerTool({
+    name: "sigma_knowledge_classification_reviews",
+    description: "List pages in SIGMA's global Knowledge DB that need AI classification double-checking. Process pending and needs-review items from this queue using the review context tool.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        status: { type: "string", enum: ["pending", "needs-review", "all"] },
+        limit: { type: "number" },
+      },
+    },
+    annotations: { readOnlyHint: true, untrustedContentHint: true },
+    execute: async (input) => callApi("/v1/mcp/call", {
+      method: "POST",
+      body: JSON.stringify({
+        name: "knowledge_db_list_classification_reviews",
+        arguments: {
+          ...(typeof input.status === "string" ? { status: input.status } : {}),
+          ...(typeof input.limit === "number" ? { limit: input.limit } : {}),
+        },
+      }),
+    }),
+  }, { signal: controller.signal });
+
+  await modelContext.registerTool({
+    name: "sigma_knowledge_classification_review_context",
+    description: "Get the content-only context for one Knowledge DB classification review. Filenames, extensions, and storage locations are deliberately excluded. Reclassify from body/OCR/tables/figures/formulas only.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        sourceId: { type: "string" },
+        pageNumber: { type: "number" },
+      },
+      required: ["sourceId", "pageNumber"],
+    },
+    annotations: { readOnlyHint: true, untrustedContentHint: true },
+    execute: async (input) => callApi("/v1/mcp/call", {
+      method: "POST",
+      body: JSON.stringify({
+        name: "knowledge_db_get_classification_review_context",
+        arguments: {
+          sourceId: String(input.sourceId),
+          pageNumber: Number(input.pageNumber),
+        },
+      }),
+    }),
+  }, { signal: controller.signal });
+
+  await modelContext.registerTool({
+    name: "sigma_knowledge_submit_classification_review",
+    description: "Submit an AI classification double-check. Provide one or more full 教科→科目→単元 paths, confidence, and concise evidence. Matching SIGMA classification is confirmed; disagreement is recorded as needs-review without changing SIGMA's original taxonomy.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        sourceId: { type: "string" },
+        pageNumber: { type: "number" },
+        paths: { type: "array", items: { type: "array", items: { type: "string" } } },
+        confidence: { type: "number" },
+        reason: { type: "string" },
+        evidence: { type: "array", items: { type: "string" } },
+      },
+      required: ["sourceId", "pageNumber", "paths", "confidence"],
+    },
+    annotations: { readOnlyHint: false, consequentialHint: false, untrustedContentHint: true },
+    execute: async (input) => callApi("/v1/mcp/call", {
+      method: "POST",
+      body: JSON.stringify({
+        name: "knowledge_db_submit_classification_review",
+        arguments: {
+          sourceId: String(input.sourceId),
+          pageNumber: Number(input.pageNumber),
+          paths: Array.isArray(input.paths) ? input.paths : [],
+          confidence: Number(input.confidence),
+          ...(typeof input.reason === "string" ? { reason: input.reason } : {}),
+          ...(Array.isArray(input.evidence) ? { evidence: input.evidence } : {}),
+        },
+      }),
+    }),
+  }, { signal: controller.signal });
+
+  await modelContext.registerTool({
     name: "sigma_run_agent",
     description: "Run Codex, Claude, or Gemini through Sigma Studio's Agent Runtime. The agent can create normal Sigma edit proposals; it cannot execute arbitrary shell commands through this tool.",
     inputSchema: {
