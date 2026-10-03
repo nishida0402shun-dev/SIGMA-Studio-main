@@ -61,6 +61,14 @@ export function registerKnowledgeDbIpc(deps: RegisterKnowledgeDbIpcDeps): void {
     return { ok: await store.deleteSource(sourceId) };
   });
 
+  ipcMain.handle("knowledge-db:related", async (event, payload: unknown) => {
+    if (event.sender !== getMainWindow()?.webContents) return [];
+    const sourceId = payload && typeof payload === "object" && "sourceId" in payload && typeof payload.sourceId === "string" ? payload.sourceId : "";
+    const limit = payload && typeof payload === "object" && "limit" in payload && typeof payload.limit === "number" ? payload.limit : 6;
+    if (!sourceId) throw new Error("invalid source id");
+    return store.getRelatedSources(sourceId, limit);
+  });
+
   ipcMain.handle("knowledge-db:get-page-pdf", async (event, payload: unknown) => {
     if (event.sender !== getMainWindow()?.webContents) return null;
     if (!payload || typeof payload !== "object") throw new Error("invalid page request");
