@@ -490,11 +490,15 @@ export class KnowledgeDbStore {
             ? await extractKnowledgeFilePageTexts(source.name, bytes, source.pageCount)
             : source.pages.map((page) => page.text ?? "");
           let structureResults: Awaited<ReturnType<KnowledgeStructureParser["parsePdf"]>> = [];
-          if (source.mimeType === "application/pdf" && pageTexts.some((text) => !text.trim())) {
+          const structureExtensions = new Set([".pdf", ".png", ".jpg", ".jpeg", ".webp", ".bmp", ".tif", ".tiff"]);
+          const extension = path.extname(source.name).toLowerCase();
+          if (structureExtensions.has(extension) && pageTexts.some((text) => !text.trim())) {
             const parserStatus = await this.getStructureParserStatus();
             if (parserStatus.available) {
               try {
-                structureResults = await this.structureParser.parsePdf(source.storedPath);
+                structureResults = extension === ".pdf"
+                  ? await this.structureParser.parsePdf(source.storedPath)
+                  : await this.structureParser.parseImage(source.storedPath);
               } catch (error) {
                 source.indexError = error instanceof Error ? error.message : String(error);
               }
