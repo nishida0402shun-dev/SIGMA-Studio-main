@@ -271,7 +271,7 @@ export function classifyKnowledgeTaxonomy(text: string, keywords: string[] = [])
       const boundedScore = Math.min(1, score);
       candidates.push({
         nodeId: node.id,
-        path,
+        path: path.filter((part, index) => index === 0 || part !== path[index - 1]),
         score: boundedScore,
         confidence: boundedScore,
       });
