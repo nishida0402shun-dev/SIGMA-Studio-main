@@ -178,7 +178,7 @@ export class KnowledgeDbStore {
       const extension = path.extname(filePath).toLowerCase();
       const pdf = extension === ".pdf" ? await PDFDocument.load(bytes, { ignoreEncryption: false }) : null;
       const id = `src_${randomUUID()}`;
-      const storedPath = path.join(paths.sourcesDir, `${id}.pdf`);
+      const storedPath = path.join(paths.sourcesDir, `${id}${extension || ".bin"}`);
       const now = new Date().toISOString();
       const source: KnowledgeSource = {
         id,
@@ -192,7 +192,7 @@ export class KnowledgeDbStore {
         updatedAt: now,
         contentHash,
         extractionStatus: "ocr-needed",
-        pages: Array.from({ length: pageCount }, (_, index) => ({
+        pages: Array.from({ length: pdf?.getPageCount() ?? 1 }, (_, index) => ({
           id: `${id}_p${index + 1}`,
           sourceId: id,
           pageNumber: index + 1,
