@@ -116,17 +116,44 @@ export class KnowledgeDbStore {
     await this.ensureIndexed();
     const library = await this.readLibrary();
     const safeLimit = Math.max(1, Math.min(limit, 50));
-    const matches = await this.vectorIndex().search(trimmed, Math.min(50, safeLimit * 4));
+    const matches = await this.vectorIndex().search(trimmed, Math.min(50, safeLimit * 5));
     const bestByPage = new Map<string, (typeof matches)[number]>();
     for (const match of matches) {
       const current = bestByPage.get(`${match.sourceId}:${match.pageNumber}`);
       if (!current || match.score > current.score) bestByPage.set(`${match.sourceId}:${match.pageNumber}`, match);
     }
+    const queryTokens = tokenizeForSearch(trimmed);
     const sourceNames = new Map(library.sources.map((source) => [source.id, source.name]));
     return [...bestByPage.values()]
+      .map((match) => {
+        const lexical = lexicalScore(match.text, queryTokens);
+        return { ...match, score: match.score * 0.75 + lexical * 0.25 };
+      })
       .sort((a, b) => b.score - a.score)
       .slice(0, safeLimit)
       .map((match) => ({ ...match, sourceName: sourceNames.get(match.sourceId) ?? match.sourceId }));
+  }
+
+  async getContext(query: string, limit = 8): Promise<KnowledgeContextItem[]> {
+    const results = await this.search(query, limit);
+    const items: KnowledgeContextItem[] = [];
+    for (const result of results) {
+      const { source, page } = await this.getPage(result.sourceId, result.pageNumber);
+      const text = result.text.trim() || page.text?.trim() || "";
+      if (!text) continue;
+      items.push({
+        id: result.id,
+        sourceId: source.id,
+        pageId: page.id,
+        sourceName: source.name,
+        pageNumber: page.pageNumber,
+        semanticType: page.semanticType,
+        score: result.score,
+        text: text.slice(0, 5000),
+        citation: `[SIGMA:${source.id}:p${page.pageNumber}]`,
+      });
+    }
+    return items;
   }
 
   async getPage(sourceId: string, pageNumber: number): Promise<{ source: KnowledgeSource; page: KnowledgePage }> {
@@ -306,7 +333,26 @@ export class KnowledgeDbStore {
         const id = library.sources.some((source) => source.id === legacy.id) ? "src_" + cryptoRandomId() : legacy.id;
         const storedPath = path.join(paths.sourcesDir, id + ".pdf");
         await fs.copyFile(legacy.storedPath, storedPath);
-        library.sources.push({ ...legacy, id, storedPath, contentHash: hash, pages: legacy.pages.map((page: KnowledgePage) => ({ ...page, id: id + "_p" + page.pageNumber, sourceId: id })) });
+        library.sources.push({
+          id,
+          name: String(legacy.name ?? "Imported PDF"),
+          originalPath: String(legacy.originalPath ?? ""),
+          storedPath,
+          mimeType: "application/pdf",
+          sizeBytes: Number(legacy.sizeBytes ?? bytes.byteLength),
+          pageCount: Number(legacy.pageCount ?? legacy.pages.length),
+          importedAt: String(legacy.importedAt ?? new Date().toISOString()),
+          updatedAt: String(legacy.updatedAt ?? legacy.importedAt ?? new Date().toISOString()),
+          contentHash: hash,
+          pages: legacy.pages.map((page: KnowledgePage) => ({
+            id: id + "_p" + page.pageNumber,
+            sourceId: id,
+            pageNumber: page.pageNumber,
+            semanticType: page.semanticType ?? "unknown",
+            ...(page.title ? { title: page.title } : {}),
+            ...(page.text ? { text: page.text } : {}),
+          })),
+        });
       }
     }
     return library;
@@ -352,6 +398,29 @@ async function extractPdfPageTexts(bytes: Uint8Array, pageCount: number): Promis
   } catch {
     return Array.from({ length: pageCount }, () => "");
   }
+}
+
+export interface KnowledgeContextItem {
+  id: string;
+  sourceId: string;
+  pageId: string;
+  sourceName: string;
+  pageNumber: number;
+  semanticType: KnowledgeSemanticType;
+  score: number;
+  text: string;
+  citation: string;
+}
+
+function tokenizeForSearch(text: string): string[] {
+  return text.normalize("NFKC").toLocaleLowerCase().match(/[\\p{L}\\p{N}][\\p{P}\\p{L}\\p{N}_-]*/gu) ?? [];
+}
+
+function lexicalScore(text: string, queryTokens: string[]): number {
+  if (queryTokens.length === 0) return 0;
+  const normalized = text.normalize("NFKC").toLocaleLowerCase();
+  const hits = queryTokens.filter((token) => normalized.includes(token)).length;
+  return Math.min(1, hits / queryTokens.length);
 }
 
 function chunkText(text: string, maxLength = 900, overlap = 140): string[] {
