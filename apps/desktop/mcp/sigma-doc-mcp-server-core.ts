@@ -3134,9 +3134,9 @@ registerTool(
       runId: z.string().min(1).max(256).optional(),
     },
   },
-  async ({ workspaceId, sourceId, pageNumber, x, y, width, height, runId }) => withToolErrorHandling(async () => {
-    const filePath = await new KnowledgeDbStore(storeContext.dataDir).extractRegion(workspaceId, sourceId, pageNumber, { x, y, width, height });
-    const sources = await new KnowledgeDbStore(storeContext.dataDir).listSources(workspaceId);
+  async ({ sourceId, pageNumber, x, y, width, height, runId }) => withToolErrorHandling(async () => {
+    const filePath = await new KnowledgeDbStore(storeContext.dataDir).extractRegion(sourceId, pageNumber, { x, y, width, height });
+    const sources = await new KnowledgeDbStore(storeContext.dataDir).listSources();
     const source = sources.find((item) => item.id === sourceId);
     if (source) {
       recordKnowledgeDbPageReference(runId, {
