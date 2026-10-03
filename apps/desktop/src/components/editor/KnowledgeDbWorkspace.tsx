@@ -241,20 +241,18 @@ export function KnowledgeDbWorkspace({ open, onClose, onOpenAi, t }: Props) {
     [...pages].map((pageNumber) => ({ sourceId, pageNumber })),
   );
 
+  const selectedSourceId = selectedPages[0]?.sourceId;
+  const selectedPageKey = selectedPages.map((item) => `${item.sourceId}:${item.pageNumber}`).join("|");
   useEffect(() => {
-    const sourceId = selectedPages[0]?.sourceId;
-    if (!knowledgeDb || !sourceId) {
-      setRelatedSources([]);
-      return;
-    }
+    if (!knowledgeDb || !selectedSourceId) return;
     let cancelled = false;
-    void knowledgeDb.related({ sourceId, limit: 6 }).then((value) => {
+    void knowledgeDb.related({ sourceId: selectedSourceId, limit: 6 }).then((value) => {
       if (!cancelled) setRelatedSources((Array.isArray(value) ? value : []) as typeof relatedSources);
     }).catch(() => {
       if (!cancelled) setRelatedSources([]);
     });
     return () => { cancelled = true; };
-  }, [knowledgeDb, selectedPages.length, selectedPages[0]?.sourceId]);
+  }, [knowledgeDb, selectedSourceId, selectedPageKey]);
 
   if (!open) return null;
 
