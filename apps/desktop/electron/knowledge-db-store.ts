@@ -32,6 +32,17 @@ export interface KnowledgePage {
   taxonomyVersion?: number;
 }
 
+interface KnowledgeSearchResult extends VectorSearchResult {
+  sourceName: string;
+  matchReasons: string[];
+  citationRegions?: Array<{
+    type: KnowledgeStructureBlockType;
+    text: string;
+    bbox?: [number, number, number, number];
+    confidence?: number;
+  }>;
+}
+
 export interface KnowledgeSource {
   id: string;
   name: string;
@@ -209,7 +220,7 @@ export class KnowledgeDbStore {
     return added;
   }
 
-  async search(query: string, limit = 12): Promise<Array<VectorSearchResult & { sourceName: string }>> {
+  async search(query: string, limit = 12): Promise<KnowledgeSearchResult[]> {
     const trimmed = query.trim();
     if (!trimmed) return [];
     if (this.indexPromise) await this.indexPromise;
@@ -674,6 +685,10 @@ export interface KnowledgeContextItem {
     pageId: string;
     pageNumber: number;
   };
+}
+
+function safeId(value: string): string {
+  return value.replace(/[^a-zA-Z0-9._-]+/gu, "_").slice(0, 160) || "item";
 }
 
 function countWords(text: string): number {
