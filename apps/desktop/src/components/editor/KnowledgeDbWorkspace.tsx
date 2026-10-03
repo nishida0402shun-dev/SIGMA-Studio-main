@@ -2,7 +2,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { Database, Download, ExternalLink, FilePlus2, FileText, MessageSquare, Search, Trash2, X } from "lucide-react";
+import { BookmarkPlus, Database, Download, ExternalLink, FilePlus2, FileText, History, MessageSquare, Search, Trash2, X } from "lucide-react";
 import { KnowledgePdfPageViewer, type KnowledgeRegion } from "./KnowledgePdfPageViewer";
 import { getDesktopBridge } from "@/lib/desktop-bridge";
 import type { KnowledgeDbAiContext, KnowledgeSearchResult, KnowledgeSemanticType, KnowledgeSource } from "@/types/knowledge-db";
@@ -13,6 +13,15 @@ interface Props {
   onClose: () => void;
   onOpenAi: (context?: KnowledgeDbAiContext[]) => void;
   t: Translate<"chrome">;
+}
+
+interface ResearchSession {
+  id: string;
+  title: string;
+  query: string;
+  sourceReferences: Array<{ sourceId: string; sourceName: string; pageNumber: number; pageId?: string }>;
+  createdAt: string;
+  updatedAt: string;
 }
 
 const TYPES: KnowledgeSemanticType[] = ["problem", "example", "explanation", "column", "definition", "theorem", "answer", "figure"];
@@ -40,6 +49,8 @@ export function KnowledgeDbWorkspace({ open, onClose, onOpenAi, t }: Props) {
   const [searchResults, setSearchResults] = useState<KnowledgeSearchResult[]>([]);
   const [region, setRegion] = useState<KnowledgeRegion | null>(null);
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null);
+  const [researchSessions, setResearchSessions] = useState<ResearchSession[]>([]);
+  const researchApi = desktop?.researchSessions;
   const desktop = getDesktopBridge();
   const knowledgeDb = desktop?.knowledgeDb;
 
@@ -51,6 +62,15 @@ export function KnowledgeDbWorkspace({ open, onClose, onOpenAi, t }: Props) {
     });
     return () => { cancelled = true; };
   }, [knowledgeDb, open]);
+
+  useEffect(() => {
+    if (!open || !researchApi) return;
+    let cancelled = false;
+    void researchApi.list().then((value) => {
+      if (!cancelled && Array.isArray(value)) setResearchSessions(value as ResearchSession[]);
+    });
+    return () => { cancelled = true; };
+  }, [open, researchApi]);
 
   useEffect(() => {
     if (!knowledgeDb || !query.trim()) return;
@@ -84,6 +104,38 @@ export function KnowledgeDbWorkspace({ open, onClose, onOpenAi, t }: Props) {
   );
 
   if (!open) return null;
+
+  async function saveResearchSession(): Promise<void> {
+    if (!researchApi) return;
+    const researchQuery = query.trim() || "選択したKnowledge DB資料の調査";
+    const sourceReferences = selectedPages.flatMap(({ sourceId, pageNumber }) => {
+      const source = sources.find((item) => item.id === sourceId);
+      const page = source?.pages.find((item) => item.pageNumber === pageNumber);
+      return source && page ? [{
+        sourceId,
+        sourceName: source.name,
+        pageNumber,
+        pageId: page.id,
+      }] : [];
+    });
+    const created = await researchApi.create({ query: researchQuery, sourceReferences });
+    if (created && typeof created === "object") {
+      setResearchSessions((current) => [created as ResearchSession, ...current.filter((item) => item.id !== (created as ResearchSession).id)].slice(0, 200));
+    }
+  }
+
+  async function loadResearchSession(id: string): Promise<void> {
+    const session = researchSessions.find((item) => item.id === id);
+    if (!session) return;
+    setQuery(session.query);
+    setSelected(() => {
+      const next: Record<string, Set<number>> = {};
+      for (const ref of session.sourceReferences) {
+        next[ref.sourceId] = new Set([...(next[ref.sourceId] ?? []), ref.pageNumber]);
+      }
+      return next;
+    });
+  }
 
   async function addSources(): Promise<void> {
     if (!knowledgeDb) return;
@@ -293,7 +345,7 @@ export function KnowledgeDbWorkspace({ open, onClose, onOpenAi, t }: Props) {
   background: transparent;
 }
 
-.knowledge-db-toolbar select {
+.knowledge-db-session-select {\n  display: inline-flex;\n  align-items: center;\n  gap: 5px;\n}\n\n.knowledge-db-toolbar select {
   min-height: 34px;
   padding: 5px 9px;
   border: 1px solid rgb(100 116 139 / 0.28);
@@ -500,6 +552,7 @@ export function KnowledgeDbWorkspace({ open, onClose, onOpenAi, t }: Props) {
           <div className="knowledge-db-title"><Database size={20} /><strong>{t("appMenu.knowledgeDb.title")}</strong></div>
           <div className="knowledge-db-actions">
             <button type="button" onClick={() => void extractPdf()} disabled={selectedPages.length === 0}><Download size={16} />{t("appMenu.knowledgeDb.extractPdf")}</button>
+            <button type="button" onClick={() => void saveResearchSession()} disabled={!researchApi}><BookmarkPlus size={16} />研究を保存</button>
             <button type="button" onClick={() => void handoffAi()}><MessageSquare size={16} />{t("appMenu.knowledgeDb.handoffAi")}</button>
             <button type="button" className="knowledge-db-close" onClick={onClose} aria-label={t("appMenu.knowledgeDb.close")}><X size={18} /></button>
           </div>
@@ -512,6 +565,13 @@ export function KnowledgeDbWorkspace({ open, onClose, onOpenAi, t }: Props) {
             {TYPES.map((type) => <option key={type} value={type}>{semanticTypeLabel(t, type)}</option>)}
           </select>
           <span>{t("appMenu.knowledgeDb.resultCount", { count: visible.length })}</span>
+          <label className="knowledge-db-session-select" title="Research Session">
+            <History size={15} />
+            <select defaultValue="" onChange={(event) => void loadResearchSession(event.target.value)}>
+              <option value="">Research Session</option>
+              {researchSessions.map((session) => <option key={session.id} value={session.id}>{session.title}</option>)}
+            </select>
+          </label>
         </div>
         <div className="knowledge-db-content">
           <div className="knowledge-db-results">
