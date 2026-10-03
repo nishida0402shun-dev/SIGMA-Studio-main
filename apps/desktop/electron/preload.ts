@@ -354,6 +354,12 @@ const desktopAPI = {
     startIndexing(): Promise<unknown> {
       return ipcRenderer.invoke("knowledge-db:index-start");
     },
+    getAnalysisStatus(): Promise<unknown> {
+      return ipcRenderer.invoke("knowledge-db:analysis-status");
+    },
+    reanalyze(sourceIds?: string[]): Promise<unknown> {
+      return ipcRenderer.invoke("knowledge-db:reanalyze", sourceIds ? { sourceIds } : {});
+    },
     search(payload: { query: string; limit?: number }): Promise<unknown[]> {
       return ipcRenderer.invoke("knowledge-db:search", payload);
     },
