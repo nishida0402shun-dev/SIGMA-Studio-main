@@ -93,7 +93,7 @@ describe("Web AI bridge", () => {
     expect((await documents.json()).documents).toEqual([]);
 
     const tools = await fetch(`${base}/v1/mcp/tools`, { headers });
-    expect(tools.status).toBe(409);
+    expect(tools.status).toBe(200);
     const call = await fetch(`${base}/v1/mcp/call`, {
       method: "POST",
       headers: { ...headers, "Content-Type": "application/json" },
