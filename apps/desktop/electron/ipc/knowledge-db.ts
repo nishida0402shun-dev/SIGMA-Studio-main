@@ -68,7 +68,7 @@ export function registerKnowledgeDbIpc(deps: RegisterKnowledgeDbIpcDeps): void {
     return store.getStructureParserStatus();
   });
 
-  ipcMain.handle("knowledge-db:list", async (event, payload: unknown) => {
+  ipcMain.handle("knowledge-db:list", async (event) => {
     if (event.sender !== getMainWindow()?.webContents) return [];
     return store.listSources();
   });
