@@ -3096,6 +3096,36 @@ registerTool(
 );
 
 registerTool(
+  "knowledge_db_route_query",
+  {
+    title: "Knowledge DB検索要否を判定",
+    description: "質問内容から、共有Knowledge DBを参照すべきかを決定するための決定論的ルーターです。資料・ページ・定義・公式事項・過去教材の参照要求や、教科内容の根拠確認を優先して検索を提案します。Workspaceには依存しません。",
+    inputSchema: {
+      query: z.string().min(1).max(2000),
+    },
+  },
+  async ({ query }) => withToolErrorHandling(async () => {
+    const normalized = query.normalize("NFKC").toLocaleLowerCase();
+    const explicit = /(?:資料|教材|このPDF|この本|ページ|p\\.?\\s*\\d+|knowledge ?db|根拠|出典|引用|上記|前述|定義|定理|例題|解答|教科書|参考書|本文|図|表|formula|theorem|definition|source|citation)/u.test(normalized);
+    const subjectMatter = /(?:数学|数式|英語|英文法|国語|古文|漢文|物理|化学|生物|地理|日本史|世界史|公民|政治|経済|倫理|確率|微分|積分|三角関数|ベクトル|力学|電磁気|有機|無機|遺伝|読解)/u.test(normalized);
+    const factualQuestion = /(?:何|なぜ|どう|求め|説明|証明|計算|解いて|違い|意味|とは|どれ|when|why|how|what|prove|solve|define)/u.test(normalized);
+    const shouldSearch = explicit || (subjectMatter && factualQuestion);
+    const reason = explicit
+      ? "資料・出典・ページ・既存教材などKnowledge DB固有の参照要求を検出しました。"
+      : shouldSearch
+        ? "教科内容の具体的な質問を検出しました。共有教材を根拠候補として検索できます。"
+        : "Knowledge DB固有の参照要求や教科内容の具体的質問を検出しませんでした。";
+    return {
+      ok: true,
+      shouldSearch,
+      reason,
+      suggestedQuery: query.trim(),
+      nextTool: shouldSearch ? "knowledge_db_get_context" : null,
+    };
+  }),
+);
+
+registerTool(
   "knowledge_db_get_context",
   {
     title: "Knowledge DBからAI Contextを取得",
