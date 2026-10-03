@@ -3126,6 +3126,40 @@ registerTool(
 );
 
 registerTool(
+  "knowledge_db_list_classification_reviews",
+  {
+    title: "Knowledge DB分類ダブルチェック対象一覧",
+    description: "SIGMAの自動分類でAIダブルチェックが必要なページ一覧を取得します。confidenceが低いページや複数単元にまたがるページが対象です。Web AIは一覧から順にreview contextを取得し、内容だけを根拠に再判定できます。",
+    inputSchema: {
+      status: z.enum(["pending", "needs-review", "all"]).optional(),
+      limit: z.number().int().min(1).max(100).optional(),
+    },
+  },
+  async ({ status, limit }) => withToolErrorHandling(async () => {
+    const sources = await new KnowledgeDbStore(storeContext.dataDir).listSources();
+    const reviews = sources.flatMap((source) => source.pages
+      .filter((page) => {
+        const current = page.classificationReviewStatus;
+        return status === "all"
+          ? Boolean(current)
+          : status
+            ? current === status
+            : current === "pending" || current === "needs-review";
+      })
+      .map((page) => ({
+        sourceId: source.id,
+        pageNumber: page.pageNumber,
+        status: page.classificationReviewStatus,
+        taxonomyPaths: page.taxonomyPaths ?? [],
+        taxonomyConfidence: page.taxonomyConfidence ?? 0,
+        reviewPaths: page.classificationReviewPaths ?? [],
+        reviewConfidence: page.classificationReviewConfidence,
+      })));
+    return { ok: true, reviews: reviews.slice(0, limit ?? 100), total: reviews.length };
+  }),
+);
+
+registerTool(
   "knowledge_db_get_classification_review_context",
   {
     title: "Knowledge DB分類のAIダブルチェック用Context",
