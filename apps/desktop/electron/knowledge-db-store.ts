@@ -15,6 +15,8 @@ export interface KnowledgePage {
   semanticType: KnowledgeSemanticType;
   title?: string;
   text?: string;
+  extractionStatus?: "text" | "ocr-needed" | "empty";
+  wordCount?: number;
 }
 
 export interface KnowledgeSource {
@@ -29,6 +31,9 @@ export interface KnowledgeSource {
   updatedAt: string;
   contentHash?: string;
   pages: KnowledgePage[];
+  extractionStatus?: "complete" | "partial" | "ocr-needed";
+  indexedAt?: string;
+  indexError?: string;
 }
 
 interface KnowledgeLibrary {
@@ -43,15 +48,42 @@ export interface KnowledgeRegion {
   height: number;
 }
 
+export interface KnowledgeIndexStatus {
+  state: "idle" | "running" | "completed" | "failed";
+  total: number;
+  completed: number;
+  currentSourceId?: string;
+  error?: string;
+  startedAt?: string;
+  finishedAt?: string;
+}
+
 export class KnowledgeDbStore {
   private readonly dataDir: string;
+  private indexPromise: Promise<void> | null = null;
+  private indexStatus: KnowledgeIndexStatus = { state: "idle", total: 0, completed: 0 };
 
   constructor(dataDir: string) {
     this.dataDir = dataDir;
   }
 
   async listSources(): Promise<KnowledgeSource[]> {
-    return this.ensureIndexed();
+    const library = await this.readLibrary();
+    return library.sources;
+  }
+
+  getIndexStatus(): KnowledgeIndexStatus {
+    return { ...this.indexStatus };
+  }
+
+  startBackgroundIndexing(): KnowledgeIndexStatus {
+    if (!this.indexPromise) {
+      this.indexPromise = this.ensureIndexed()
+        .then(() => { this.indexStatus = { ...this.indexStatus, state: "completed", finishedAt: new Date().toISOString() }; })
+        .catch((error) => { this.indexStatus = { ...this.indexStatus, state: "failed", error: error instanceof Error ? error.message : String(error), finishedAt: new Date().toISOString() }; })
+        .finally(() => { this.indexPromise = null; });
+    }
+    return this.getIndexStatus();
   }
 
   async addFiles(filePaths: string[]): Promise<KnowledgeSource[]> {
@@ -85,12 +117,15 @@ export class KnowledgeDbStore {
         importedAt: now,
         updatedAt: now,
         contentHash,
+        extractionStatus: pageTexts.every(Boolean) ? "complete" : "ocr-needed",
         pages: Array.from({ length: pageCount }, (_, index) => ({
           id: `${id}_p${index + 1}`,
           sourceId: id,
           pageNumber: index + 1,
           semanticType: "unknown",
           text: pageTexts[index] || undefined,
+          extractionStatus: pageTexts[index] ? "text" : "ocr-needed",
+          wordCount: pageTexts[index] ? countWords(pageTexts[index]) : 0,
         })),
       };
 
@@ -296,22 +331,37 @@ export class KnowledgeDbStore {
 
   private async ensureIndexed(): Promise<KnowledgeSource[]> {
     const library = await this.readLibrary();
+    const pending = library.sources.filter((source) => source.pages.some((page) => page.text === undefined) || source.pages.some((page) => page.extractionStatus === "ocr-needed") || !(await this.vectorIndex().hasSource(source.id)));
+    this.indexStatus = { state: pending.length ? "running" : "completed", total: pending.length, completed: 0, startedAt: pending.length ? new Date().toISOString() : this.indexStatus.startedAt };
     let changed = false;
     for (const source of library.sources) {
       const needsText = source.pages.some((page) => page.text === undefined);
       const needsIndex = !(await this.vectorIndex().hasSource(source.id));
-      if (!needsText && !needsIndex) continue;
+      if (!needsText && !needsIndex) { continue; }
+      this.indexStatus = { ...this.indexStatus, currentSourceId: source.id };
       try {
         if (needsText) {
           const bytes = await fs.readFile(source.storedPath);
           const pageTexts = await extractPdfPageTexts(bytes, source.pageCount);
-          source.pages = source.pages.map((page, index) => ({ ...page, text: pageTexts[index] || undefined }));
+          source.pages = source.pages.map((page, index) => ({
+            ...page,
+            text: pageTexts[index] || undefined,
+            extractionStatus: pageTexts[index] ? "text" : "ocr-needed",
+            wordCount: pageTexts[index] ? countWords(pageTexts[index]) : 0,
+          }));
+          source.extractionStatus = source.pages.every((page) => page.text) ? "complete" : "ocr-needed";
           source.updatedAt = new Date().toISOString();
           changed = true;
         }
         await this.vectorIndex().removeSource(source.id);
         await this.indexSource(source);
-      } catch {}
+        source.indexedAt = new Date().toISOString();
+        source.indexError = undefined;
+      } catch (error) {
+        source.indexError = error instanceof Error ? error.message : String(error);
+        changed = true;
+      }
+      this.indexStatus = { ...this.indexStatus, completed: this.indexStatus.completed + 1 };
     }
     if (changed) await this.writeLibrary(library);
     return library.sources;
@@ -445,6 +495,10 @@ export interface KnowledgeContextItem {
   score: number;
   text: string;
   citation: string;
+}
+
+function countWords(text: string): number {
+  return text.normalize("NFKC").trim() ? text.normalize("NFKC").trim().split(/\\s+/u).length : 0;
 }
 
 function tokenizeForSearch(text: string): string[] {
