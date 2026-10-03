@@ -357,6 +357,30 @@ async function registerSigmaWebAiTools(): Promise<void> {
   }, { signal: controller.signal });
 
   await modelContext.registerTool({
+    name: "sigma_knowledge_related",
+    description: "Find documents related to a SIGMA Knowledge DB source. Use this to discover comparison candidates across the global library.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        sourceId: { type: "string" },
+        limit: { type: "number" },
+      },
+      required: ["sourceId"],
+    },
+    annotations: { readOnlyHint: true, untrustedContentHint: true },
+    execute: async (input) => callApi("/v1/mcp/call", {
+      method: "POST",
+      body: JSON.stringify({
+        name: "knowledge_db_get_related_sources",
+        arguments: {
+          sourceId: String(input.sourceId),
+          ...(typeof input.limit === "number" ? { limit: input.limit } : {}),
+        },
+      }),
+    }),
+  }, { signal: controller.signal });
+
+  await modelContext.registerTool({
     name: "sigma_run_agent",
     description: "Run Codex, Claude, or Gemini through Sigma Studio's Agent Runtime. The agent can create normal Sigma edit proposals; it cannot execute arbitrary shell commands through this tool.",
     inputSchema: {
