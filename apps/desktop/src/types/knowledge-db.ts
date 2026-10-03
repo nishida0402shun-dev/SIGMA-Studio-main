@@ -26,6 +26,9 @@ export interface KnowledgePage {
   analysisStatus?: KnowledgeAnalysisStatus;
   analysisVersion?: number;
   analysisError?: string;
+  analysisStatus?: KnowledgeAnalysisStatus;
+  analysisVersion?: number;
+  analysisError?: string;
 }
 
 export interface KnowledgeSource {
@@ -62,4 +65,11 @@ export interface KnowledgeDbAiContext {
   text: string;
   citation: string;
   matchReasons?: string[];
+  taxonomyConfidence?: number;
+  analysisStatus?: KnowledgeAnalysisStatus;
+  citationRef?: {
+    sourceId: string;
+    pageId: string;
+    pageNumber: number;
+  };
 }
