@@ -32,7 +32,7 @@ export interface KnowledgeSource {
 }
 
 interface KnowledgeLibrary {
-  version: 2;
+  version: 3;
   sources: KnowledgeSource[];
 }
 
