@@ -712,12 +712,12 @@ function tokenizeForSearch(text: string): string[] {
 async function extractKnowledgeFilePageTexts(fileName: string, bytes: Uint8Array, pageCount: number): Promise<string[]> {
   const extension = path.extname(fileName).toLowerCase();
   if (extension === ".pdf") return extractPdfPageTexts(bytes, pageCount);
-  const textExtensions = new Set([".txt", ".md", ".markdown", ".csv", ".tsv", ".json", ".xml", ".html", ".htm", ".css", ".js", ".jsx", ".ts", ".tsx", ".yml", ".yaml", ".toml", ".ini", ".log", ".sql", ".tex", ".bib", ".svg"]);
+  const textExtensions = new Set([".txt", ".md", ".markdown", ".csv", ".tsv", ".json", ".xml", ".html", ".htm", ".css", ".js", ".jsx", ".ts", ".tsx", ".yml", ".yaml", ".toml", ".ini", ".log", ".sql", ".tex", ".bib", ".svg", ".rst", ".org", ".properties", ".env", ".mjs", ".cjs", ".vue", ".svelte", ".py", ".java", ".c", ".h", ".cpp", ".hpp", ".cs", ".go", ".rs", ".swift", ".kt", ".kts", ".rb", ".php", ".sh", ".bash", ".zsh", ".fish", ".bat", ".cmd", ".ps1", ".graphql", ".gql"]);
   if (textExtensions.has(extension)) {
     const text = new TextDecoder("utf-8", { fatal: false }).decode(bytes).replace(/\\u0000/gu, "").trim();
     return [text];
   }
-  if (extension === ".docx" || extension === ".xlsx" || extension === ".pptx") {
+  if (extension === ".docx" || extension === ".xlsx" || extension === ".pptx" || extension === ".odt" || extension === ".ods" || extension === ".odp" || extension === ".epub") {
     const zip = await JSZip.loadAsync(bytes);
     const names = Object.keys(zip.files).filter((name) => /\\.(?:xml|rels)$/u.test(name));
     const chunks: string[] = [];
@@ -742,7 +742,7 @@ function mimeTypeForExtension(extension: string): string {
   const types: Record<string, string> = {
     ".pdf": "application/pdf", ".txt": "text/plain", ".md": "text/markdown", ".csv": "text/csv", ".json": "application/json",
     ".html": "text/html", ".htm": "text/html", ".xml": "application/xml", ".svg": "image/svg+xml", ".docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-    ".xlsx": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", ".pptx": "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+    ".xlsx": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", ".pptx": "application/vnd.openxmlformats-officedocument.presentationml.presentation", ".odt": "application/vnd.oasis.opendocument.text", ".ods": "application/vnd.oasis.opendocument.spreadsheet", ".odp": "application/vnd.oasis.opendocument.presentation", ".epub": "application/epub+zip",
     ".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".gif": "image/gif", ".webp": "image/webp",
   };
   return types[extension] ?? "application/octet-stream";
