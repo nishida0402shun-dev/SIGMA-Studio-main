@@ -449,7 +449,7 @@ export class KnowledgeDbStore {
         try { bytes = await fs.readFile(legacy.storedPath); } catch { continue; }
         const hash = legacy.contentHash || createHash("sha256").update(bytes).digest("hex");
         if (library.sources.some((source) => source.contentHash === hash)) continue;
-        const id = library.sources.some((source) => source.id === legacy.id) ? "src_" + cryptoRandomId() : legacy.id;
+        const id = library.sources.some((source) => source.id === legacy.id) ? `src_${randomUUID()}` : legacy.id;
         const storedPath = path.join(paths.sourcesDir, id + ".pdf");
         await fs.copyFile(legacy.storedPath, storedPath);
         library.sources.push({
