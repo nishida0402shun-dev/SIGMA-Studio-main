@@ -105,7 +105,7 @@ export class KnowledgeDbStore {
       const storedPath = path.join(paths.sourcesDir, `${id}.pdf`);
       const now = new Date().toISOString();
       const pageCount = pdf.getPageCount();
-      const pageTexts = await extractPdfPageTexts(bytes, pageCount);
+
       const source: KnowledgeSource = {
         id,
         name: path.basename(filePath),
@@ -117,22 +117,20 @@ export class KnowledgeDbStore {
         importedAt: now,
         updatedAt: now,
         contentHash,
-        extractionStatus: pageTexts.every(Boolean) ? "complete" : "ocr-needed",
+        extractionStatus: "ocr-needed",
         pages: Array.from({ length: pageCount }, (_, index) => ({
           id: `${id}_p${index + 1}`,
           sourceId: id,
           pageNumber: index + 1,
           semanticType: "unknown",
-          text: pageTexts[index] || undefined,
-          extractionStatus: pageTexts[index] ? "text" : "ocr-needed",
-          wordCount: pageTexts[index] ? countWords(pageTexts[index]) : 0,
+          extractionStatus: "ocr-needed",
+          wordCount: 0,
         })),
       };
 
       await fs.mkdir(paths.sourcesDir, { recursive: true });
       try {
         await fs.copyFile(filePath, storedPath);
-        await this.indexSource(source);
         library.sources.unshift(source);
         await this.writeLibrary(library);
         added.push(source);
@@ -142,6 +140,7 @@ export class KnowledgeDbStore {
         throw error;
       }
     }
+    this.startBackgroundIndexing();
     return added;
   }
 
