@@ -71,40 +71,6 @@ interface TaxonomyTreeNode {
   pages: Array<{ source: KnowledgeSource; page: KnowledgeSource["pages"][number] }>;
 }
 
-function buildTaxonomyTree(sources: KnowledgeSource[]): TaxonomyTreeNode[] {
-  const roots = new Map<string, TaxonomyTreeNode>();
-  for (const source of sources) {
-    for (const page of source.pages) {
-      const paths = page.taxonomyPaths ?? [];
-      for (const path of paths) {
-        if (path.length === 0) continue;
-        let level = roots;
-        let parentPath: string[] = [];
-        for (const name of path) {
-          const key = [...parentPath, name].join("\\u001f");
-          let node = level.get(key);
-          if (!node) {
-            node = { key, name, path: [...parentPath, name], children: [], pages: [] };
-            level.set(key, node);
-          }
-          if (!node.pages.some((item) => item.source.id === source.id && item.page.id === page.id)) {
-            node.pages.push({ source, page });
-          }
-          parentPath = [...parentPath, name];
-          if (!node.children.some((child) => child.name === path[parentPath.length])) {
-            // Child nodes are created by the next path segment.
-          }
-          const childMap = new Map(node.children.map((child) => [child.key, child]));
-          level = childMap;
-          // Keep the node's child map synchronized by rebuilding from the map on demand below.
-          node.children = [...childMap.values()];
-        }
-      }
-    }
-  }
-  return [...roots.values()];
-}
-
 function buildTaxonomyTreeStable(sources: KnowledgeSource[]): TaxonomyTreeNode[] {
   const roots: TaxonomyTreeNode[] = [];
   const ensure = (siblings: TaxonomyTreeNode[], name: string, path: string[]): TaxonomyTreeNode => {
