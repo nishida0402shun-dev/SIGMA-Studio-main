@@ -326,6 +326,21 @@ const desktopAPI = {
     },
   },
 
+  researchSessions: {
+    list(): Promise<unknown[]> {
+      return ipcRenderer.invoke("research-session:list");
+    },
+    create(payload: { title?: string; query: string; sourceReferences?: unknown[] }): Promise<unknown> {
+      return ipcRenderer.invoke("research-session:create", payload);
+    },
+    update(payload: { id: string; title?: string; query?: string; sourceReferences?: unknown[] }): Promise<unknown> {
+      return ipcRenderer.invoke("research-session:update", payload);
+    },
+    delete(payload: { id: string }): Promise<{ ok: boolean }> {
+      return ipcRenderer.invoke("research-session:delete", payload);
+    },
+  },
+
   knowledgeDb: {
     chooseSources(): Promise<{ paths: string[] } | null> {
       return ipcRenderer.invoke("knowledge-db:choose-sources");
