@@ -53,7 +53,7 @@ import paddlex
 
 deps_all = list(paddlex.utils.deps.BASE_DEP_SPECS.keys())
 deps_need = [dist.metadata["Name"] for dist in importlib.metadata.distributions() if dist.metadata["Name"] in deps_all]
-cmd = ["pyinstaller", sys.argv[1], "--collect-data", "paddlex", "--collect-binaries", "paddle"]
+cmd = ["pyinstaller", "--noconfirm", "--clean", "--onedir", "--name", "sigma-ocr", sys.argv[1], "--collect-data", "paddlex", "--collect-binaries", "paddle"]
 for dep in deps_need:
     cmd += ["--copy-metadata", dep]
 print("PyInstaller command:", " ".join(cmd))
