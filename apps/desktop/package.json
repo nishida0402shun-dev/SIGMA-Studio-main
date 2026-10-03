@@ -20,6 +20,7 @@
     "csp:smoke": "electron scripts/electron-csp-smoke.mjs out",
     "typecheck": "tsc --noEmit",
     "mcp:sigma-doc": "node scripts/run-sigma-doc-mcp.mjs",
+    "ocr:runtime:build": "node scripts/build-paddleocr-runtime.mjs",
     "electron:build": "node scripts/build-electron.mjs",
     "icons:generate": "node scripts/generate-app-icons.mjs",
     "electron:brand-dev": "node scripts/brand-dev-electron.mjs",
