@@ -31,6 +31,11 @@ export interface KnowledgePage {
   taxonomyPaths?: string[][];
   taxonomyConfidence?: number;
   taxonomyVersion?: number;
+  classificationReviewStatus?: "pending" | "confirmed" | "needs-review";
+  classificationReviewPaths?: string[][];
+  classificationReviewConfidence?: number;
+  classificationReviewReason?: string;
+  classificationReviewEvidence?: string[];
 }
 
 interface KnowledgeSearchResult extends VectorSearchResult {
@@ -346,6 +351,37 @@ export class KnowledgeDbStore {
     const page = source.pages.find((item) => item.pageNumber === pageNumber);
     if (!page) throw new Error("knowledge page not found");
     return { source, page };
+  }
+
+  async applyClassificationReview(input: {
+    sourceId: string;
+    pageNumber: number;
+    paths: string[][];
+    confidence: number;
+    reason?: string;
+    evidence?: string[];
+  }): Promise<{ status: "confirmed" | "needs-review"; page: KnowledgePage }> {
+    const library = await this.readLibrary();
+    const source = library.sources.find((item) => item.id === input.sourceId);
+    if (!source) throw new Error("knowledge source not found");
+    const page = source.pages.find((item) => item.pageNumber === input.pageNumber);
+    if (!page) throw new Error("knowledge page not found");
+
+    const normalizePath = (value: string[]) => value.map((part) => part.normalize("NFKC").trim()).filter(Boolean);
+    const reviewed = input.paths.map(normalizePath).filter((path) => path.length > 0);
+    const local = (page.taxonomyPaths ?? []).map(normalizePath);
+    const samePath = (a: string[], b: string[]) => a.length === b.length && a.every((part, index) => part === b[index]);
+    const matchesLocal = reviewed.length > 0 && reviewed.every((candidate) => local.some((existing) => samePath(candidate, existing)));
+    const status = matchesLocal ? "confirmed" : "needs-review";
+
+    page.classificationReviewStatus = status;
+    page.classificationReviewPaths = reviewed;
+    page.classificationReviewConfidence = Math.max(0, Math.min(1, input.confidence));
+    page.classificationReviewReason = input.reason?.trim() || undefined;
+    page.classificationReviewEvidence = input.evidence?.map((item) => item.trim()).filter(Boolean).slice(0, 8);
+    source.updatedAt = new Date().toISOString();
+    await this.writeLibrary(library);
+    return { status, page };
   }
 
   async deleteSource(sourceId: string): Promise<boolean> {
