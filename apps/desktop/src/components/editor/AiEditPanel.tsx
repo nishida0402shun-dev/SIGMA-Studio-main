@@ -3562,7 +3562,6 @@ export function AssistantTurnView({
   appliedChange,
   onRevertAppliedChange,
   onOpenSourceDocument,
-  documentWorkspaceId,
   restorable,
   onRestoreProposal,
   proposal,
