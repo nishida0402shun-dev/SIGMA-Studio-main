@@ -134,8 +134,11 @@ export class KnowledgeDbStore {
       .map((match) => ({ ...match, sourceName: sourceNames.get(match.sourceId) ?? match.sourceId }));
   }
 
-  async getContext(query: string, limit = 8): Promise<KnowledgeContextItem[]> {
-    const results = await this.search(query, limit);
+  async getContext(query: string, limit = 8, sourceIds?: string[]): Promise<KnowledgeContextItem[]> {
+    const allowed = sourceIds?.length ? new Set(sourceIds) : null;
+    const results = (await this.search(query, Math.min(50, Math.max(limit * 3, limit))))
+      .filter((result) => !allowed || allowed.has(result.sourceId))
+      .slice(0, Math.max(1, Math.min(limit, 20)));
     const items: KnowledgeContextItem[] = [];
     for (const result of results) {
       const { source, page } = await this.getPage(result.sourceId, result.pageNumber);
@@ -154,6 +157,31 @@ export class KnowledgeDbStore {
       });
     }
     return items;
+  }
+
+  async getRelatedSources(sourceId: string, limit = 6): Promise<Array<{ sourceId: string; sourceName: string; score: number; pageNumber: number }>> {
+    const source = await this.findSource(sourceId);
+    const query = source.pages
+      .map((page) => page.text?.trim())
+      .filter((text): text is string => Boolean(text))
+      .slice(0, 3)
+      .join(" ")
+      .slice(0, 4000);
+    if (!query) return [];
+    const matches = await this.search(query, Math.min(50, Math.max(limit * 4, limit)));
+    const seen = new Set<string>();
+    return matches
+      .filter((match) => match.sourceId !== sourceId && !seen.has(match.sourceId))
+      .map((match) => {
+        seen.add(match.sourceId);
+        return {
+          sourceId: match.sourceId,
+          sourceName: match.sourceName,
+          score: match.score,
+          pageNumber: match.pageNumber,
+        };
+      })
+      .slice(0, Math.max(1, Math.min(limit, 20)));
   }
 
   async getPage(sourceId: string, pageNumber: number): Promise<{ source: KnowledgeSource; page: KnowledgePage }> {
