@@ -870,7 +870,7 @@ export function KnowledgeDbWorkspace({ open, onClose, onOpenAi, t }: Props) {
                   <FileText size={18} />
                   <span className="knowledge-db-item-main">
                     <strong>{source.name}</strong>
-                    <span>{t("appMenu.knowledgeDb.page", { page: page.pageNumber })} · {semanticTypeLabel(t, page.semanticType)}{score !== undefined ? ` · ${score.toFixed(2)}` : ""}</span>
+                    <span>{t("appMenu.knowledgeDb.page", { page: page.pageNumber })} · {semanticTypeLabel(t, page.semanticType)}{score !== undefined ? ` · ${score.toFixed(2)}` : ""}{page.classificationReviewStatus === "confirmed" ? " · AI確認済み" : page.classificationReviewStatus === "needs-review" ? " · AI要確認" : ""}</span>
                   </span>
                 </label>
               );
@@ -915,6 +915,18 @@ export function KnowledgeDbWorkspace({ open, onClose, onOpenAi, t }: Props) {
                 <button type="button" className="knowledge-db-detail-button" onClick={() => void openSelectedPage()}>
                   <ExternalLink size={15} />選択ページを開く
                 </button>
+                {(() => {
+                  const page = selectedSource?.pages.find((item) => item.pageNumber === selectedPages[0]!.pageNumber);
+                  if (!page?.classificationReviewStatus) return null;
+                  return (
+                    <div className="knowledge-db-region-status">
+                      {page.classificationReviewStatus === "confirmed"
+                        ? "AI分類ダブルチェック: 一致・確定"
+                        : "AI分類ダブルチェック: SIGMA分類と不一致（要確認）"}
+                      {page.classificationReviewConfidence !== undefined ? ` · 信頼度 ${Math.round(page.classificationReviewConfidence * 100)}%` : ""}
+                    </div>
+                  );
+                })()}
                 <label className="knowledge-db-type-editor">
                   <span>ページ分類</span>
                   <select
