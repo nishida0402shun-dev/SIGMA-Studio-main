@@ -62,6 +62,8 @@ import { registerAiResourcesIpc } from "./ipc/ai-resources";
 import { registerFileIpc } from "./ipc/file";
 import { KnowledgeDbStore } from "./knowledge-db-store";
 import { registerKnowledgeDbIpc } from "./ipc/knowledge-db";
+import { ResearchSessionStore } from "./research-session-store";
+import { registerResearchSessionIpc } from "./ipc/research-session";
 import { documentPathsFromArgv, ExternalDocumentOpenQueue } from "./external-document-open";
 import { registerMaterialsIpc } from "./ipc/materials";
 import { registerStorageIpc } from "./ipc/storage";
@@ -186,6 +188,7 @@ const localAiEditChatRoomStore = new LocalAiEditChatRoomStore(USER_DATA_PATH);
 const localAiResourceStore = new LocalAiResourceStore(USER_DATA_PATH);
 const SIGMA_STUDIO_DATA_PATH = path.join(USER_DATA_PATH, "data");
 const knowledgeDbStore = new KnowledgeDbStore(SIGMA_STUDIO_DATA_PATH);
+const researchSessionStore = new ResearchSessionStore(SIGMA_STUDIO_DATA_PATH);
 const appUpdateController = new AppUpdateController({ releaseUrl: RELEASE_PAGE_URL });
 const desktopSettings = readDesktopSettingsSync(SIGMA_STUDIO_DATA_PATH);
 /**
@@ -1615,6 +1618,11 @@ function registerIpc() {
   registerKnowledgeDbIpc({
     getMainWindow: () => mainWindow,
     store: knowledgeDbStore,
+  });
+
+  registerResearchSessionIpc({
+    getMainWindow: () => mainWindow,
+    store: researchSessionStore,
   });
 
   registerMaterialsIpc({
