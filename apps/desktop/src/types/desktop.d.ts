@@ -877,6 +877,8 @@ export interface DesktopKnowledgeDbAPI {
   chooseSources(): Promise<{ paths: string[] } | null>;
   list(): Promise<unknown[]>;
   getIndexStatus(): Promise<unknown>;
+  getAnalysisStatus(): Promise<unknown>;
+  reanalyze(sourceIds?: string[]): Promise<unknown>;
   getStructureParserStatus(): Promise<unknown>;
   startIndexing(): Promise<unknown>;
   search(payload: { query: string; limit?: number }): Promise<unknown[]>;
