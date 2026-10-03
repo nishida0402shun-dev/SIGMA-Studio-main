@@ -60,7 +60,15 @@ MCPからの書き込み系ツールは、既定では教材ファイルを直�
 - `get_block` - 指定ブロックを読みます。
 - `get_blocks` - 複数ブロックを最大10件までIDでまとめて読みます。既定では `{id, type, text}` の軽量ビューのみを返し、`includeFull: true` を指定した場合のみ各ブロックの完全なJSONも含めます。
 - `search_document` - 本文テキスト、TeX、表セル、overlayテキスト図形を横断してクエリ文字列を検索します。`get_document_outline` より対象を絞り込みたい時に使います。
-- `search_library` - 今開いている教材だけでなく、ユーザーの過去教材ライブラリ全体から類似の問題・記述を検索します。`query`(必須)、`scope`(`"all"` 既定 / `"problems"`)、`limit`(既定8、上限20)、`excludeFileId`(結果から除外するfileId。通常は現在編集中の教材)を受け取ります。`scope: "problems"` にすると問題ブロック単位でヒットし、prompt本文とtagsを含む詳しい抜粋を返すため、類題を探す用途に向きます。
+- `search_library` - 今開いている教材だけでなく、ユーザーの過去教材ライブラリ全体から類似の問題・記述を検索します。
+- `knowledge_db_get_analysis_status` - グローバルKnowledge DBの解析・分類状態を取得します。
+- `knowledge_db_reanalyze` - グローバルKnowledge DBの解析を再実行します。
+- `knowledge_db_list_classification_reviews` - AI分類の確認待ちページ一覧を取得します。
+- `knowledge_db_get_classification_review_context` - 分類確認に必要な本文・OCR・構造情報を取得します。
+- `knowledge_db_submit_classification_review` - AI分類の確認結果を承認ゲート経由で反映します。
+- `knowledge_db_get_context` - グローバルKnowledge DBからAI用コンテキストを取得します。
+- `knowledge_db_get_related_sources` - 関連するKnowledge DBソースを取得します。
+- `knowledge_db_route_query` - クエリをKnowledge DB検索経路へ振り分けます。`query`(必須)、`scope`(`"all"` 既定 / `"problems"`)、`limit`(既定8、上限20)、`excludeFileId`(結果から除外するfileId。通常は現在編集中の教材)を受け取ります。`scope: "problems"` にすると問題ブロック単位でヒットし、prompt本文とtagsを含む詳しい抜粋を返すため、類題を探す用途に向きます。
 - `validate_local_document` - SigmaDoc と MathLive TeX を検証します。
 - `list_edit_proposals` - 現在のrun/チャットに帰属するMCP編集提案の軽量な一覧を返します。`draft`、変更後教材全体、内部proposal IDは含みません。
 - `get_edit_proposal` - `fileId`/`runId`から現在の作業案を読みます。既定の `detail:"summary"` は要約のみ、`detail:"full"` は再適用可能な `draft` を含みますが、内部の教材スナップショットとproposal IDは返しません。
