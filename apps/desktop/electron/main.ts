@@ -1768,7 +1768,7 @@ async function startWebAiBridgeServer(): Promise<void> {
         : serializedArguments;
       if (!owner) return false;
       const confirmationMessage = [
-        `Web AI が ${level} を要求しています。`,
+        `Web AI requested a ${permissionClass} operation.`,
         "",
         `Tool: ${toolName}`,
         "",
