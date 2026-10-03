@@ -885,21 +885,29 @@ export function KnowledgeDbWorkspace({ open, onClose, onOpenAi, t }: Props) {
             <span>{t("appMenu.knowledgeDb.selectedPages", { count: selectedPages.length })}</span>
             {selectedPages.length > 0 && (
               <>
-                <div
-                  className="knowledge-db-page-preview"
-                  onContextMenu={(event) => {
-                    event.preventDefault();
-                    setContextMenu({ x: event.clientX, y: event.clientY });
-                  }}
-                >
-                  <KnowledgePdfPageViewer
-                    sourceId={selectedPages[0]!.sourceId}
-                    pageNumber={selectedPages[0]!.pageNumber}
-                    getPagePdf={(payload) => knowledgeDb?.getPagePdf(payload) ?? Promise.resolve(null)}
-                    onRegionSelected={(nextRegion) => setRegion(nextRegion)}
-                  />
-                </div>
-                {region && <span className="knowledge-db-region-status">範囲選択済み · {Math.round(region.width)} × {Math.round(region.height)}</span>}
+                {(() => {
+                  const selectedSource = sources.find((source) => source.id === selectedPages[0]!.sourceId);
+                  if (selectedSource?.mimeType === "application/pdf") {
+                    return <>
+                      <div
+                        className="knowledge-db-page-preview"
+                        onContextMenu={(event) => {
+                          event.preventDefault();
+                          setContextMenu({ x: event.clientX, y: event.clientY });
+                        }}
+                      >
+                        <KnowledgePdfPageViewer
+                          sourceId={selectedPages[0]!.sourceId}
+                          pageNumber={selectedPages[0]!.pageNumber}
+                          getPagePdf={(payload) => knowledgeDb?.getPagePdf(payload) ?? Promise.resolve(null)}
+                          onRegionSelected={(nextRegion) => setRegion(nextRegion)}
+                        />
+                      </div>
+                      {region && <span className="knowledge-db-region-status">範囲選択済み · {Math.round(region.width)} × {Math.round(region.height)}</span>}
+                    </>;
+                  }
+                  return <div className="knowledge-db-page-preview">テキスト解析済み: {selectedSource?.name ?? "ファイル"}</div>;
+                })()}
                 <button type="button" className="knowledge-db-detail-button" onClick={() => void openSelectedPage()}>
                   <ExternalLink size={15} />選択ページを開く
                 </button>
