@@ -2,7 +2,9 @@ import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
 import type { CallToolResult, Tool } from "@modelcontextprotocol/sdk/types.js";
 
-const KNOWLEDGE_DB_TOOLS = new Set(["knowledge_db_list_sources","knowledge_db_search","knowledge_db_get_context","knowledge_db_get_page","knowledge_db_get_region","knowledge_db_get_related_sources"]);\n\nconst READ_ONLY_TOOLS = new Set([
+const KNOWLEDGE_DB_TOOLS = new Set(["knowledge_db_list_sources","knowledge_db_search","knowledge_db_get_context","knowledge_db_get_page","knowledge_db_get_region","knowledge_db_get_related_sources"]);
+
+const READ_ONLY_TOOLS = new Set([
   "get_local_app_status","list_edit_proposals","get_edit_proposal","list_all_pending_proposals","list_local_documents",
   "read_local_document","get_edit_context","get_document_outline","get_block","get_blocks","search_document","search_library",
   "validate_local_document","list_materials","get_material","render_block_context","render_page","get_selected_block",
