@@ -26,9 +26,6 @@ export interface KnowledgePage {
   analysisStatus?: KnowledgeAnalysisStatus;
   analysisVersion?: number;
   analysisError?: string;
-  analysisStatus?: KnowledgeAnalysisStatus;
-  analysisVersion?: number;
-  analysisError?: string;
 }
 
 export interface KnowledgeSource {
@@ -51,8 +48,21 @@ export interface KnowledgeSearchResult {
   chunkIndex: number;
   text: string;
   score: number;
+  semanticType?: KnowledgeSemanticType;
+  title?: string;
+  keywords?: string[];
+  analysisSignals?: string[];
+  taxonomyPaths?: string[][];
+  matchReasons?: string[];
+  citationRegions?: KnowledgeCitationRegion[];
 }
 
+export interface KnowledgeCitationRegion {
+  type: "text" | "title" | "table" | "figure" | "formula" | "caption" | "unknown";
+  text: string;
+  bbox?: [number, number, number, number];
+  confidence?: number;
+}
 
 export interface KnowledgeDbAiContext {
   sourceId: string;
@@ -67,6 +77,7 @@ export interface KnowledgeDbAiContext {
   matchReasons?: string[];
   taxonomyConfidence?: number;
   analysisStatus?: KnowledgeAnalysisStatus;
+  citationRegions?: KnowledgeCitationRegion[];
   citationRef?: {
     sourceId: string;
     pageId: string;
