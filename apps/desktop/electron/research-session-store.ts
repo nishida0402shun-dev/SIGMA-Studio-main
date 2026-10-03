@@ -1,4 +1,5 @@
 import fs from "node:fs/promises";
+import { randomUUID } from "node:crypto";
 import path from "node:path";
 
 export interface ResearchSourceReference {
@@ -34,7 +35,7 @@ export class ResearchSessionStore {
     const library = await this.read();
     const now = new Date().toISOString();
     const session: ResearchSession = {
-      id: `research_${crypto.randomUUID()}`,
+      id: `research_${randomUUID()}`,
       title: input.title?.trim() || input.query.trim().slice(0, 80) || "Research",
       query: input.query.trim(),
       sourceReferences: dedupeReferences(input.sourceReferences ?? []),
