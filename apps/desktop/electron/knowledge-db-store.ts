@@ -179,7 +179,11 @@ export class KnowledgeDbStore {
         const lexical = lexicalScore(match.text, queryTokens);
         const page = pages.get(`${match.sourceId}:${match.pageNumber}`);
         const metadata = page ? metadataScore(page, trimmed, queryTokens) : 0;
-        return { ...match, score: match.score * 0.65 + lexical * 0.20 + metadata * 0.15 };
+        return {
+          ...match,
+          score: match.score * 0.65 + lexical * 0.20 + metadata * 0.15,
+          ...(page ? { semanticType: page.semanticType, title: page.title, keywords: page.keywords, analysisSignals: page.analysisSignals } : {}),
+        };
       })
       .sort((a, b) => b.score - a.score)
       .slice(0, safeLimit)
@@ -359,7 +363,9 @@ export class KnowledgeDbStore {
     const pending: KnowledgeSource[] = [];
     for (const source of library.sources) {
       const indexed = await this.vectorIndex().hasSource(source.id);
-      if (source.pages.some((page) => page.text === undefined) || source.pages.some((page) => page.extractionStatus === "ocr-needed") || !indexed) {
+      const needsText = source.pages.some((page) => page.text === undefined);
+      const needsAnalysis = source.pages.some((page) => Boolean(page.text) && (!page.keywords || page.keywords.length === 0 || !page.analysisSignals));
+      if (needsText || needsAnalysis || source.pages.some((page) => page.extractionStatus === "ocr-needed") || !indexed) {
         pending.push(source);
       }
     }
@@ -367,13 +373,14 @@ export class KnowledgeDbStore {
     let changed = false;
     for (const source of library.sources) {
       const needsText = source.pages.some((page) => page.text === undefined);
+      const needsAnalysis = source.pages.some((page) => Boolean(page.text) && (!page.keywords || page.keywords.length === 0 || !page.analysisSignals));
       const needsIndex = !(await this.vectorIndex().hasSource(source.id));
-      if (!needsText && !needsIndex) { continue; }
+      if (!needsText && !needsAnalysis && !needsIndex) { continue; }
       this.indexStatus = { ...this.indexStatus, currentSourceId: source.id };
       try {
-        if (needsText) {
+        if (needsText || needsAnalysis) {
           const bytes = await fs.readFile(source.storedPath);
-          const pageTexts = await extractPdfPageTexts(bytes, source.pageCount);
+          const pageTexts = needsText ? await extractPdfPageTexts(bytes, source.pageCount) : source.pages.map((page) => page.text ?? "");
           let structureResults: Awaited<ReturnType<KnowledgeStructureParser["parsePdf"]>> = [];
           if (pageTexts.some((text) => !text.trim())) {
             const parserStatus = await this.getStructureParserStatus();
