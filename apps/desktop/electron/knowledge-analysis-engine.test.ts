@@ -40,6 +40,8 @@ describe("analyzeKnowledgePage", () => {
   it("returns a specific mathematics taxonomy path", () => {
     const matches = classifyKnowledgeTaxonomy("数学Ⅱ 三角関数の加法定理と方程式");
     expect(matches[0]?.path).toEqual(["数学", "数学Ⅱ", "三角関数"]);
+    expect(matches[0]?.nodeId).toBe("math-ii-trigonometry");
+    expect(matches[0]?.confidence).toBeGreaterThan(0);
   });
 
   it("returns cross-branch matches for shared concepts", () => {
