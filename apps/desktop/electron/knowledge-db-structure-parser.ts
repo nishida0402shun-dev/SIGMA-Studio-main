@@ -39,7 +39,7 @@ pipeline = PPStructureV3(
     use_doc_unwarping=False,
     use_textline_orientation=True,
 )
-results = pipeline.predict(pdf_path)
+results = pipeline.predict(input_path)
 pages = []
 for index, result in enumerate(results, 1):
     data = result.json if hasattr(result, "json") else {}
@@ -89,12 +89,20 @@ export class KnowledgeStructureParser {
   }
 
   async parsePdf(pdfPath: string): Promise<StructurePageResult[]> {
+    return this.parseInput(pdfPath);
+  }
+
+  async parseImage(imagePath: string): Promise<StructurePageResult[]> {
+    return this.parseInput(imagePath);
+  }
+
+  private async parseInput(inputPath: string): Promise<StructurePageResult[]> {
     const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "sigma-structure-"));
     const wrapperPath = path.join(tempDir, "runner.py");
     const outputPath = path.join(tempDir, "result.json");
     try {
       await fs.writeFile(wrapperPath, WRAPPER, "utf8");
-      await this.runPython([wrapperPath, pdfPath, outputPath], 20 * 60_000);
+      await this.runPython([wrapperPath, inputPath, outputPath], 20 * 60_000);
       const raw = JSON.parse(await fs.readFile(outputPath, "utf8")) as unknown;
       return normalizeStructureResults(raw);
     } finally {
