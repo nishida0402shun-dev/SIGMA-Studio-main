@@ -46,12 +46,27 @@ for index, result in enumerate(results, 1):
 with open(out_path, "w", encoding="utf-8") as f:
     json.dump(pages, f, ensure_ascii=False)
 `;
+const packageHelper = `import importlib.metadata
+import subprocess
+import sys
+import paddlex
+
+deps_all = list(paddlex.utils.deps.BASE_DEP_SPECS.keys())
+deps_need = [dist.metadata["Name"] for dist in importlib.metadata.distributions() if dist.metadata["Name"] in deps_all]
+cmd = ["pyinstaller", sys.argv[1], "--collect-data", "paddlex", "--collect-binaries", "paddle"]
+for dep in deps_need:
+    cmd += ["--copy-metadata", dep]
+print("PyInstaller command:", " ".join(cmd))
+subprocess.run(cmd, check=True)
+`;
 const runnerPath = join(work, "sigma_ocr.py");
+const packagePath = join(work, "package.py");
 writeFileSync(runnerPath, runner, "utf8");
+writeFileSync(packagePath, packageHelper, "utf8");
 
 execFileSync(python, ["-m", "pip", "install", "--upgrade", "pip"], { stdio: "inherit" });
 execFileSync(python, ["-m", "pip", "install", "paddlepaddle==3.3.0", "paddleocr[doc-parser]", "pyinstaller"], { stdio: "inherit" });
-execFileSync(python, ["-m", "PyInstaller", "--noconfirm", "--clean", "--onedir", "--name", "sigma-ocr", "--collect-all", "paddleocr", "--collect-all", "paddlex", "--collect-all", "paddle", "--copy-metadata", "paddleocr", runnerPath], { cwd: work, stdio: "inherit" });
+execFileSync(python, ["package.py", "sigma_ocr.py"], { cwd: work, stdio: "inherit" });
 
 const dist = join(work, "dist", "sigma-ocr");
 if (!existsSync(dist)) throw new Error("PyInstaller did not produce sigma-ocr runtime.");
