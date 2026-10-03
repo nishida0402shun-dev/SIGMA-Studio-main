@@ -128,7 +128,7 @@ const eslintConfig = [
       "electron/local-sigma-doc-store.ts",
       "electron/local-library-record.ts",
       "electron/local-document-reconciler.ts",
-      // Knowledge DB taxonomy/analysis data is internal classification content, not UI copy.
+      // Knowledge DB taxonomy/analysis data is internal classification content, not UI copy; audit it with domain tests instead.
       "electron/knowledge-taxonomy.ts",
       "electron/knowledge-analysis-engine.ts",
       "electron/knowledge-db-store.ts",
