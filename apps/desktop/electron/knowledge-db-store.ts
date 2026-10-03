@@ -221,7 +221,7 @@ export class KnowledgeDbStore {
     const page = copied[0];
     if (!page) throw new Error("knowledge page not found");
     output.addPage(page);
-    const paths = this.paths(normalized);
+    const paths = this.paths();
     await fs.mkdir(paths.openedPagesDir, { recursive: true });
     const outputPath = path.join(paths.openedPagesDir, `${safeId(source.id)}-p${pageNumber}.pdf`);
     await fs.writeFile(outputPath, await output.save());
@@ -314,7 +314,14 @@ export class KnowledgeDbStore {
     await fs.mkdir(paths.root, { recursive: true });
     try {
       const parsed = JSON.parse(await fs.readFile(paths.libraryPath, "utf8")) as Partial<KnowledgeLibrary>;
-      if (parsed.version === 3 && Array.isArray(parsed.sources)) return parsed as KnowledgeLibrary;
+      if (parsed.version === 3 && Array.isArray(parsed.sources)) {
+        const sources = parsed.sources.map((source) => {
+          const legacy = source as KnowledgeSource & { workspaceId?: unknown };
+          const { workspaceId: _workspaceId, ...globalSource } = legacy;
+          return globalSource as KnowledgeSource;
+        });
+        return { version: 3, sources };
+      }
     } catch {}
     const library: KnowledgeLibrary = { version: 3, sources: [] };
     const legacyRoot = path.join(this.dataDir, "knowledge-db", "workspaces");
