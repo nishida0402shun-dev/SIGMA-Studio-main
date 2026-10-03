@@ -87,8 +87,21 @@ export function AiWebProviderPanel({
       const url = (event as Event & { url?: string }).url;
       if (!url) return;
       try {
-        const host = new URL(url).hostname;
-        if (![...allowedHosts].some((allowed) => host === allowed || host.endsWith(`.${allowed}`))) {
+        const parsed = new URL(url);
+        if (parsed.protocol === "sigma:" && parsed.hostname === "knowledge-db") {
+          const parts = parsed.pathname.split("/").filter(Boolean).map(decodeURIComponent);
+          const sourceId = parts[0] ?? "";
+          const pageIndex = parts.findIndex((part) => part === "p");
+          const pageNumber = pageIndex >= 0 ? Number(parts[pageIndex + 1]) : 0;
+          if (sourceId && Number.isInteger(pageNumber) && pageNumber > 0) {
+            event.preventDefault();
+            void getDesktopBridge()?.knowledgeDb?.openPage({ sourceId, pageNumber });
+          } else {
+            event.preventDefault();
+          }
+          return;
+        }
+        if (![...allowedHosts].some((allowed) => parsed.hostname === allowed || parsed.hostname.endsWith(`.${allowed}`))) {
           event.preventDefault();
         }
       } catch {
