@@ -112,7 +112,11 @@ export function KnowledgeDbWorkspace({ open, onClose, onOpenAi, t }: Props) {
   }
 
   async function addSources(): Promise<void> {
-    if (!knowledgeDb || !selectedWorkspaceId) return;
+    if (!selectedWorkspaceId) {
+      window.alert("先にワークスペースを選択してください。");
+      return;
+    }
+    if (!knowledgeDb) return;
     const picked = await knowledgeDb.chooseSources();
     if (!picked?.paths?.length) return;
     const added = await knowledgeDb.importSources({ workspaceId: selectedWorkspaceId, paths: picked.paths });
@@ -546,7 +550,7 @@ export function KnowledgeDbWorkspace({ open, onClose, onOpenAi, t }: Props) {
               ))}
             </select>
           </label>
-          <button type="button" className="knowledge-db-add-button" onClick={() => void addSources()} disabled={!selectedWorkspaceId} title={!selectedWorkspaceId ? "ワークスペースを選択してください" : undefined}><FilePlus2 size={16} />{t("appMenu.knowledgeDb.add")}</button>
+          <button type="button" className="knowledge-db-add-button" onClick={() => void addSources()} title={!selectedWorkspaceId ? "ワークスペースを選択してからファイルを追加します" : undefined}><FilePlus2 size={16} />{t("appMenu.knowledgeDb.add")}</button>
           <label className="knowledge-db-search"><Search size={16} /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder={t("appMenu.knowledgeDb.searchPlaceholder")} /></label>
           <select value={typeFilter} onChange={(event) => setTypeFilter(event.target.value as KnowledgeSemanticType | "all")}>
             <option value="all">{t("appMenu.knowledgeDb.allTypes")}</option>
