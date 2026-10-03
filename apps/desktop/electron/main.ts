@@ -1776,9 +1776,10 @@ async function startWebAiBridgeServer(): Promise<void> {
         cancelId: 0,
         noLink: true,
       };
-      const result = owner
-        ? await dialog.showMessageBox(owner, messageBoxOptions)
-        : await dialog.showMessageBox(messageBoxOptions);
+      if (!owner) return false;
+      const result = await owner.webContents.executeJavaScript(
+        `window.confirm("Web AI が変更操作を要求しています。\\n\\nTool: ${toolName}\\n\\n${description}\\n\\nArguments:\\n${details}")`,
+      );
       return result.response === 1;
     },
   });
