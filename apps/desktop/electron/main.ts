@@ -1,4 +1,4 @@
-import { app, BrowserWindow, dialog, ipcMain, Menu, nativeImage, shell } from "electron";
+import { app, BrowserWindow, dialog, ipcMain, Menu, nativeImage, shell, type MessageBoxOptions } from "electron";
 import crypto from "node:crypto";
 import { createInterface } from "node:readline";
 import { resolveDevServerUrl, isDevServerNavigation } from "./dev-server";
@@ -1766,7 +1766,7 @@ async function startWebAiBridgeServer(): Promise<void> {
       const details = serializedArguments.length > 1800
         ? `${serializedArguments.slice(0, 1800)}…`
         : serializedArguments;
-      const messageBoxOptions = {
+      const messageBoxOptions: MessageBoxOptions = {
         type: permissionClass === "consequential" ? "warning" : "question",
         title: "SIGMA Studio: AI操作の許可",
         message: `Web AI が ${level} を要求しています。`,
