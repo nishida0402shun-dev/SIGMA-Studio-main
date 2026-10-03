@@ -3075,11 +3075,12 @@ registerTool(
     inputSchema: {
       query: z.string().min(1).max(2000),
       limit: z.number().int().min(1).max(12).optional(),
+      sourceIds: z.array(z.string().min(1)).max(20).optional(),
       runId: z.string().min(1).max(256).optional(),
     },
   },
-  async ({ query, limit, runId }) => withToolErrorHandling(async () => {
-    const context = await new KnowledgeDbStore(storeContext.dataDir).getContext(query, limit ?? 8);
+  async ({ query, limit, sourceIds, runId }) => withToolErrorHandling(async () => {
+    const context = await new KnowledgeDbStore(storeContext.dataDir).getContext(query, limit ?? 8, sourceIds);
     for (const item of context) {
       recordKnowledgeDbPageReference(runId, {
         sourceId: item.sourceId,
@@ -3093,6 +3094,22 @@ registerTool(
       context,
       instructions: "回答では根拠として使った項目のcitationを保持してください。例: [SIGMA:sourceId:p17]",
     };
+  }),
+);
+
+registerTool(
+  "knowledge_db_get_related_sources",
+  {
+    title: "Knowledge DBの関連資料を取得",
+    description: "指定した資料と内容が関連する他のKnowledge DB資料を検索します。複数資料の比較対象を見つける用途に使います。",
+    inputSchema: {
+      sourceId: z.string().min(1),
+      limit: z.number().int().min(1).max(12).optional(),
+    },
+  },
+  async ({ sourceId, limit }) => withToolErrorHandling(async () => {
+    const related = await new KnowledgeDbStore(storeContext.dataDir).getRelatedSources(sourceId, limit ?? 6);
+    return { ok: true, sourceId, related };
   }),
 );
 
