@@ -95,7 +95,7 @@ describe("Web AI MCP gateway live server path", () => {
     ).resolves.toBeTruthy();
     await expect(
       gateway.callTool("knowledge_db_get_classification_review_context", { sourceId: "missing", pageNumber: 1 }, null),
-    ).rejects.toThrow();
+    ).resolves.toMatchObject({ isError: true });
   });
 
   it("routes a real HTTP Bridge request into the real MCP server", async () => {
@@ -155,7 +155,7 @@ describe("Web AI MCP gateway live server path", () => {
         { sourceId: "missing", pageNumber: 1, paths: ["その他"], confidence: 0.5 },
         null,
       ),
-    ).rejects.toThrow();
+    ).resolves.toMatchObject({ isError: true });
     expect(requestedWrites).toContain("knowledge_db_submit_classification_review");
   });
 
