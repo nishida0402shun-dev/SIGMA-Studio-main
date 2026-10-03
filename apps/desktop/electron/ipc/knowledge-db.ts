@@ -10,14 +10,6 @@ export interface RegisterKnowledgeDbIpcDeps {
   store: KnowledgeDbStore;
 }
 
-function requireWorkspaceId(payload: unknown): string {
-  const value = payload && typeof payload === "object" && "workspaceId" in payload && typeof payload.workspaceId === "string"
-    ? payload.workspaceId.trim()
-    : "";
-  if (!value) throw new Error("workspace not selected");
-  return value;
-}
-
 async function collectPdfFiles(paths: string[]): Promise<string[]> {
   const files: string[] = [];
   for (const candidate of paths) {
