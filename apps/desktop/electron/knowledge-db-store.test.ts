@@ -52,35 +52,36 @@ describe("KnowledgeDbStore", () => {
   it("uses analysis metadata to boost semantically matching pages", async () => {
     const dataDir = await fs.mkdtemp(path.join(os.tmpdir(), "sigma-knowledge-db-ranking-"));
     tempDirs.push(dataDir);
-    const sourcePath = await createPdf("ranking.pdf", 2);
+    await createPdf("ranking.pdf", 2);
     const store = new KnowledgeDbStore(dataDir);
-    const added = await store.addFiles([sourcePath]);
-    const source = added[0]!;
+    const sourceId = "src_ranking";
     const libraryPath = path.join(dataDir, "knowledge-db", "library.json");
-    const library = JSON.parse(await fs.readFile(libraryPath, "utf8"));
-    library.sources[0].pages = [
-      {
-        ...library.sources[0].pages[0],
-        text: "shared neutral content",
-        extractionStatus: "text",
-        semanticType: "theorem",
-        title: "定理の証明",
-        keywords: ["証明", "数学"],
-      },
-      {
-        ...library.sources[0].pages[1],
-        text: "shared neutral content",
-        extractionStatus: "text",
-        semanticType: "unknown",
-      },
-    ];
-    library.sources[0].extractionStatus = "complete";
+    await fs.mkdir(path.dirname(libraryPath), { recursive: true });
+    const library = {
+      version: 3,
+      sources: [{
+        id: sourceId,
+        name: "ranking.pdf",
+        originalPath: "",
+        storedPath: "",
+        mimeType: "application/pdf",
+        sizeBytes: 0,
+        pageCount: 2,
+        importedAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        extractionStatus: "complete",
+        pages: [
+          { id: sourceId + "_p1", sourceId, pageNumber: 1, semanticType: "theorem", text: "shared neutral content", extractionStatus: "text", title: "定理の証明", keywords: ["証明", "数学"] },
+          { id: sourceId + "_p2", sourceId, pageNumber: 2, semanticType: "unknown", text: "shared neutral content", extractionStatus: "text" },
+        ],
+      }],
+    };
     await fs.writeFile(libraryPath, JSON.stringify(library), "utf8");
 
     const index = new LocalVectorIndex(path.join(dataDir, "knowledge-db", "vector-index"));
     await index.upsertMany([
-      { id: source.id + "_p1_c0", sourceId: source.id, pageNumber: 1, chunkIndex: 0, text: "shared neutral content" },
-      { id: source.id + "_p2_c0", sourceId: source.id, pageNumber: 2, chunkIndex: 0, text: "shared neutral content" },
+      { id: sourceId + "_p1_c0", sourceId, pageNumber: 1, chunkIndex: 0, text: "shared neutral content" },
+      { id: sourceId + "_p2_c0", sourceId, pageNumber: 2, chunkIndex: 0, text: "shared neutral content" },
     ]);
 
     const results = await store.search("定理", 2);
