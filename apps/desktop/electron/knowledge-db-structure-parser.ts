@@ -23,6 +23,7 @@ export interface StructureParserStatus {
   available: boolean;
   engine: "pp-structurev3" | null;
   pythonPath: string | null;
+  source: "bundled" | "configured" | "system" | "none";
   error?: string;
 }
 
@@ -55,20 +56,33 @@ with open(out_path, "w", encoding="utf-8") as f:
 
 export class KnowledgeStructureParser {
   private readonly pythonPath: string;
+  private readonly source: StructureParserStatus["source"];
 
-  constructor(pythonPath = process.env.SIGMA_PADDLEOCR_PYTHON?.trim() || process.env.PYTHON?.trim() || (process.platform === "win32" ? "python" : "python3")) {
-    this.pythonPath = pythonPath;
+  constructor(pythonPath?: string) {
+    const configured = pythonPath?.trim() || process.env.SIGMA_PADDLEOCR_PYTHON?.trim();
+    const bundled = findBundledPython();
+    if (configured) {
+      this.pythonPath = configured;
+      this.source = "configured";
+    } else if (bundled) {
+      this.pythonPath = bundled;
+      this.source = "bundled";
+    } else {
+      this.pythonPath = process.env.PYTHON?.trim() || (process.platform === "win32" ? "python" : "python3");
+      this.source = "system";
+    }
   }
 
   async getStatus(): Promise<StructureParserStatus> {
     try {
       await this.runPython(["-c", "import paddleocr; from paddleocr import PPStructureV3; print('ok')"], 15_000);
-      return { available: true, engine: "pp-structurev3", pythonPath: this.pythonPath };
+      return { available: true, engine: "pp-structurev3", pythonPath: this.pythonPath, source: this.source };
     } catch (error) {
       return {
         available: false,
         engine: null,
         pythonPath: this.pythonPath,
+        source: this.source,
         error: error instanceof Error ? error.message : String(error),
       };
     }
@@ -175,4 +189,18 @@ function normalizeBbox(...values: unknown[]): [number, number, number, number] |
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return Boolean(value) && typeof value === "object" && !Array.isArray(value);
+}
+
+
+function findBundledPython(): string | null {
+  const resourcesPath = process.resourcesPath;
+  if (!resourcesPath) return null;
+  const executable = process.platform === "win32" ? "python.exe" : "python";
+  const candidate = path.join(resourcesPath, "ocr-runtime", "python", executable);
+  try {
+    require("node:fs").accessSync(candidate);
+    return candidate;
+  } catch {
+    return null;
+  }
 }
