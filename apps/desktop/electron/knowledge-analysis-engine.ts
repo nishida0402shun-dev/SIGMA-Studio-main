@@ -1,5 +1,7 @@
 import type { KnowledgeStructureBlock } from "./knowledge-db-structure-parser";
 
+export const KNOWLEDGE_ANALYSIS_VERSION = 2;
+
 export type KnowledgeAnalysisSemanticType =
   | "problem"
   | "example"
