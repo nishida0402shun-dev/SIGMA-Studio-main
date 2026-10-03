@@ -3106,7 +3106,7 @@ registerTool(
   },
   async ({ query }) => withToolErrorHandling(async () => {
     const normalized = query.normalize("NFKC").toLocaleLowerCase();
-    const explicit = /(?:資料|教材|このPDF|この本|ページ|p\\.?\\s*\\d+|knowledge ?db|根拠|出典|引用|上記|前述|定義|定理|例題|解答|教科書|参考書|本文|図|表|formula|theorem|definition|source|citation)/u.test(normalized);
+    const explicit = /(?:資料|教材|このPDF|この本|ページ|p\.?\s*\d+|knowledge ?db|根拠|出典|引用|上記|前述|定義|定理|例題|解答|教科書|参考書|本文|図|表|formula|theorem|definition|source|citation)/u.test(normalized);
     const subjectMatter = /(?:数学|数式|英語|英文法|国語|古文|漢文|物理|化学|生物|地理|日本史|世界史|公民|政治|経済|倫理|確率|微分|積分|三角関数|ベクトル|力学|電磁気|有機|無機|遺伝|読解)/u.test(normalized);
     const factualQuestion = /(?:何|なぜ|どう|求め|説明|証明|計算|解いて|違い|意味|とは|どれ|when|why|how|what|prove|solve|define)/u.test(normalized);
     const shouldSearch = explicit || (subjectMatter && factualQuestion);
