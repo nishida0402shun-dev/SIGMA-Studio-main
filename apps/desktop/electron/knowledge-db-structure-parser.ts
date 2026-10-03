@@ -196,7 +196,7 @@ function findBundledPython(): string | null {
   const resourcesPath = process.resourcesPath;
   if (!resourcesPath) return null;
   const executable = process.platform === "win32" ? "sigma-ocr.exe" : "sigma-ocr";
-  const candidate = path.join(resourcesPath, "ocr-runtime", executable);
+  const candidate = path.join(resourcesPath, "ocr-runtime", "sigma-ocr", executable);
   try {
     require("node:fs").accessSync(candidate);
     return candidate;
