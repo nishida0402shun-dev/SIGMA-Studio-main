@@ -916,6 +916,7 @@ export function KnowledgeDbWorkspace({ open, onClose, onOpenAi, t }: Props) {
                   <ExternalLink size={15} />選択ページを開く
                 </button>
                 {(() => {
+                  const selectedSource = sources.find((source) => source.id === selectedPages[0]!.sourceId);
                   const page = selectedSource?.pages.find((item) => item.pageNumber === selectedPages[0]!.pageNumber);
                   if (!page?.classificationReviewStatus) return null;
                   return (
