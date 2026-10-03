@@ -3,6 +3,7 @@ import path from "node:path";
 import { createHash } from "node:crypto";
 import { PDFDocument } from "pdf-lib";
 import { LocalVectorIndex, type VectorSearchResult } from "./local-vector-index";
+import { KnowledgeStructureParser, type KnowledgeStructureBlock, type StructureParserStatus } from "./knowledge-db-structure-parser";
 
 export type KnowledgeSemanticType =
   | "problem" | "example" | "explanation" | "column" | "definition"
@@ -17,6 +18,7 @@ export interface KnowledgePage {
   text?: string;
   extractionStatus?: "text" | "ocr-needed" | "empty";
   wordCount?: number;
+  structureBlocks?: KnowledgeStructureBlock[];
 }
 
 export interface KnowledgeSource {
@@ -62,6 +64,8 @@ export class KnowledgeDbStore {
   private readonly dataDir: string;
   private indexPromise: Promise<void> | null = null;
   private indexStatus: KnowledgeIndexStatus = { state: "idle", total: 0, completed: 0 };
+  private readonly structureParser = new KnowledgeStructureParser();
+  private structureParserStatusPromise: Promise<StructureParserStatus> | null = null;
 
   constructor(dataDir: string) {
     this.dataDir = dataDir;
@@ -74,6 +78,11 @@ export class KnowledgeDbStore {
 
   getIndexStatus(): KnowledgeIndexStatus {
     return { ...this.indexStatus };
+  }
+
+  async getStructureParserStatus(): Promise<StructureParserStatus> {
+    this.structureParserStatusPromise ??= this.structureParser.getStatus();
+    return this.structureParserStatusPromise;
   }
 
   startBackgroundIndexing(): KnowledgeIndexStatus {
@@ -349,12 +358,30 @@ export class KnowledgeDbStore {
         if (needsText) {
           const bytes = await fs.readFile(source.storedPath);
           const pageTexts = await extractPdfPageTexts(bytes, source.pageCount);
-          source.pages = source.pages.map((page, index) => ({
-            ...page,
-            text: pageTexts[index] || undefined,
-            extractionStatus: pageTexts[index] ? "text" : "ocr-needed",
-            wordCount: pageTexts[index] ? countWords(pageTexts[index]) : 0,
-          }));
+          let structureResults: Awaited<ReturnType<KnowledgeStructureParser["parsePdf"]>> = [];
+          if (pageTexts.some((text) => !text.trim())) {
+            const parserStatus = await this.getStructureParserStatus();
+            if (parserStatus.available) {
+              try {
+                structureResults = await this.structureParser.parsePdf(source.storedPath);
+              } catch (error) {
+                source.indexError = error instanceof Error ? error.message : String(error);
+              }
+            }
+          }
+          const structureByPage = new Map(structureResults.map((result) => [result.pageNumber, result]));
+          source.pages = source.pages.map((page, index) => {
+            const nativeText = pageTexts[index]?.trim() ?? "";
+            const structured = structureByPage.get(page.pageNumber);
+            const text = nativeText || structured?.text || "";
+            return {
+              ...page,
+              text: text || undefined,
+              extractionStatus: text ? "text" : "ocr-needed",
+              wordCount: text ? countWords(text) : 0,
+              ...(structured?.blocks?.length ? { structureBlocks: structured.blocks } : {}),
+            };
+          });
           source.extractionStatus = source.pages.every((page) => page.text) ? "complete" : "ocr-needed";
           source.updatedAt = new Date().toISOString();
           changed = true;
