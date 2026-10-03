@@ -17,7 +17,7 @@ const BRIDGE_DIR_NAME = "ai-run-context";
 const BRIDGE_FILE_NAME = "web-ai-bridge.json";
 const API_VERSION = "1";
 
-const WEB_AI_ORIGINS = new Set([
+const KNOWLEDGE_DB_MCP_TOOLS = new Set(["knowledge_db_list_sources","knowledge_db_search","knowledge_db_get_context","knowledge_db_get_page","knowledge_db_get_region"]);\n\nconst WEB_AI_ORIGINS = new Set([
   "https://chatgpt.com",
   "https://chat.openai.com",
   "https://claude.ai",
@@ -294,20 +294,12 @@ export function createWebAiBridgeServer(deps: CreateWebAiBridgeServerDeps): http
       }
 
       if (req.method === "GET" && pathname === "/v1/mcp/tools") {
-        if (!workspaceId) {
-          sendJson(res, 409, { ok: false, error: "Select a SIGMA Workspace before using MCP." }, origin);
-          return;
-        }
         const tools = await deps.mcpGateway.listTools(workspaceId);
         sendJson(res, 200, { ok: true, workspaceId, tools }, origin);
         return;
       }
 
       if (req.method === "POST" && pathname === "/v1/mcp/call") {
-        if (!workspaceId) {
-          sendJson(res, 409, { ok: false, error: "Select a SIGMA Workspace before using MCP." }, origin);
-          return;
-        }
         const body = await readBody(req);
         if (!body || typeof body !== "object" || Array.isArray(body)) {
           sendJson(res, 400, { ok: false, error: "invalid request" }, origin);
@@ -318,6 +310,10 @@ export function createWebAiBridgeServer(deps: CreateWebAiBridgeServerDeps): http
         const args = record.arguments;
         if (!name || (args !== undefined && (typeof args !== "object" || args === null || Array.isArray(args)))) {
           sendJson(res, 400, { ok: false, error: "name and object arguments are required" }, origin);
+          return;
+        }
+        if (!workspaceId && !KNOWLEDGE_DB_MCP_TOOLS.has(name)) {
+          sendJson(res, 409, { ok: false, error: "Select a SIGMA Workspace before using this Tool." }, origin);
           return;
         }
         const result = await deps.mcpGateway.callTool(
