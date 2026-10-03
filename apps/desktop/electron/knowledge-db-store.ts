@@ -3,7 +3,7 @@ import path from "node:path";
 import { createHash, randomUUID } from "node:crypto";
 import { PDFDocument } from "pdf-lib";
 import { LocalVectorIndex, type VectorSearchResult } from "./local-vector-index";
-import { KnowledgeStructureParser, type KnowledgeStructureBlock, type StructureParserStatus } from "./knowledge-db-structure-parser";
+import { KnowledgeStructureParser, type KnowledgeStructureBlock, type KnowledgeStructureBlockType, type StructureParserStatus } from "./knowledge-db-structure-parser";
 import { analyzeKnowledgePage, KNOWLEDGE_ANALYSIS_VERSION } from "./knowledge-analysis-engine";
 import { classifyKnowledgeTaxonomy, KNOWLEDGE_TAXONOMY_VERSION } from "./knowledge-taxonomy";
 
