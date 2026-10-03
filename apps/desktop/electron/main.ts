@@ -1766,7 +1766,7 @@ async function startWebAiBridgeServer(): Promise<void> {
       const details = serializedArguments.length > 1800
         ? `${serializedArguments.slice(0, 1800)}…`
         : serializedArguments;
-      const result = await dialog.showMessageBox(owner ?? undefined, {
+      const messageBoxOptions = {
         type: permissionClass === "consequential" ? "warning" : "question",
         title: "SIGMA Studio: AI操作の許可",
         message: `Web AI が ${level} を要求しています。`,
@@ -1775,7 +1775,10 @@ async function startWebAiBridgeServer(): Promise<void> {
         defaultId: 0,
         cancelId: 0,
         noLink: true,
-      });
+      } as const;
+      const result = owner
+        ? await dialog.showMessageBox(owner, messageBoxOptions)
+        : await dialog.showMessageBox(messageBoxOptions);
       return result.response === 1;
     },
   });
