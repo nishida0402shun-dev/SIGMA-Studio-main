@@ -1,6 +1,7 @@
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
 import type { CallToolResult, Tool } from "@modelcontextprotocol/sdk/types.js";
+import { createAiPermissionGate, type AiPermissionRequester } from "./ai-permission-gate";
 
 const KNOWLEDGE_DB_TOOLS = new Set(["knowledge_db_list_sources","knowledge_db_search","knowledge_db_route_query","knowledge_db_get_context","knowledge_db_get_page","knowledge_db_get_region","knowledge_db_get_related_sources","knowledge_db_get_analysis_status","knowledge_db_get_classification_review_context","knowledge_db_list_classification_reviews","knowledge_db_submit_classification_review"]);
 
@@ -33,7 +34,7 @@ function hasExactWorkspaceFileId(result: unknown, fileId: string, workspaceId: s
   return false;
 }
 
-export interface WebAiMcpGatewayOptions { mcpServerPath: string; userDataPath: string; }
+export interface WebAiMcpGatewayOptions { mcpServerPath: string; userDataPath: string; requestPermission?: AiPermissionRequester; }
 export interface WebAiMcpGateway {
   start(): Promise<void>;
   stop(): Promise<void>;
@@ -42,6 +43,7 @@ export interface WebAiMcpGateway {
 }
 
 export function createWebAiMcpGateway(options: WebAiMcpGatewayOptions): WebAiMcpGateway {
+  const permissionGate = createAiPermissionGate(options.requestPermission ?? (async () => false));
   let client: Client | null = null;
   let transport: StdioClientTransport | null = null;
   let startPromise: Promise<void> | null = null;
@@ -79,19 +81,22 @@ export function createWebAiMcpGateway(options: WebAiMcpGatewayOptions): WebAiMcp
     async listTools(workspaceId) {
       const currentClient = await ensureStarted();
       const result = await currentClient.listTools();
-      return result.tools.filter((tool) => READ_ONLY_TOOLS.has(tool.name) && (Boolean(workspaceId) || KNOWLEDGE_DB_TOOLS.has(tool.name))).map((tool) =>
+      return result.tools.filter((tool) => Boolean(workspaceId) || KNOWLEDGE_DB_TOOLS.has(tool.name)).map((tool) =>
         tool.name === "list_local_documents" && isRecord(tool.inputSchema) && workspaceId
           ? { ...tool, description: `${tool.description ?? ""} Current SIGMA Workspace: ${workspaceId}.` }
           : tool,
       );
     },
     async callTool(name, args, workspaceId) {
-      if (!READ_ONLY_TOOLS.has(name)) throw new Error(`Web AI cannot use this Tool: ${name}`);
       if (!workspaceId && !KNOWLEDGE_DB_TOOLS.has(name)) {
         throw new Error("Select a SIGMA Workspace before using this Tool.");
       }
       const currentClient = await ensureStarted();
+      const availableTools = await currentClient.listTools();
+      const tool = availableTools.tools.find((candidate) => candidate.name === name);
+      if (!tool) throw new Error(`Web AI cannot use this Tool: ${name}`);
       const input = { ...args };
+      if (!await permissionGate.check(tool, input, READ_ONLY_TOOLS)) throw new Error("Web AI Tool request was denied.");
       if (KNOWLEDGE_DB_TOOLS.has(name)) {
         delete input.workspaceId;
         return (await currentClient.callTool({ name, arguments: input })) as CallToolResult;
