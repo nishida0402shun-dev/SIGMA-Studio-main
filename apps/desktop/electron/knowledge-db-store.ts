@@ -87,6 +87,49 @@ export class KnowledgeDbStore {
     return library.sources;
   }
 
+  async getAnalysisStatus(): Promise<{
+    totalPages: number;
+    analyzed: number;
+    pending: number;
+    processing: number;
+    stale: number;
+    failed: number;
+    ocrNeeded: number;
+    taxonomyCurrent: number;
+    taxonomyStale: number;
+  }> {
+    const library = await this.readLibrary();
+    const pages = library.sources.flatMap((source) => source.pages);
+    const count = (status: KnowledgePage["analysisStatus"]) => pages.filter((page) => page.analysisStatus === status).length;
+    return {
+      totalPages: pages.length,
+      analyzed: count("analyzed"),
+      pending: count("pending"),
+      processing: count("processing"),
+      stale: count("stale"),
+      failed: count("failed"),
+      ocrNeeded: pages.filter((page) => page.extractionStatus === "ocr-needed").length,
+      taxonomyCurrent: pages.filter((page) => page.taxonomyVersion === KNOWLEDGE_TAXONOMY_VERSION).length,
+      taxonomyStale: pages.filter((page) => page.taxonomyVersion !== KNOWLEDGE_TAXONOMY_VERSION).length,
+    };
+  }
+
+  async reanalyze(sourceIds?: string[]): Promise<KnowledgeIndexStatus> {
+    const library = await this.readLibrary();
+    const allowed = sourceIds?.length ? new Set(sourceIds) : null;
+    let changed = false;
+    for (const source of library.sources) {
+      if (allowed && !allowed.has(source.id)) continue;
+      source.pages = source.pages.map((page) => page.text
+        ? { ...page, analysisStatus: "stale", analysisVersion: 0, taxonomyVersion: 0, analysisError: undefined }
+        : page);
+      source.updatedAt = new Date().toISOString();
+      changed = true;
+    }
+    if (changed) await this.writeLibrary(library);
+    return this.startBackgroundIndexing();
+  }
+
   getIndexStatus(): KnowledgeIndexStatus {
     return { ...this.indexStatus };
   }
@@ -232,10 +275,13 @@ export class KnowledgeDbStore {
         pageNumber: page.pageNumber,
         semanticType: page.semanticType,
         taxonomyPaths: page.taxonomyPaths,
+        taxonomyConfidence: page.taxonomyConfidence,
+        analysisStatus: page.analysisStatus,
         score: result.score,
         text: text.slice(0, 5000),
         citation: `[${source.name} p${page.pageNumber}](sigma://knowledge-db/${encodeURIComponent(source.id)}/p/${page.pageNumber})`,
         matchReasons: result.matchReasons,
+        citationRef: { sourceId: source.id, pageId: page.id, pageNumber: page.pageNumber },
       };
       const remaining = Math.max(0, maxChars - usedChars);
       if (remaining <= 0) break;
@@ -447,7 +493,7 @@ export class KnowledgeDbStore {
               analysisStatus: "analyzed",
               analysisVersion: KNOWLEDGE_ANALYSIS_VERSION,
               analysisError: undefined,
-              ...(taxonomy.length ? { taxonomyNodeIds: taxonomy.map((item) => item.nodeId), taxonomyPaths: taxonomy.map((item) => item.path), taxonomyConfidence: taxonomy[0]?.score ?? 0 } : { taxonomyNodeIds: [], taxonomyPaths: [], taxonomyConfidence: 0 }),
+              ...(taxonomy.length ? { taxonomyNodeIds: taxonomy.map((item) => item.nodeId), taxonomyPaths: taxonomy.map((item) => item.path), taxonomyConfidence: taxonomy[0]?.confidence ?? 0 } : { taxonomyNodeIds: [], taxonomyPaths: [], taxonomyConfidence: 0 }),
               taxonomyVersion: KNOWLEDGE_TAXONOMY_VERSION,
               extractionStatus: text ? "text" : "ocr-needed",
               wordCount: text ? countWords(text) : 0,
@@ -602,11 +648,18 @@ export interface KnowledgeContextItem {
   pageNumber: number;
   semanticType: KnowledgeSemanticType;
   taxonomyPaths?: string[][];
+  taxonomyConfidence?: number;
+  analysisStatus?: KnowledgePage["analysisStatus"];
   score: number;
   text: string;
   citation: string;
   matchReasons?: string[];
   contextChars?: number;
+  citationRef?: {
+    sourceId: string;
+    pageId: string;
+    pageNumber: number;
+  };
 }
 
 function countWords(text: string): number {
