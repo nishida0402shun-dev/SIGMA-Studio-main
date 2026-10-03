@@ -32,6 +32,7 @@ function IndexStatusBadge({ knowledgeDb }: { knowledgeDb: NonNullable<ReturnType
   const [analysisStatus, setAnalysisStatus] = useState<{ totalPages: number; analyzed: number; pending: number; processing: number; stale: number; failed: number; ocrNeeded: number; taxonomyCurrent: number; taxonomyStale: number } | null>(null);
   const db = knowledgeDb;
   useEffect(() => {
+    if (!db) return;
     let cancelled = false;
     const refresh = () => void db.getIndexStatus().then((value) => {
       if (!cancelled && value && typeof value === "object") setStatus(value as typeof status);
