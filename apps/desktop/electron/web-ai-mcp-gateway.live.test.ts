@@ -76,6 +76,9 @@ describe("Web AI MCP gateway live server path", () => {
     expect(names.has("knowledge_db_list_classification_reviews")).toBe(true);
     expect(names.has("knowledge_db_get_classification_review_context")).toBe(true);
     expect(names.has("knowledge_db_submit_classification_review")).toBe(true);
+    const reviewTool = tools.find((tool) => tool.name === "knowledge_db_submit_classification_review");
+    expect(reviewTool?.annotations?.readOnlyHint).toBe(false);
+    expect(reviewTool?.annotations?.destructiveHint).toBe(false);
     expect(names.has("create_local_document")).toBe(true);
     expect(names.size).toBeGreaterThan(5);
 
