@@ -51,6 +51,11 @@ export function registerKnowledgeDbIpc(deps: RegisterKnowledgeDbIpcDeps): void {
     return store.startBackgroundIndexing();
   });
 
+  ipcMain.handle("knowledge-db:structure-status", async (event) => {
+    if (event.sender !== getMainWindow()?.webContents) return { available: false, engine: null, pythonPath: null };
+    return store.getStructureParserStatus();
+  });
+
   ipcMain.handle("knowledge-db:list", async (event, payload: unknown) => {
     if (event.sender !== getMainWindow()?.webContents) return [];
     return store.listSources();
