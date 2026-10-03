@@ -224,7 +224,7 @@ export class KnowledgeDbStore {
         .filter(Boolean)
         .join("\n");
       if (!text) continue;
-      items.push({
+      const item: KnowledgeContextItem = {
         id: result.id,
         sourceId: source.id,
         pageId: page.id,
