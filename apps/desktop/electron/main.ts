@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, Menu, nativeImage, shell } from "electron";
+import { app, BrowserWindow, dialog, ipcMain, Menu, nativeImage, shell } from "electron";
 import crypto from "node:crypto";
 import { createInterface } from "node:readline";
 import { resolveDevServerUrl, isDevServerNavigation } from "./dev-server";
@@ -1755,7 +1755,30 @@ async function startAiRenderBridgeServer(): Promise<void> {
 }
 
 async function startWebAiBridgeServer(): Promise<void> {
-  webAiMcpGateway ??= createWebAiMcpGateway({ mcpServerPath: resolveMcpServerScriptPath(), userDataPath: USER_DATA_PATH });
+  webAiMcpGateway ??= createWebAiMcpGateway({
+    mcpServerPath: resolveMcpServerScriptPath(),
+    userDataPath: USER_DATA_PATH,
+    requestPermission: async ({ toolName, permissionClass, tool, arguments: toolArguments }) => {
+      const owner = mainWindow && !mainWindow.isDestroyed() ? mainWindow : undefined;
+      const level = permissionClass === "consequential" ? "高リスク操作" : "変更操作";
+      const description = tool.description?.trim() || "説明なし";
+      const serializedArguments = JSON.stringify(toolArguments, null, 2);
+      const details = serializedArguments.length > 1800
+        ? `${serializedArguments.slice(0, 1800)}…`
+        : serializedArguments;
+      const result = await dialog.showMessageBox(owner, {
+        type: permissionClass === "consequential" ? "warning" : "question",
+        title: "SIGMA Studio: AI操作の許可",
+        message: `Web AI が ${level} を要求しています。`,
+        detail: `Tool: ${toolName}\\n\\n${description}\\n\\nArguments:\\n${details}`,
+        buttons: ["拒否", "今回だけ許可"],
+        defaultId: 0,
+        cancelId: 0,
+        noLink: true,
+      });
+      return result.response === 1;
+    },
+  });
   await webAiMcpGateway.start();
   const token = crypto.randomBytes(32).toString("hex");
   const server = createWebAiBridgeServer({
