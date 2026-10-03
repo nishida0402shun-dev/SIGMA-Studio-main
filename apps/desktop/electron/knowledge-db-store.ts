@@ -5,6 +5,7 @@ import { PDFDocument } from "pdf-lib";
 import { LocalVectorIndex, type VectorSearchResult } from "./local-vector-index";
 import { KnowledgeStructureParser, type KnowledgeStructureBlock, type StructureParserStatus } from "./knowledge-db-structure-parser";
 import { analyzeKnowledgePage } from "./knowledge-analysis-engine";
+import { classifyKnowledgeTaxonomy, KNOWLEDGE_TAXONOMY_VERSION } from "./knowledge-taxonomy";
 
 export type KnowledgeSemanticType =
   | "problem" | "example" | "explanation" | "column" | "definition"
@@ -22,6 +23,10 @@ export interface KnowledgePage {
   structureBlocks?: KnowledgeStructureBlock[];
   keywords?: string[];
   analysisSignals?: string[];
+  taxonomyNodeIds?: string[];
+  taxonomyPaths?: string[][];
+  taxonomyConfidence?: number;
+  taxonomyVersion?: number;
 }
 
 export interface KnowledgeSource {
@@ -215,6 +220,7 @@ export class KnowledgeDbStore {
         sourceName: source.name,
         pageNumber: page.pageNumber,
         semanticType: page.semanticType,
+        taxonomyPaths: page.taxonomyPaths,
         score: result.score,
         text: text.slice(0, 5000),
         citation: `[${source.name} p${page.pageNumber}](sigma://knowledge-db/${encodeURIComponent(source.id)}/p/${page.pageNumber})`,
@@ -365,7 +371,8 @@ export class KnowledgeDbStore {
       const indexed = await this.vectorIndex().hasSource(source.id);
       const needsText = source.pages.some((page) => page.text === undefined);
       const needsAnalysis = source.pages.some((page) => Boolean(page.text) && page.analysisSignals === undefined);
-      if (needsText || needsAnalysis || source.pages.some((page) => page.extractionStatus === "ocr-needed") || !indexed) {
+      const needsTaxonomy = source.pages.some((page) => Boolean(page.text) && page.taxonomyVersion !== KNOWLEDGE_TAXONOMY_VERSION);
+      if (needsText || needsAnalysis || needsTaxonomy || source.pages.some((page) => page.extractionStatus === "ocr-needed") || !indexed) {
         pending.push(source);
       }
     }
@@ -374,8 +381,9 @@ export class KnowledgeDbStore {
     for (const source of library.sources) {
       const needsText = source.pages.some((page) => page.text === undefined);
       const needsAnalysis = source.pages.some((page) => Boolean(page.text) && (!page.keywords || page.keywords.length === 0 || !page.analysisSignals));
+      const needsTaxonomy = source.pages.some((page) => Boolean(page.text) && page.taxonomyVersion !== KNOWLEDGE_TAXONOMY_VERSION);
       const needsIndex = !(await this.vectorIndex().hasSource(source.id));
-      if (!needsText && !needsAnalysis && !needsIndex) { continue; }
+      if (!needsText && !needsAnalysis && !needsTaxonomy && !needsIndex) { continue; }
       this.indexStatus = { ...this.indexStatus, currentSourceId: source.id };
       try {
         if (needsText || needsAnalysis) {
@@ -399,6 +407,7 @@ export class KnowledgeDbStore {
             const text = nativeText || structured?.text || "";
             const blocks = structured?.blocks ?? [];
             const analysis = analyzeKnowledgePage(text, blocks);
+            const taxonomy = classifyKnowledgeTaxonomy(text, analysis.keywords);
             return {
               ...page,
               text: text || undefined,
@@ -406,6 +415,8 @@ export class KnowledgeDbStore {
               ...(page.title || !analysis.title ? {} : { title: analysis.title }),
               keywords: analysis.keywords,
               analysisSignals: analysis.signals,
+              ...(taxonomy.length ? { taxonomyNodeIds: taxonomy.map((item) => item.nodeId), taxonomyPaths: taxonomy.map((item) => item.path), taxonomyConfidence: taxonomy[0]?.score ?? 0 } : { taxonomyNodeIds: [], taxonomyPaths: [], taxonomyConfidence: 0 }),
+              taxonomyVersion: KNOWLEDGE_TAXONOMY_VERSION,
               extractionStatus: text ? "text" : "ocr-needed",
               wordCount: text ? countWords(text) : 0,
               ...(blocks.length ? { structureBlocks: blocks } : {}),
@@ -554,6 +565,7 @@ export interface KnowledgeContextItem {
   sourceName: string;
   pageNumber: number;
   semanticType: KnowledgeSemanticType;
+  taxonomyPaths?: string[][];
   score: number;
   text: string;
   citation: string;
