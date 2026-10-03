@@ -31,12 +31,13 @@ function IndexStatusBadge({ knowledgeDb }: { knowledgeDb: NonNullable<ReturnType
   const [structureStatus, setStructureStatus] = useState<{ available: boolean; engine: string | null; source: string; error?: string } | null>(null);
   const [analysisStatus, setAnalysisStatus] = useState<{ totalPages: number; analyzed: number; pending: number; processing: number; stale: number; failed: number; ocrNeeded: number; taxonomyCurrent: number; taxonomyStale: number } | null>(null);
   useEffect(() => {
-    if (!knowledgeDb) return;
+    const db = knowledgeDb;
+    if (!db) return;
     let cancelled = false;
     const refresh = () => void knowledgeDb.getIndexStatus().then((value) => {
       if (!cancelled && value && typeof value === "object") setStatus(value as typeof status);
     });
-    const refreshAnalysis = () => void knowledgeDb.getAnalysisStatus?.().then((value) => {
+    const refreshAnalysis = () => void db.getAnalysisStatus().then((value) => {
       if (!cancelled && value && typeof value === "object") setAnalysisStatus(value as typeof analysisStatus);
     }).catch(() => undefined);
     void knowledgeDb.getStructureParserStatus().then((value) => {
@@ -59,8 +60,8 @@ function IndexStatusBadge({ knowledgeDb }: { knowledgeDb: NonNullable<ReturnType
       {analysisStatus && (
         <>
           <span className="knowledge-db-index-status">解析 {analysisStatus.analyzed}/{analysisStatus.totalPages}</span>
-          {(analysisStatus.stale > 0 || analysisStatus.taxonomyStale > 0 || analysisStatus.failed > 0) && knowledgeDb.reanalyze && (
-            <button type="button" className="knowledge-db-index-status" onClick={() => void knowledgeDb.reanalyze().then(() => undefined)}>
+          {(analysisStatus.stale > 0 || analysisStatus.taxonomyStale > 0 || analysisStatus.failed > 0) && db.reanalyze && (
+            <button type="button" className="knowledge-db-index-status" onClick={() => void db.reanalyze().then(() => undefined)}>
               再解析
             </button>
           )}
@@ -368,6 +369,12 @@ export function KnowledgeDbWorkspace({ open, onClose, onOpenAi, t }: Props) {
         sourceName: source.name,
         pageNumber: page.pageNumber,
         semanticType: page.semanticType,
+        score: 1,
+        citation: `[${source.name} p${page.pageNumber}](sigma://knowledge-db/${encodeURIComponent(source.id)}/p/${page.pageNumber})`,
+        taxonomyPaths: page.taxonomyPaths,
+        taxonomyConfidence: page.taxonomyConfidence,
+        analysisStatus: page.analysisStatus,
+        citationRegions: [],
         text: [action ? `【AI操作: ${action}】` : "", pageText].filter(Boolean).join("\\n"),
       } satisfies KnowledgeDbAiContext];
     });
