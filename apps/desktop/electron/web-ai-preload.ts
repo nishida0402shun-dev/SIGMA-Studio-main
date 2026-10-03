@@ -285,6 +285,78 @@ async function registerSigmaWebAiTools(): Promise<void> {
   }, { signal: controller.signal });
 
   await modelContext.registerTool({
+    name: "sigma_knowledge_search",
+    description: "Search SIGMA's global Knowledge DB. Use this when the user asks about documents stored in SIGMA, even when no Workspace is selected. Returns source/page references.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        query: { type: "string" },
+        limit: { type: "number" },
+      },
+      required: ["query"],
+    },
+    annotations: { readOnlyHint: true, untrustedContentHint: true },
+    execute: async (input) => callApi("/v1/mcp/call", {
+      method: "POST",
+      body: JSON.stringify({
+        name: "knowledge_db_search",
+        arguments: {
+          query: String(input.query),
+          ...(typeof input.limit === "number" ? { limit: input.limit } : {}),
+        },
+      }),
+    }),
+  }, { signal: controller.signal });
+
+  await modelContext.registerTool({
+    name: "sigma_knowledge_context",
+    description: "Build a citation-aware Context Pack from SIGMA's global Knowledge DB for the current question. Prefer this before answering questions grounded in SIGMA documents.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        query: { type: "string" },
+        limit: { type: "number" },
+      },
+      required: ["query"],
+    },
+    annotations: { readOnlyHint: true, untrustedContentHint: true },
+    execute: async (input) => callApi("/v1/mcp/call", {
+      method: "POST",
+      body: JSON.stringify({
+        name: "knowledge_db_get_context",
+        arguments: {
+          query: String(input.query),
+          ...(typeof input.limit === "number" ? { limit: input.limit } : {}),
+        },
+      }),
+    }),
+  }, { signal: controller.signal });
+
+  await modelContext.registerTool({
+    name: "sigma_knowledge_page",
+    description: "Read one exact page from SIGMA's global Knowledge DB using a sourceId and 1-based pageNumber. Preserve the returned SIGMA citation marker in grounded answers.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        sourceId: { type: "string" },
+        pageNumber: { type: "number" },
+      },
+      required: ["sourceId", "pageNumber"],
+    },
+    annotations: { readOnlyHint: true, untrustedContentHint: true },
+    execute: async (input) => callApi("/v1/mcp/call", {
+      method: "POST",
+      body: JSON.stringify({
+        name: "knowledge_db_get_page",
+        arguments: {
+          sourceId: String(input.sourceId),
+          pageNumber: Number(input.pageNumber),
+        },
+      }),
+    }),
+  }, { signal: controller.signal });
+
+  await modelContext.registerTool({
     name: "sigma_run_agent",
     description: "Run Codex, Claude, or Gemini through Sigma Studio's Agent Runtime. The agent can create normal Sigma edit proposals; it cannot execute arbitrary shell commands through this tool.",
     inputSchema: {
