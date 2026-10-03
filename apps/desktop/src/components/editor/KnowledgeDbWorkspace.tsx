@@ -31,7 +31,6 @@ function IndexStatusBadge({ knowledgeDb }: { knowledgeDb: NonNullable<ReturnType
   const [structureStatus, setStructureStatus] = useState<{ available: boolean; engine: string | null; source: string; error?: string } | null>(null);
   const [analysisStatus, setAnalysisStatus] = useState<{ totalPages: number; analyzed: number; pending: number; processing: number; stale: number; failed: number; ocrNeeded: number; taxonomyCurrent: number; taxonomyStale: number } | null>(null);
   const db = knowledgeDb;
-  if (!db) return null;
   useEffect(() => {
     let cancelled = false;
     const refresh = () => void db.getIndexStatus().then((value) => {
@@ -51,6 +50,7 @@ function IndexStatusBadge({ knowledgeDb }: { knowledgeDb: NonNullable<ReturnType
     const timer = window.setInterval(() => { refresh(); refreshAnalysis(); }, 800);
     return () => { cancelled = true; window.clearInterval(timer); };
   }, [knowledgeDb]);
+  if (!db) return null;
   if (!status || (status.state === "completed" && status.total === 0)) return null;
   if (status.state === "running") return <span className="knowledge-db-index-status">Indexing {status.completed}/{status.total}</span>;
   if (status.state === "failed") return <button type="button" className="knowledge-db-index-status error" onClick={() => void db.startIndexing()}>Index retry</button>;
