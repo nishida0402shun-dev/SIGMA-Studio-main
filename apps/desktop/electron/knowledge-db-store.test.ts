@@ -4,6 +4,7 @@ import path from "node:path";
 import { PDFDocument } from "pdf-lib";
 import { afterEach, describe, expect, it } from "vitest";
 import { KnowledgeDbStore } from "./knowledge-db-store";
+import { LocalVectorIndex } from "./local-vector-index";
 
 const tempDirs: string[] = [];
 
@@ -45,6 +46,46 @@ describe("KnowledgeDbStore", () => {
     expect(await store.deleteSource(source!.id)).toBe(true);
     expect(await store.listSources()).toHaveLength(0);
     expect(await store.search("source")).toHaveLength(0);
+  });
+
+
+  it("uses analysis metadata to boost semantically matching pages", async () => {
+    const dataDir = await fs.mkdtemp(path.join(os.tmpdir(), "sigma-knowledge-db-ranking-"));
+    tempDirs.push(dataDir);
+    const sourcePath = await createPdf("ranking.pdf", 2);
+    const store = new KnowledgeDbStore(dataDir);
+    const added = await store.addFiles([sourcePath]);
+    const source = added[0]!;
+    const libraryPath = path.join(dataDir, "knowledge-db", "library.json");
+    const library = JSON.parse(await fs.readFile(libraryPath, "utf8"));
+    library.sources[0].pages = [
+      {
+        ...library.sources[0].pages[0],
+        text: "shared neutral content",
+        extractionStatus: "text",
+        semanticType: "theorem",
+        title: "定理の証明",
+        keywords: ["証明", "数学"],
+      },
+      {
+        ...library.sources[0].pages[1],
+        text: "shared neutral content",
+        extractionStatus: "text",
+        semanticType: "unknown",
+      },
+    ];
+    library.sources[0].extractionStatus = "complete";
+    await fs.writeFile(libraryPath, JSON.stringify(library), "utf8");
+
+    const index = new LocalVectorIndex(path.join(dataDir, "knowledge-db", "vector-index"));
+    await index.upsertMany([
+      { id: source.id + "_p1_c0", sourceId: source.id, pageNumber: 1, chunkIndex: 0, text: "shared neutral content" },
+      { id: source.id + "_p2_c0", sourceId: source.id, pageNumber: 2, chunkIndex: 0, text: "shared neutral content" },
+    ]);
+
+    const results = await store.search("定理", 2);
+    expect(results[0]?.pageNumber).toBe(1);
+    expect(results[0]?.score).toBeGreaterThan(results[1]?.score ?? -1);
   });
 
   it("extracts selected pages from multiple imported PDFs into one PDF", async () => {
