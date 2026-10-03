@@ -3038,7 +3038,7 @@ registerTool(
       name: source.name,
       pageCount: source.pageCount,
       importedAt: source.importedAt,
-      pages: source.pages.map((page) => ({ id: page.id, pageNumber: page.pageNumber, semanticType: page.semanticType, title: page.title, keywords: page.keywords, analysisSignals: page.analysisSignals })),
+      pages: source.pages.map((page) => ({ id: page.id, pageNumber: page.pageNumber, semanticType: page.semanticType, title: page.title, keywords: page.keywords, analysisSignals: page.analysisSignals, taxonomyNodeIds: page.taxonomyNodeIds, taxonomyPaths: page.taxonomyPaths, taxonomyConfidence: page.taxonomyConfidence })),
     })) };
   }),
 );
@@ -3047,7 +3047,7 @@ registerTool(
   "knowledge_db_search",
   {
     title: "Knowledge DBを検索",
-    description: "SIGMA全体で共有されるKnowledge DBを意味検索・キーワード補助検索します。質問文をそのまま渡せます。",
+    description: "SIGMA全体で共有されるKnowledge DBを意味検索・キーワード補助検索します。教科→科目→単元のKnowledge Taxonomy分類も結果に含まれます。質問文をそのまま渡せます。",
     inputSchema: {
       query: z.string().min(1).max(2000),
       limit: z.number().int().min(1).max(20).optional(),
