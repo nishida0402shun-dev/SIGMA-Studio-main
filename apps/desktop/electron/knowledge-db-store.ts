@@ -511,7 +511,7 @@ export class KnowledgeDbStore {
             const text = nativeText || structured?.text || "";
             const blocks = structured?.blocks ?? [];
             const analysis = analyzeKnowledgePage(text, blocks);
-            const taxonomy = classifyKnowledgeTaxonomy(text, analysis.keywords);
+            const taxonomy = classifyKnowledgeTaxonomy([source.name, text].filter(Boolean).join("\n"), analysis.keywords);
             return {
               ...page,
               text: text || undefined,
