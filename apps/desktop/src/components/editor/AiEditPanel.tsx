@@ -1270,7 +1270,7 @@ export function AiEditPanel({
       console.warn("Knowledge DB retrieval failed; continuing without retrieved context.", error);
       return { text: "", references: [] };
     }
-  }, [document, documentWorkspaceId, lockedProvider, provider, turnReferences]);
+  }, [document, lockedProvider, provider, turnReferences]);
 
 
   const buildRunParams = useCallback(async (): Promise<RunParams> => {
