@@ -152,7 +152,7 @@ describe("Web AI MCP gateway live server path", () => {
     await expect(
       gateway.callTool(
         "knowledge_db_submit_classification_review",
-        { sourceId: "missing", pageNumber: 1, paths: [["その他"]], confidence: 0.5 },
+        { sourceId: "missing", pageNumber: 1, paths: ["その他"], confidence: 0.5 },
         null,
       ),
     ).rejects.toThrow();
