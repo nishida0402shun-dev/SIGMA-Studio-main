@@ -770,7 +770,7 @@ function EditorShellBody({ embeddedHost, editorStore }: EditorShellProps & { edi
   const whiteboardViewportRef = useRef<HTMLDivElement | null>(null);
   const handleWhiteboardViewportChange = useCallback((element: HTMLDivElement | null) => {
     whiteboardViewportRef.current = element;
-  }, [setAiDisplayMode, setAiSidebarOpen, setAiInlineOpen]);
+  }, []);
   const [previewOpen, setPreviewOpen] = useState(false);
   const [pdfExporting, setPdfExporting] = useState(false);
   const [exportedPdfPath, setExportedPdfPath] = useState<string | null>(null);
@@ -5652,7 +5652,7 @@ function EditorShellBody({ embeddedHost, editorStore }: EditorShellProps & { edi
     setAiDisplayMode(next.displayMode);
     setAiSidebarOpen(next.aiSidebarOpen);
     setAiInlineOpen(next.aiInlineOpen);
-  }, []);
+  }, [setAiDisplayMode, setAiSidebarOpen, setAiInlineOpen]);
 
   const openKnowledgeDb = useCallback(() => {
     if (!isDesktopApp) return;
