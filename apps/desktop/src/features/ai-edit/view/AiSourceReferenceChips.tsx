@@ -71,13 +71,11 @@ export function AiSourceReferenceChips({
   sourceReferences,
   className,
   onOpenDocument,
-  workspaceId,
 }: {
 
   sourceReferences: DesktopAiSourceReference[];
   className?: string;
   onOpenDocument?: (params: AiSourceReferenceOpenDocumentParams) => void;
-  workspaceId?: string | null;
 }) {
   const t = useT("ai");
   if (sourceReferences.length === 0) {
@@ -92,7 +90,6 @@ export function AiSourceReferenceChips({
           key={sourceReferenceKey(reference, index)}
           reference={reference}
           onOpenDocument={onOpenDocument}
-          workspaceId={workspaceId}
         />
       ))}
     </div>
