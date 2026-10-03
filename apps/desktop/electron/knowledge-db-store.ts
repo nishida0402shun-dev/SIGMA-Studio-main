@@ -186,7 +186,9 @@ export class KnowledgeDbStore {
     const items: KnowledgeContextItem[] = [];
     for (const result of results) {
       const { source, page } = await this.getPage(result.sourceId, result.pageNumber);
-      const structureText = page.structureBlocks?.map((block) => `[${block.type}] ${block.text}`).join("\n") ?? "";\n      const text = result.text.trim() || page.text?.trim() || structureText;
+      const structureText = page.structureBlocks?.map((block) => `[${block.type}] ${block.text}`).join("
+") ?? "";
+      const text = result.text.trim() || page.text?.trim() || structureText;
       if (!text) continue;
       items.push({
         id: result.id,
