@@ -1,4 +1,5 @@
 import { spawn } from "node:child_process";
+import fsSync from "node:fs";
 import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
@@ -206,7 +207,7 @@ function findBundledPython(): string | null {
   const executable = process.platform === "win32" ? "sigma-ocr.exe" : "sigma-ocr";
   const candidate = path.join(resourcesPath, "ocr-runtime", "sigma-ocr", executable);
   try {
-    require("node:fs").accessSync(candidate);
+    fsSync.accessSync(candidate);
     return candidate;
   } catch {
     return null;
