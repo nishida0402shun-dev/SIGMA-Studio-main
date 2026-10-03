@@ -90,6 +90,10 @@ interface TaxonomyTreeNode {
 
 function buildTaxonomyTreeStable(sources: KnowledgeSource[]): TaxonomyTreeNode[] {
   const roots: TaxonomyTreeNode[] = [];
+  const subjects = ["数学", "英語", "国語", "物理", "化学", "生物", "地理", "日本史", "世界史", "公民", "その他"];
+  for (const subject of subjects) {
+    roots.push({ key: subject, name: subject, path: [subject], children: [], pages: [] });
+  }
   const ensure = (siblings: TaxonomyTreeNode[], name: string, path: string[]): TaxonomyTreeNode => {
     const key = path.join("\\u001f");
     const existing = siblings.find((node) => node.key === key);
