@@ -153,7 +153,7 @@ export class KnowledgeDbStore {
         semanticType: page.semanticType,
         score: result.score,
         text: text.slice(0, 5000),
-        citation: `[SIGMA:${source.id}:p${page.pageNumber}]`,
+        citation: `[${source.name} p${page.pageNumber}](sigma://knowledge-db/${encodeURIComponent(source.id)}/p/${page.pageNumber})`,
       });
     }
     return items;
