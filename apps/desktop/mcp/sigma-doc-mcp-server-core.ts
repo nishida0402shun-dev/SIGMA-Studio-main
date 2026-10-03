@@ -3124,7 +3124,6 @@ registerTool(
     title: "Knowledge DBの指定範囲を取得",
     description: "PDFページ内の座標範囲を指定して、その範囲をPDFとして抽出します。ドラッグ選択から渡された範囲の再利用に使えます。",
     inputSchema: {
-      workspaceId: z.string().min(1).max(256),
       sourceId: z.string().min(1),
       pageNumber: z.number().int().min(1),
       x: z.number().min(0),
