@@ -139,9 +139,7 @@ function AiSourceReferenceChip({
         className="ai-source-ref-chip ai-source-ref-chip--document"
         title={tooltip}
         onClick={() => {
-          if (!workspaceId?.trim()) return;
           void getDesktopBridge()?.knowledgeDb?.openPage({
-            workspaceId: workspaceId.trim(),
             sourceId: reference.sourceId,
             pageNumber: reference.pageNumber,
           });
