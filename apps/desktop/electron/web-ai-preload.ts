@@ -429,7 +429,7 @@ async function registerSigmaWebAiTools(): Promise<void> {
 
   await modelContext.registerTool({
     name: "sigma_knowledge_submit_classification_review",
-    description: "Submit an AI classification double-check. Provide one or more full 教科→科目→単元 paths, confidence, and concise evidence. Matching SIGMA classification is confirmed; disagreement is recorded as needs-review without changing SIGMA's original taxonomy.",
+    description: "Submit an AI classification double-check. Provide one or more full subject-to-course-to-unit paths, confidence, and concise evidence. Matching SIGMA classification is confirmed; disagreement is recorded as needs-review without changing SIGMA's original taxonomy.",
     inputSchema: {
       type: "object",
       properties: {
