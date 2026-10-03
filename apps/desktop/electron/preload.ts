@@ -330,18 +330,17 @@ const desktopAPI = {
     chooseSources(): Promise<{ paths: string[] } | null> {
       return ipcRenderer.invoke("knowledge-db:choose-sources");
     },
-    list(payload: { workspaceId: string }): Promise<unknown[]> {
-      return ipcRenderer.invoke("knowledge-db:list", payload);
+    list(): Promise<unknown[]> {
+      return ipcRenderer.invoke("knowledge-db:list");
     },
-    search(payload: { workspaceId: string; query: string; limit?: number }): Promise<unknown[]> {
+    search(payload: { query: string; limit?: number }): Promise<unknown[]> {
       return ipcRenderer.invoke("knowledge-db:search", payload);
     },
-    importSources(payload: { workspaceId: string; paths: string[] }): Promise<unknown[]> {
+    importSources(payload: { paths: string[] }): Promise<unknown[]> {
       return ipcRenderer.invoke("knowledge-db:import", payload);
     },
     extractPages(payload: {
-      workspaceId: string;
-      sourceId?: string;
+            sourceId?: string;
       pageNumbers?: number[];
       selections?: Array<{ sourceId: string; pageNumbers: number[] }>;
     }): Promise<{ filePath: string; pageCount: number } | null> {
