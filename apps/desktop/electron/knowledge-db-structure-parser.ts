@@ -195,8 +195,8 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 function findBundledPython(): string | null {
   const resourcesPath = process.resourcesPath;
   if (!resourcesPath) return null;
-  const executable = process.platform === "win32" ? "python.exe" : "python";
-  const candidate = path.join(resourcesPath, "ocr-runtime", "python", executable);
+  const executable = process.platform === "win32" ? "sigma-ocr.exe" : "sigma-ocr";
+  const candidate = path.join(resourcesPath, "ocr-runtime", executable);
   try {
     require("node:fs").accessSync(candidate);
     return candidate;
