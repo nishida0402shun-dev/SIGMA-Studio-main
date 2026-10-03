@@ -876,6 +876,8 @@ export interface DesktopResearchSessionsAPI {
 export interface DesktopKnowledgeDbAPI {
   chooseSources(): Promise<{ paths: string[] } | null>;
   list(): Promise<unknown[]>;
+  getIndexStatus(): Promise<unknown>;
+  startIndexing(): Promise<unknown>;
   search(payload: { query: string; limit?: number }): Promise<unknown[]>;
   related(payload: { sourceId: string; limit?: number }): Promise<unknown[]>;
   importSources(payload: { paths: string[] }): Promise<unknown[]>;
