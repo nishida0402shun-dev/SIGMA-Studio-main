@@ -149,6 +149,30 @@ describe("Knowledge DB analysis lifecycle", () => {
     expect(page.taxonomyPaths?.some((path) => path.includes("数学Ⅱ"))).toBe(true);
   });
 
+  it("reports analysis lifecycle state and can reanalyze without reimporting the PDF", async () => {
+    const dataDir = await fs.mkdtemp(path.join(os.tmpdir(), "sigma-knowledge-db-reanalyze-"));
+    tempDirs.push(dataDir);
+    const sourcePath = await createPdf("reanalyze.pdf", 1);
+    const store = new KnowledgeDbStore(dataDir);
+    const [source] = await store.addFiles([sourcePath]);
+    expect(source).toBeTruthy();
+    await store.search("warmup", 1);
+
+    const before = await store.listSources();
+    expect(before[0]?.pages[0]?.analysisStatus).toBeDefined();
+    const status = await store.getAnalysisStatus();
+    expect(status.totalPages).toBe(1);
+    expect(status.taxonomyCurrent).toBe(1);
+
+    const run = await store.reanalyze([source!.id]);
+    expect(["running", "completed"]).toContain(run.state);
+    await store.search("再解析", 1);
+    const after = await store.listSources();
+    expect(after[0]?.id).toBe(source!.id);
+    expect(after[0]?.pages[0]?.analysisVersion).toBeGreaterThan(0);
+    expect(after[0]?.pages[0]?.taxonomyVersion).toBeGreaterThan(0);
+  });
+
   it("assembles deduplicated context within the requested character budget and exposes reasons", async () => {
     const dataDir = await fs.mkdtemp(path.join(os.tmpdir(), "sigma-knowledge-db-context-"));
     tempDirs.push(dataDir);
