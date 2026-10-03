@@ -3038,7 +3038,7 @@ registerTool(
       name: source.name,
       pageCount: source.pageCount,
       importedAt: source.importedAt,
-      pages: source.pages.map((page) => ({ id: page.id, pageNumber: page.pageNumber, semanticType: page.semanticType, title: page.title })),
+      pages: source.pages.map((page) => ({ id: page.id, pageNumber: page.pageNumber, semanticType: page.semanticType, title: page.title, keywords: page.keywords, analysisSignals: page.analysisSignals })),
     })) };
   }),
 );
