@@ -17,6 +17,10 @@ export interface KnowledgePage {
   text?: string;
   keywords?: string[];
   analysisSignals?: string[];
+  taxonomyNodeIds?: string[];
+  taxonomyPaths?: string[][];
+  taxonomyConfidence?: number;
+  taxonomyVersion?: number;
 }
 
 export interface KnowledgeSource {
