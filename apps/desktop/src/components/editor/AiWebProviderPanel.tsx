@@ -59,8 +59,6 @@ export function AiWebProviderPanel({
   );
 
   useEffect(() => {
-    setWebviewReady(false);
-    setWebMcpAvailable(null);
     const webview = webviewRef.current as (HTMLElement & {
       addEventListener: (type: string, listener: EventListener) => void;
       removeEventListener: (type: string, listener: EventListener) => void;
@@ -110,7 +108,6 @@ export function AiWebProviderPanel({
     };
     webview.addEventListener("will-navigate", onNavigate);
     return () => {
-      setWebviewReady(false);
       webview.removeEventListener("dom-ready", onDomReady);
       webview.removeEventListener("will-navigate", onNavigate);
       webview.removeEventListener("ipc-message", onIpcMessage);
@@ -205,6 +202,7 @@ export function AiWebProviderPanel({
               ref={(node: HTMLElement | null) => {
                 webviewRef.current = node;
               }}
+              key={`${provider}:${preloadUrl}`}
               src={selected.url}
               preload={preloadUrl}
               partition="persist:sigma-studio-ai-web"
