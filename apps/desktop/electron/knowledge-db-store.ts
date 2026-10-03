@@ -186,7 +186,7 @@ export class KnowledgeDbStore {
     const items: KnowledgeContextItem[] = [];
     for (const result of results) {
       const { source, page } = await this.getPage(result.sourceId, result.pageNumber);
-      const text = result.text.trim() || page.text?.trim() || "";
+      const structureText = page.structureBlocks?.map((block) => `[${block.type}] ${block.text}`).join("\n") ?? "";\n      const text = result.text.trim() || page.text?.trim() || structureText;
       if (!text) continue;
       items.push({
         id: result.id,
