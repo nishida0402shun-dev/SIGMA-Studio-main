@@ -866,6 +866,13 @@ export interface DesktopWorkspacePreviewAPI {
   put(fileId: string, revision: number, dataUrl: string): Promise<{ ok: boolean }>;
 }
 
+export interface DesktopResearchSessionsAPI {
+  list(): Promise<unknown[]>;
+  create(payload: { title?: string; query: string; sourceReferences?: unknown[] }): Promise<unknown>;
+  update(payload: { id: string; title?: string; query?: string; sourceReferences?: unknown[] }): Promise<unknown>;
+  delete(payload: { id: string }): Promise<{ ok: boolean }>;
+}
+
 export interface DesktopKnowledgeDbAPI {
   chooseSources(): Promise<{ paths: string[] } | null>;
   list(): Promise<unknown[]>;
@@ -905,6 +912,7 @@ export interface DesktopAPI {
   templates: DesktopTemplatesAPI;
   storage: DesktopStorageAPI;
   knowledgeDb?: DesktopKnowledgeDbAPI;
+  researchSessions?: DesktopResearchSessionsAPI;
   workspacePreview?: DesktopWorkspacePreviewAPI;
   onMenuAction(handler: (action: string) => void): () => void;
 }
