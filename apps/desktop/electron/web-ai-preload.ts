@@ -260,7 +260,7 @@ async function registerSigmaWebAiTools(): Promise<void> {
 
   await modelContext.registerTool({
     name: "sigma_mcp_list_tools",
-    description: "List the read-only MCP tools exposed by Sigma Studio for the selected Workspace.",
+    description: "List the MCP tools exposed by Sigma Studio for the selected Workspace. Knowledge DB classification review submission is a controlled write operation; other exposed tools are read-only.",
     inputSchema: { type: "object", properties: {} },
     annotations: { readOnlyHint: true, untrustedContentHint: false },
     execute: async () => callApi("/v1/mcp/tools"),
@@ -268,7 +268,7 @@ async function registerSigmaWebAiTools(): Promise<void> {
 
   await modelContext.registerTool({
     name: "sigma_mcp_call_tool",
-    description: "Call a read-only SIGMA MCP tool returned by sigma_mcp_list_tools.",
+    description: "Call an allowlisted SIGMA MCP tool returned by sigma_mcp_list_tools. Most tools are read-only; Knowledge DB classification review submission is the only controlled classification write operation.",
     inputSchema: {
       type: "object",
       properties: { name: { type: "string" }, arguments: { type: "object" } },
