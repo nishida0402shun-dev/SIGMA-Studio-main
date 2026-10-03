@@ -23,6 +23,11 @@ export interface KnowledgePage {
   taxonomyPaths?: string[][];
   taxonomyConfidence?: number;
   taxonomyVersion?: number;
+  classificationReviewStatus?: "pending" | "confirmed" | "needs-review";
+  classificationReviewPaths?: string[][];
+  classificationReviewConfidence?: number;
+  classificationReviewReason?: string;
+  classificationReviewEvidence?: string[];
   analysisStatus?: KnowledgeAnalysisStatus;
   analysisVersion?: number;
   analysisError?: string;
