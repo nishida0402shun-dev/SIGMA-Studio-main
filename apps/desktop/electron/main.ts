@@ -1778,7 +1778,7 @@ async function startWebAiBridgeServer(): Promise<void> {
         details,
       ].join("\\n");
       return owner.webContents.executeJavaScript(
-        `window.confirm("${level}")`,
+        `window.confirm(${JSON.stringify(confirmationMessage)})`,
       );
     },
   });
