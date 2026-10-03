@@ -225,6 +225,7 @@ export interface KnowledgeTaxonomyMatch {
   nodeId: string;
   path: string[];
   score: number;
+  confidence: number;
 }
 
 function normalizeTaxonomyText(value: string): string {
@@ -267,7 +268,13 @@ export function classifyKnowledgeTaxonomy(text: string, keywords: string[] = [])
     if (score > 0) {
       // Prefer the deepest matched node; parents remain available as context.
       score += Math.min(0.25, path.length * 0.04);
-      candidates.push({ nodeId: node.id, path, score: Math.min(1, score) });
+      const boundedScore = Math.min(1, score);
+      candidates.push({
+        nodeId: node.id,
+        path,
+        score: boundedScore,
+        confidence: boundedScore,
+      });
     }
   }
 
