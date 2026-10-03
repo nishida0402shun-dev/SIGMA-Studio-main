@@ -50,7 +50,7 @@ function IndexStatusBadge({ knowledgeDb }: { knowledgeDb: NonNullable<ReturnType
     refreshAnalysis();
     const timer = window.setInterval(() => { refresh(); refreshAnalysis(); }, 800);
     return () => { cancelled = true; window.clearInterval(timer); };
-  }, [knowledgeDb]);
+  }, [db, knowledgeDb]);
   if (!db) return null;
   if (!status || (status.state === "completed" && status.total === 0)) return null;
   if (status.state === "running") return <span className="knowledge-db-index-status">Indexing {status.completed}/{status.total}</span>;
