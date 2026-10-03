@@ -637,8 +637,8 @@ export class KnowledgeDbStore {
     await fs.mkdir(paths.sourcesDir, { recursive: true });
     for (const entry of entries) {
       if (!entry.isDirectory()) continue;
-      let parsed: any;
-      try { parsed = JSON.parse(await fs.readFile(path.join(legacyRoot, entry.name, "library.json"), "utf8")); } catch { continue; }
+      let parsed: { sources?: Array<Record<string, unknown>> };
+      try { parsed = JSON.parse(await fs.readFile(path.join(legacyRoot, entry.name, "library.json"), "utf8")) as { sources?: Array<Record<string, unknown>> }; } catch { continue; }
       if (!Array.isArray(parsed.sources)) continue;
       for (const legacy of parsed.sources) {
         let bytes: Uint8Array;
