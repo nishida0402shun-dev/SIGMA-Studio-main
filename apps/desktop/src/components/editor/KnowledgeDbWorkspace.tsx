@@ -30,22 +30,22 @@ function IndexStatusBadge({ knowledgeDb }: { knowledgeDb: NonNullable<ReturnType
   const [status, setStatus] = useState<{ state: string; total: number; completed: number; error?: string } | null>(null);
   const [structureStatus, setStructureStatus] = useState<{ available: boolean; engine: string | null; source: string; error?: string } | null>(null);
   const [analysisStatus, setAnalysisStatus] = useState<{ totalPages: number; analyzed: number; pending: number; processing: number; stale: number; failed: number; ocrNeeded: number; taxonomyCurrent: number; taxonomyStale: number } | null>(null);
+  const db = knowledgeDb;
+  if (!db) return null;
   useEffect(() => {
-    const db = knowledgeDb;
-    if (!db) return;
     let cancelled = false;
-    const refresh = () => void knowledgeDb.getIndexStatus().then((value) => {
+    const refresh = () => void db.getIndexStatus().then((value) => {
       if (!cancelled && value && typeof value === "object") setStatus(value as typeof status);
     });
     const refreshAnalysis = () => void db.getAnalysisStatus().then((value) => {
       if (!cancelled && value && typeof value === "object") setAnalysisStatus(value as typeof analysisStatus);
     }).catch(() => undefined);
-    void knowledgeDb.getStructureParserStatus().then((value) => {
+    void db.getStructureParserStatus().then((value) => {
       if (!cancelled && value && typeof value === "object") setStructureStatus(value as typeof structureStatus);
     }).catch(() => {
       if (!cancelled) setStructureStatus(null);
     });
-    void knowledgeDb.startIndexing().then(refresh);
+    void db.startIndexing().then(refresh);
     refresh();
     refreshAnalysis();
     const timer = window.setInterval(() => { refresh(); refreshAnalysis(); }, 800);
@@ -53,7 +53,7 @@ function IndexStatusBadge({ knowledgeDb }: { knowledgeDb: NonNullable<ReturnType
   }, [knowledgeDb]);
   if (!status || (status.state === "completed" && status.total === 0)) return null;
   if (status.state === "running") return <span className="knowledge-db-index-status">Indexing {status.completed}/{status.total}</span>;
-  if (status.state === "failed") return <button type="button" className="knowledge-db-index-status error" onClick={() => void knowledgeDb?.startIndexing()}>Index retry</button>;
+  if (status.state === "failed") return <button type="button" className="knowledge-db-index-status error" onClick={() => void db.startIndexing()}>Index retry</button>;
   return (
     <>
       <span className="knowledge-db-index-status">Index complete</span>
