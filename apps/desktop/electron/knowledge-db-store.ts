@@ -20,6 +20,8 @@ export interface KnowledgePage {
   extractionStatus?: "text" | "ocr-needed" | "empty";
   wordCount?: number;
   structureBlocks?: KnowledgeStructureBlock[];
+  keywords?: string[];
+  analysisSignals?: string[];
 }
 
 export interface KnowledgeSource {
@@ -188,7 +190,12 @@ export class KnowledgeDbStore {
     for (const result of results) {
       const { source, page } = await this.getPage(result.sourceId, result.pageNumber);
       const structureText = page.structureBlocks?.map((block) => `[${block.type}] ${block.text}`).join("\n") ?? "";
-      const text = [page.title ? `[title] ${page.title}` : "", result.text.trim() || page.text?.trim() || structureText]
+      const analysisText = [
+        page.title ? `[title] ${page.title}` : "",
+        page.semanticType !== "unknown" ? `[type] ${page.semanticType}` : "",
+        page.keywords?.length ? `[keywords] ${page.keywords.join(", ")}` : "",
+      ].filter(Boolean).join("\n");
+      const text = [analysisText, result.text.trim() || page.text?.trim() || structureText]
         .filter(Boolean)
         .join("\n");
       if (!text) continue;
@@ -385,6 +392,8 @@ export class KnowledgeDbStore {
               text: text || undefined,
               semanticType: page.semanticType === "unknown" ? analysis.semanticType : page.semanticType,
               ...(page.title || !analysis.title ? {} : { title: analysis.title }),
+              ...(analysis.keywords.length ? { keywords: analysis.keywords } : {}),
+              ...(analysis.signals.length ? { analysisSignals: analysis.signals } : {}),
               extractionStatus: text ? "text" : "ocr-needed",
               wordCount: text ? countWords(text) : 0,
               ...(blocks.length ? { structureBlocks: blocks } : {}),
