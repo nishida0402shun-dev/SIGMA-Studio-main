@@ -29,12 +29,16 @@ const TYPES: KnowledgeSemanticType[] = ["problem", "example", "explanation", "co
 function IndexStatusBadge({ knowledgeDb }: { knowledgeDb: NonNullable<ReturnType<typeof getDesktopBridge>>["knowledgeDb"] | undefined }): React.ReactElement | null {
   const [status, setStatus] = useState<{ state: string; total: number; completed: number; error?: string } | null>(null);
   const [structureStatus, setStructureStatus] = useState<{ available: boolean; engine: string | null; source: string; error?: string } | null>(null);
+  const [analysisStatus, setAnalysisStatus] = useState<{ totalPages: number; analyzed: number; pending: number; processing: number; stale: number; failed: number; ocrNeeded: number; taxonomyCurrent: number; taxonomyStale: number } | null>(null);
   useEffect(() => {
     if (!knowledgeDb) return;
     let cancelled = false;
     const refresh = () => void knowledgeDb.getIndexStatus().then((value) => {
       if (!cancelled && value && typeof value === "object") setStatus(value as typeof status);
     });
+    const refreshAnalysis = () => void knowledgeDb.getAnalysisStatus?.().then((value) => {
+      if (!cancelled && value && typeof value === "object") setAnalysisStatus(value as typeof analysisStatus);
+    }).catch(() => undefined);
     void knowledgeDb.getStructureParserStatus().then((value) => {
       if (!cancelled && value && typeof value === "object") setStructureStatus(value as typeof structureStatus);
     }).catch(() => {
@@ -42,7 +46,8 @@ function IndexStatusBadge({ knowledgeDb }: { knowledgeDb: NonNullable<ReturnType
     });
     void knowledgeDb.startIndexing().then(refresh);
     refresh();
-    const timer = window.setInterval(refresh, 800);
+    refreshAnalysis();
+    const timer = window.setInterval(() => { refresh(); refreshAnalysis(); }, 800);
     return () => { cancelled = true; window.clearInterval(timer); };
   }, [knowledgeDb]);
   if (!status || (status.state === "completed" && status.total === 0)) return null;
@@ -51,6 +56,16 @@ function IndexStatusBadge({ knowledgeDb }: { knowledgeDb: NonNullable<ReturnType
   return (
     <>
       <span className="knowledge-db-index-status">Index complete</span>
+      {analysisStatus && (
+        <>
+          <span className="knowledge-db-index-status">解析 {analysisStatus.analyzed}/{analysisStatus.totalPages}</span>
+          {(analysisStatus.stale > 0 || analysisStatus.taxonomyStale > 0 || analysisStatus.failed > 0) && knowledgeDb.reanalyze && (
+            <button type="button" className="knowledge-db-index-status" onClick={() => void knowledgeDb.reanalyze().then(() => undefined)}>
+              再解析
+            </button>
+          )}
+        </>
+      )}
       {structureStatus && (
         <span
           className="knowledge-db-index-status"
