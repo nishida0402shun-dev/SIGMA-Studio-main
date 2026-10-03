@@ -158,6 +158,20 @@ describe("KnowledgeDbStore", () => {
 });
 
 
+it("imports non-PDF files into the global Knowledge DB and indexes their text", async () => {
+  const dataDir = await fs.mkdtemp(path.join(os.tmpdir(), "sigma-knowledge-db-file-types-"));
+  tempDirs.push(dataDir);
+  const filePath = path.join(dataDir, "notes.md");
+  await fs.writeFile(filePath, "# 三角関数\\n\\n正弦定理と余弦定理のメモ", "utf8");
+  const store = new KnowledgeDbStore(dataDir);
+  const [source] = await store.addFiles([filePath]);
+  expect(source?.mimeType).toBe("text/markdown");
+  expect(source?.pageCount).toBe(1);
+  expect(source?.pages[0]?.text).toContain("正弦定理");
+  expect(source?.pages[0]?.analysisStatus).toBe("analyzed");
+  expect((await store.search("正弦定理", 5)).some((item) => item.sourceId === source?.id)).toBe(true);
+});
+
 describe("global library", () => {
   it("shares sources across all app contexts", async () => {
     const dataDir = await fs.mkdtemp(path.join(os.tmpdir(), "sigma-knowledge-db-global-"));
