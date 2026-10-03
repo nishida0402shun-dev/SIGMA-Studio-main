@@ -348,6 +348,12 @@ const desktopAPI = {
     list(): Promise<unknown[]> {
       return ipcRenderer.invoke("knowledge-db:list");
     },
+    getIndexStatus(): Promise<unknown> {
+      return ipcRenderer.invoke("knowledge-db:index-status");
+    },
+    startIndexing(): Promise<unknown> {
+      return ipcRenderer.invoke("knowledge-db:index-start");
+    },
     search(payload: { query: string; limit?: number }): Promise<unknown[]> {
       return ipcRenderer.invoke("knowledge-db:search", payload);
     },
