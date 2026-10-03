@@ -2,7 +2,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { BookmarkPlus, Database, Download, ExternalLink, FilePlus2, FileText, History, MessageSquare, Search, Trash2, X } from "lucide-react";
+import { BookmarkPlus, ChevronDown, ChevronRight, Database, Download, ExternalLink, FilePlus2, FileText, Folder, History, MessageSquare, Search, Trash2, X } from "lucide-react";
 import { KnowledgePdfPageViewer, type KnowledgeRegion } from "./KnowledgePdfPageViewer";
 import { getDesktopBridge } from "@/lib/desktop-bridge";
 import type { KnowledgeDbAiContext, KnowledgeSearchResult, KnowledgeSemanticType, KnowledgeSource } from "@/types/knowledge-db";
@@ -63,6 +63,80 @@ function IndexStatusBadge({ knowledgeDb }: { knowledgeDb: NonNullable<ReturnType
   );
 }
 
+interface TaxonomyTreeNode {
+  key: string;
+  name: string;
+  path: string[];
+  children: TaxonomyTreeNode[];
+  pages: Array<{ source: KnowledgeSource; page: KnowledgeSource["pages"][number] }>;
+}
+
+function buildTaxonomyTree(sources: KnowledgeSource[]): TaxonomyTreeNode[] {
+  const roots = new Map<string, TaxonomyTreeNode>();
+  for (const source of sources) {
+    for (const page of source.pages) {
+      const paths = page.taxonomyPaths ?? [];
+      for (const path of paths) {
+        if (path.length === 0) continue;
+        let level = roots;
+        let parentPath: string[] = [];
+        for (const name of path) {
+          const key = [...parentPath, name].join("\\u001f");
+          let node = level.get(key);
+          if (!node) {
+            node = { key, name, path: [...parentPath, name], children: [], pages: [] };
+            level.set(key, node);
+          }
+          if (!node.pages.some((item) => item.source.id === source.id && item.page.id === page.id)) {
+            node.pages.push({ source, page });
+          }
+          parentPath = [...parentPath, name];
+          if (!node.children.some((child) => child.name === path[parentPath.length])) {
+            // Child nodes are created by the next path segment.
+          }
+          const childMap = new Map(node.children.map((child) => [child.key, child]));
+          level = childMap;
+          // Keep the node's child map synchronized by rebuilding from the map on demand below.
+          node.children = [...childMap.values()];
+        }
+      }
+    }
+  }
+  return [...roots.values()];
+}
+
+function buildTaxonomyTreeStable(sources: KnowledgeSource[]): TaxonomyTreeNode[] {
+  const roots: TaxonomyTreeNode[] = [];
+  const ensure = (siblings: TaxonomyTreeNode[], name: string, path: string[]): TaxonomyTreeNode => {
+    const key = path.join("\\u001f");
+    const existing = siblings.find((node) => node.key === key);
+    if (existing) return existing;
+    const created: TaxonomyTreeNode = { key, name, path, children: [], pages: [] };
+    siblings.push(created);
+    return created;
+  };
+  for (const source of sources) {
+    for (const page of source.pages) {
+      for (const path of page.taxonomyPaths ?? []) {
+        let siblings = roots;
+        const traversed: string[] = [];
+        for (const name of path) {
+          traversed.push(name);
+          const node = ensure(siblings, name, [...traversed]);
+          if (!node.pages.some((item) => item.source.id === source.id && item.page.id === page.id)) {
+            node.pages.push({ source, page });
+          }
+          siblings = node.children;
+        }
+      }
+    }
+  }
+  const sort = (nodes: TaxonomyTreeNode[]): TaxonomyTreeNode[] => nodes
+    .sort((a, b) => a.name.localeCompare(b.name, "ja"))
+    .map((node) => ({ ...node, children: sort(node.children) }));
+  return sort(roots);
+}
+
 function semanticTypeLabel(t: Translate<"chrome">, type: KnowledgeSemanticType): string {
   switch (type) {
     case "problem": return t("appMenu.knowledgeDb.types.problem");
@@ -78,6 +152,45 @@ function semanticTypeLabel(t: Translate<"chrome">, type: KnowledgeSemanticType):
 }
 
 
+function TaxonomyNode({
+  node,
+  depth,
+  expanded,
+  onToggle,
+  onSelect,
+}: {
+  node: TaxonomyTreeNode;
+  depth: number;
+  expanded: Set<string>;
+  onToggle: (key: string) => void;
+  onSelect: (node: TaxonomyTreeNode) => void;
+}) {
+  const isExpanded = expanded.has(node.key);
+  const hasChildren = node.children.length > 0;
+  const icon = hasChildren ? (isExpanded ? <ChevronDown size={15} /> : <ChevronRight size={15} />) : <span className="knowledge-db-tree-spacer" />;
+  return (
+    <div className="knowledge-db-tree-node">
+      <button
+        type="button"
+        className="knowledge-db-tree-row"
+        style={{ paddingLeft: 8 + depth * 18 }}
+        onClick={() => {
+          if (hasChildren) onToggle(node.key);
+          onSelect(node);
+        }}
+      >
+        {icon}
+        <Folder size={16} />
+        <span>{node.name}</span>
+        <small>{node.pages.length}</small>
+      </button>
+      {isExpanded && node.children.map((child) => (
+        <TaxonomyNode key={child.key} node={child} depth={depth + 1} expanded={expanded} onToggle={onToggle} onSelect={onSelect} />
+      ))}
+    </div>
+  );
+}
+
 export function KnowledgeDbWorkspace({ open, onClose, onOpenAi, t }: Props) {
   const [sources, setSources] = useState<KnowledgeSource[]>([]);
   const [query, setQuery] = useState("");
@@ -88,6 +201,8 @@ export function KnowledgeDbWorkspace({ open, onClose, onOpenAi, t }: Props) {
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null);
   const [researchSessions, setResearchSessions] = useState<ResearchSession[]>([]);
   const [relatedSources, setRelatedSources] = useState<Array<{ sourceId: string; sourceName: string; score: number; pageNumber: number }>>([]);
+  const [expandedTaxonomy, setExpandedTaxonomy] = useState<Set<string>>(new Set());
+  const [selectedTaxonomyNode, setSelectedTaxonomyNode] = useState<TaxonomyTreeNode | null>(null);
   const desktop = getDesktopBridge();
   const researchApi = desktop?.researchSessions;
   const knowledgeDb = desktop?.knowledgeDb;
@@ -136,6 +251,8 @@ export function KnowledgeDbWorkspace({ open, onClose, onOpenAi, t }: Props) {
       return source && page ? [{ source, page, score: result.score }] : [];
     }).filter(({ page }) => typeFilter === "all" || page.semanticType === typeFilter);
   }, [query, searchResults, sources, typeFilter]);
+
+  const taxonomyTree = useMemo(() => buildTaxonomyTreeStable(sources), [sources]);
 
   const selectedPages = Object.entries(selected).flatMap(([sourceId, pages]) =>
     [...pages].map((pageNumber) => ({ sourceId, pageNumber })),
