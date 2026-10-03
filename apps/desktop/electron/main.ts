@@ -1760,7 +1760,6 @@ async function startWebAiBridgeServer(): Promise<void> {
     userDataPath: USER_DATA_PATH,
     requestPermission: async ({ toolName, permissionClass, tool, arguments: toolArguments }) => {
       const owner = mainWindow && !mainWindow.isDestroyed() ? mainWindow : null;
-      const level = permissionClass === "consequential" ? "高リスク操作" : "変更操作";
       const description = tool.description?.trim() || "説明なし";
       const serializedArguments = JSON.stringify(toolArguments, null, 2);
       const details = serializedArguments.length > 1800
