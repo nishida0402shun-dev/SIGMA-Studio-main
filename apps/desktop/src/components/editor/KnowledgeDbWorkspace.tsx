@@ -692,6 +692,9 @@ export function KnowledgeDbWorkspace({ open, onClose, onOpenAi, t }: Props) {
           <button type="button" onClick={() => void handoffAi("内容を解説する")}>解説する</button>
           <button type="button" onClick={() => void handoffAi("数値や条件を変更した類似問題を作る")}>数値を変える</button>
           <button type="button" onClick={() => void handoffAi("この問題の類題を3問作る")}>類題を作る</button>
+          <button type="button" onClick={() => void handoffAi("選択資料を根拠に調査レポートを作る")}>レポートを作る</button>
+          <button type="button" onClick={() => void handoffAi("選択資料を比較し、比較表を作る")}>比較表を作る</button>
+          <button type="button" onClick={() => void handoffAi("選択資料の要点を根拠ページ付きで要約する")}>要約する</button>
           <button type="button" onClick={() => void handoffAi("この内容から練習問題を作る")}>問題を作る</button>
         </div>
       )}
