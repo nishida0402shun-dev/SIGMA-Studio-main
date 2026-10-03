@@ -3155,6 +3155,41 @@ registerTool(
 );
 
 registerTool(
+  "knowledge_db_submit_classification_review",
+  {
+    title: "Knowledge DB分類のAIダブルチェック結果を提出",
+    description: "Web AIが本文・OCR・構造解析だけを根拠に再判定した教科→科目→単元候補をSIGMAへ返します。SIGMAの既存分類と一致した場合はconfirmed、不一致の場合は既存分類を変更せずneeds-reviewとして記録します。",
+    inputSchema: {
+      sourceId: z.string().min(1),
+      pageNumber: z.number().int().min(1),
+      paths: z.array(z.array(z.string().min(1)).min(1)).min(1).max(4),
+      confidence: z.number().min(0).max(1),
+      reason: z.string().max(2000).optional(),
+      evidence: z.array(z.string().min(1).max(500)).max(8).optional(),
+    },
+  },
+  async ({ sourceId, pageNumber, paths, confidence, reason, evidence }) => withToolErrorHandling(async () => {
+    const result = await new KnowledgeDbStore(storeContext.dataDir).applyClassificationReview({
+      sourceId,
+      pageNumber,
+      paths,
+      confidence,
+      reason,
+      evidence,
+    });
+    return {
+      ok: true,
+      sourceId,
+      pageNumber,
+      status: result.status,
+      currentPaths: result.page.taxonomyPaths ?? [],
+      reviewedPaths: result.page.classificationReviewPaths ?? [],
+      confidence: result.page.classificationReviewConfidence ?? 0,
+    };
+  }),
+);
+
+registerTool(
   "knowledge_db_get_context",
   {
     title: "Knowledge DBからAI Contextを取得",
