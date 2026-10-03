@@ -26,6 +26,25 @@ interface ResearchSession {
 
 const TYPES: KnowledgeSemanticType[] = ["problem", "example", "explanation", "column", "definition", "theorem", "answer", "figure"];
 
+function IndexStatusBadge({ knowledgeDb }: { knowledgeDb: NonNullable<ReturnType<typeof getDesktopBridge>>["knowledgeDb"] | undefined }): JSX.Element | null {
+  const [status, setStatus] = useState<{ state: string; total: number; completed: number; error?: string } | null>(null);
+  useEffect(() => {
+    if (!knowledgeDb) return;
+    let cancelled = false;
+    const refresh = () => void knowledgeDb.getIndexStatus().then((value) => {
+      if (!cancelled && value && typeof value === "object") setStatus(value as typeof status);
+    });
+    void knowledgeDb.startIndexing().then(refresh);
+    refresh();
+    const timer = window.setInterval(refresh, 800);
+    return () => { cancelled = true; window.clearInterval(timer); };
+  }, [knowledgeDb]);
+  if (!status || (status.state === "completed" && status.total === 0)) return null;
+  if (status.state === "running") return <span className="knowledge-db-index-status">Indexing {status.completed}/{status.total}</span>;
+  if (status.state === "failed") return <button type="button" className="knowledge-db-index-status error" onClick={() => void knowledgeDb?.startIndexing()}>Index retry</button>;
+  return <span className="knowledge-db-index-status">Index complete</span>;
+}
+
 function semanticTypeLabel(t: Translate<"chrome">, type: KnowledgeSemanticType): string {
   switch (type) {
     case "problem": return t("appMenu.knowledgeDb.types.problem");
@@ -51,8 +70,8 @@ export function KnowledgeDbWorkspace({ open, onClose, onOpenAi, t }: Props) {
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null);
   const [researchSessions, setResearchSessions] = useState<ResearchSession[]>([]);
   const [relatedSources, setRelatedSources] = useState<Array<{ sourceId: string; sourceName: string; score: number; pageNumber: number }>>([]);
-  const researchApi = desktop?.researchSessions;
   const desktop = getDesktopBridge();
+  const researchApi = desktop?.researchSessions;
   const knowledgeDb = desktop?.knowledgeDb;
 
   useEffect(() => {
@@ -100,6 +119,10 @@ export function KnowledgeDbWorkspace({ open, onClose, onOpenAi, t }: Props) {
     }).filter(({ page }) => typeFilter === "all" || page.semanticType === typeFilter);
   }, [query, searchResults, sources, typeFilter]);
 
+  const selectedPages = Object.entries(selected).flatMap(([sourceId, pages]) =>
+    [...pages].map((pageNumber) => ({ sourceId, pageNumber })),
+  );
+
   useEffect(() => {
     const sourceId = selectedPages[0]?.sourceId;
     if (!knowledgeDb || !sourceId) {
@@ -114,10 +137,6 @@ export function KnowledgeDbWorkspace({ open, onClose, onOpenAi, t }: Props) {
     });
     return () => { cancelled = true; };
   }, [knowledgeDb, selectedPages.length, selectedPages[0]?.sourceId]);
-
-  const selectedPages = Object.entries(selected).flatMap(([sourceId, pages]) =>
-    [...pages].map((pageNumber) => ({ sourceId, pageNumber })),
-  );
 
   if (!open) return null;
 
@@ -361,7 +380,7 @@ export function KnowledgeDbWorkspace({ open, onClose, onOpenAi, t }: Props) {
   background: transparent;
 }
 
-.knowledge-db-session-select {\n  display: inline-flex;\n  align-items: center;\n  gap: 5px;\n}\n\n.knowledge-db-toolbar select {
+.knowledge-db-index-status {\n  display: inline-flex;\n  align-items: center;\n  font-size: 12px;\n  opacity: 0.8;\n}\n\n.knowledge-db-index-status.error {\n  cursor: pointer;\n  border: 0;\n  background: transparent;\n  text-decoration: underline;\n}\n\n.knowledge-db-session-select {\n  display: inline-flex;\n  align-items: center;\n  gap: 5px;\n}\n\n.knowledge-db-toolbar select {
   min-height: 34px;
   padding: 5px 9px;
   border: 1px solid rgb(100 116 139 / 0.28);
@@ -581,6 +600,7 @@ export function KnowledgeDbWorkspace({ open, onClose, onOpenAi, t }: Props) {
             {TYPES.map((type) => <option key={type} value={type}>{semanticTypeLabel(t, type)}</option>)}
           </select>
           <span>{t("appMenu.knowledgeDb.resultCount", { count: visible.length })}</span>
+          <IndexStatusBadge knowledgeDb={knowledgeDb} />
           <label className="knowledge-db-session-select" title="Research Session">
             <History size={15} />
             <select defaultValue="" onChange={(event) => void loadResearchSession(event.target.value)}>
