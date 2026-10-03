@@ -340,25 +340,25 @@ const desktopAPI = {
       return ipcRenderer.invoke("knowledge-db:import", payload);
     },
     extractPages(payload: {
-            sourceId?: string;
+      sourceId?: string;
       pageNumbers?: number[];
       selections?: Array<{ sourceId: string; pageNumbers: number[] }>;
     }): Promise<{ filePath: string; pageCount: number } | null> {
       return ipcRenderer.invoke("knowledge-db:extract-pages", payload);
     },
-    setPageType(payload: { workspaceId: string; sourceId: string; pageNumber: number; semanticType: string; title?: string }): Promise<unknown> {
+    setPageType(payload: { sourceId: string; pageNumber: number; semanticType: string; title?: string }): Promise<unknown> {
       return ipcRenderer.invoke("knowledge-db:set-page-type", payload);
     },
-    deleteSource(payload: { workspaceId: string; sourceId: string }): Promise<{ ok: boolean }> {
+    deleteSource(payload: { sourceId: string }): Promise<{ ok: boolean }> {
       return ipcRenderer.invoke("knowledge-db:delete-source", payload);
     },
-    openPage(payload: { workspaceId: string; sourceId: string; pageNumber: number }): Promise<{ ok: boolean; error?: string; filePath?: string }> {
+    openPage(payload: { sourceId: string; pageNumber: number }): Promise<{ ok: boolean; error?: string; filePath?: string }> {
       return ipcRenderer.invoke("knowledge-db:open-page", payload);
     },
-    getPagePdf(payload: { workspaceId: string; sourceId: string; pageNumber: number }): Promise<{ dataBase64: string; width: number; height: number } | null> {
+    getPagePdf(payload: { sourceId: string; pageNumber: number }): Promise<{ dataBase64: string; width: number; height: number } | null> {
       return ipcRenderer.invoke("knowledge-db:get-page-pdf", payload);
     },
-    extractRegion(payload: { workspaceId: string; sourceId: string; pageNumber: number; rect: { x: number; y: number; width: number; height: number } }): Promise<{ ok: boolean; error?: string; filePath?: string }> {
+    extractRegion(payload: { sourceId: string; pageNumber: number; rect: { x: number; y: number; width: number; height: number } }): Promise<{ ok: boolean; error?: string; filePath?: string }> {
       return ipcRenderer.invoke("knowledge-db:extract-region", payload);
     },
   },
