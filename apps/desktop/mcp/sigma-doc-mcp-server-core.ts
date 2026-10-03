@@ -3126,6 +3126,35 @@ registerTool(
 );
 
 registerTool(
+  "knowledge_db_get_classification_review_context",
+  {
+    title: "Knowledge DB分類のAIダブルチェック用Context",
+    description: "Knowledge DBの自動分類をWeb AIが二次確認するための読み取り専用Contextです。ファイル名や拡張子は一切渡さず、本文・OCR・構造解析ブロックとSIGMAの候補分類だけを渡します。Web AIは候補を鵜呑みにせず、内容だけを根拠に教科→科目→単元を再判定してください。",
+    inputSchema: {
+      sourceId: z.string().min(1),
+      pageNumber: z.number().int().min(1),
+    },
+  },
+  async ({ sourceId, pageNumber }) => withToolErrorHandling(async () => {
+    const { page } = await new KnowledgeDbStore(storeContext.dataDir).getPage(sourceId, pageNumber);
+    const structureText = page.structureBlocks?.map((block) => `[${block.type}] ${block.text}`).join("\n") ?? "";
+    const content = [page.text?.trim() ?? "", structureText].filter(Boolean).join("\n").slice(0, 30000);
+    const candidates = (page.taxonomyPaths ?? []).map((path, index) => ({
+      path,
+      confidence: index === 0 ? page.taxonomyConfidence ?? 0 : undefined,
+    }));
+    return {
+      ok: true,
+      sourceId,
+      pageNumber,
+      content,
+      candidates,
+      instructions: "ファイル名・拡張子・保存場所は分類根拠に使用しないでください。本文、OCR、表・図・数式などの構造解析結果だけを見て再判定してください。SIGMA候補と一致する必要はありません。複数単元にまたがる場合は複数候補を返し、根拠となる本文箇所を短く示してください。",
+    };
+  }),
+);
+
+registerTool(
   "knowledge_db_get_context",
   {
     title: "Knowledge DBからAI Contextを取得",
