@@ -3025,6 +3025,34 @@ const { registerTool, bodyImplementations } = createMcpToolRegistrar(server, {
 });
 
 registerTool(
+  "knowledge_db_get_analysis_status",
+  {
+    title: "Knowledge DBの解析状態を取得",
+    description: "Knowledge DB全体の解析・分類状態を取得します。未解析、処理中、旧バージョン、失敗、OCR待ち、taxonomy更新待ちを確認できます。Workspaceには依存しません。",
+    inputSchema: {},
+  },
+  async () => withToolErrorHandling(async () => {
+    const status = await new KnowledgeDbStore(storeContext.dataDir).getAnalysisStatus();
+    return { ok: true, status };
+  }),
+);
+
+registerTool(
+  "knowledge_db_reanalyze",
+  {
+    title: "Knowledge DBを再解析",
+    description: "指定資料、またはKnowledge DB全体を現在の上位解析エンジンとtaxonomyで再解析します。PDFの再インポートは不要です。",
+    inputSchema: {
+      sourceIds: z.array(z.string().min(1)).max(100).optional(),
+    },
+  },
+  async ({ sourceIds }) => withToolErrorHandling(async () => {
+    const status = await new KnowledgeDbStore(storeContext.dataDir).reanalyze(sourceIds);
+    return { ok: true, status };
+  }),
+);
+
+registerTool(
   "knowledge_db_list_sources",
   {
     title: "Knowledge DBの資料一覧",
