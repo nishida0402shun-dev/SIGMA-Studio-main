@@ -3711,7 +3711,6 @@ export function AssistantTurnView({
             <AiSourceReferenceChips
               sourceReferences={dedupeAiSourceReferences(sourceReferences)}
               onOpenDocument={onOpenSourceDocument}
-              workspaceId={documentWorkspaceId}
             />
           )}
           {revertError && <p className="ai-chat-error">{revertError}</p>}
