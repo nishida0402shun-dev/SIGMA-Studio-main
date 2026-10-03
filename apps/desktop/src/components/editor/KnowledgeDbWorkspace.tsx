@@ -50,6 +50,7 @@ export function KnowledgeDbWorkspace({ open, onClose, onOpenAi, t }: Props) {
   const [region, setRegion] = useState<KnowledgeRegion | null>(null);
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null);
   const [researchSessions, setResearchSessions] = useState<ResearchSession[]>([]);
+  const [relatedSources, setRelatedSources] = useState<Array<{ sourceId: string; sourceName: string; score: number; pageNumber: number }>>([]);
   const researchApi = desktop?.researchSessions;
   const desktop = getDesktopBridge();
   const knowledgeDb = desktop?.knowledgeDb;
@@ -98,6 +99,21 @@ export function KnowledgeDbWorkspace({ open, onClose, onOpenAi, t }: Props) {
       return source && page ? [{ source, page, score: result.score }] : [];
     }).filter(({ page }) => typeFilter === "all" || page.semanticType === typeFilter);
   }, [query, searchResults, sources, typeFilter]);
+
+  useEffect(() => {
+    const sourceId = selectedPages[0]?.sourceId;
+    if (!knowledgeDb || !sourceId) {
+      setRelatedSources([]);
+      return;
+    }
+    let cancelled = false;
+    void knowledgeDb.related({ sourceId, limit: 6 }).then((value) => {
+      if (!cancelled) setRelatedSources((Array.isArray(value) ? value : []) as typeof relatedSources);
+    }).catch(() => {
+      if (!cancelled) setRelatedSources([]);
+    });
+    return () => { cancelled = true; };
+  }, [knowledgeDb, selectedPages.length, selectedPages[0]?.sourceId]);
 
   const selectedPages = Object.entries(selected).flatMap(([sourceId, pages]) =>
     [...pages].map((pageNumber) => ({ sourceId, pageNumber })),
@@ -637,6 +653,24 @@ export function KnowledgeDbWorkspace({ open, onClose, onOpenAi, t }: Props) {
               </>
             )}
             <p>{t("appMenu.knowledgeDb.help")}</p>
+            {selectedPages.length > 0 && relatedSources.length > 0 && (
+              <div className="knowledge-db-source-list">
+                <strong>関連資料</strong>
+                {relatedSources.map((related) => (
+                  <button
+                    key={`${related.sourceId}:${related.pageNumber}`}
+                    type="button"
+                    className="knowledge-db-detail-button"
+                    onClick={() => {
+                      setSelected({ [related.sourceId]: new Set([related.pageNumber]) });
+                      setQuery("");
+                    }}
+                  >
+                    {related.sourceName} · p.{related.pageNumber}
+                  </button>
+                ))}
+              </div>
+            )}
             <div className="knowledge-db-source-list">
               <strong>登録資料</strong>
               {sources.map((source) => (
