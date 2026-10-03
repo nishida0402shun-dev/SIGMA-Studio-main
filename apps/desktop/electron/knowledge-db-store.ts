@@ -634,11 +634,23 @@ export class KnowledgeDbStore {
     const library: KnowledgeLibrary = { version: 3, sources: [] };
     const legacyRoot = path.join(this.dataDir, "knowledge-db", "workspaces");
     const entries = await fs.readdir(legacyRoot, { withFileTypes: true }).catch(() => []);
+    type LegacySource = {
+      id: string;
+      storedPath: string;
+      contentHash?: string;
+      name?: unknown;
+      originalPath?: unknown;
+      sizeBytes?: unknown;
+      pageCount?: unknown;
+      importedAt?: unknown;
+      updatedAt?: unknown;
+      pages: KnowledgePage[];
+    };
     await fs.mkdir(paths.sourcesDir, { recursive: true });
     for (const entry of entries) {
       if (!entry.isDirectory()) continue;
-      let parsed: { sources?: Array<Record<string, unknown>> };
-      try { parsed = JSON.parse(await fs.readFile(path.join(legacyRoot, entry.name, "library.json"), "utf8")) as { sources?: Array<Record<string, unknown>> }; } catch { continue; }
+      let parsed: { sources?: LegacySource[] };
+      try { parsed = JSON.parse(await fs.readFile(path.join(legacyRoot, entry.name, "library.json"), "utf8")) as { sources?: LegacySource[] }; } catch { continue; }
       if (!Array.isArray(parsed.sources)) continue;
       for (const legacy of parsed.sources) {
         let bytes: Uint8Array;
