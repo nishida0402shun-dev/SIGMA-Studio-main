@@ -25,7 +25,6 @@ describe("LocalVectorIndex", () => {
       });
       await index.upsert({
         id: "page-b",
-        workspaceId: "workspace-a",
         sourceId: "source-b",
         pageNumber: 2,
         chunkIndex: 0,
