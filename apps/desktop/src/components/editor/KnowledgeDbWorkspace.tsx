@@ -499,7 +499,78 @@ export function KnowledgeDbWorkspace({ open, onClose, onOpenAi, t }: Props) {
   min-height: 0;
   flex: 1;
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 300px;
+  grid-template-columns: 280px minmax(0, 1fr) 300px;
+}
+
+.knowledge-db-taxonomy {
+  min-width: 0;
+  overflow: auto;
+  padding: 10px 6px;
+  border-right: 1px solid rgb(148 163 184 / 0.24);
+  background: rgb(248 250 252 / 0.72);
+}
+
+.knowledge-db-taxonomy-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 8px 10px;
+  font-size: 13px;
+}
+
+.knowledge-db-taxonomy-header button {
+  border: 0;
+  background: transparent;
+  color: rgb(71 85 105);
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.knowledge-db-tree-row {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  min-height: 32px;
+  gap: 6px;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: rgb(30 41 59);
+  text-align: left;
+  cursor: pointer;
+}
+
+.knowledge-db-tree-row:hover {
+  background: rgb(226 232 240 / 0.8);
+}
+
+.knowledge-db-tree-row span {
+  min-width: 0;
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.knowledge-db-tree-row small {
+  color: rgb(100 116 139);
+  font-size: 10px;
+}
+
+.knowledge-db-tree-spacer {
+  width: 15px;
+  flex: 0 0 15px;
+}
+
+.knowledge-db-breadcrumb {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px;
+  padding: 7px 9px;
+  border-radius: 8px;
+  background: rgb(241 245 249);
+  font-size: 12px;
+  color: rgb(51 65 85);
 }
 
 .knowledge-db-results {
@@ -679,6 +750,10 @@ export function KnowledgeDbWorkspace({ open, onClose, onOpenAi, t }: Props) {
     grid-template-columns: 1fr;
   }
 
+  .knowledge-db-taxonomy {
+    display: none;
+  }
+
   .knowledge-db-detail {
     display: none;
   }
@@ -717,6 +792,39 @@ export function KnowledgeDbWorkspace({ open, onClose, onOpenAi, t }: Props) {
           </label>
         </div>
         <div className="knowledge-db-content">
+          {!query.trim() && (
+            <aside className="knowledge-db-taxonomy">
+              <div className="knowledge-db-taxonomy-header">
+                <strong>分類</strong>
+                <button type="button" onClick={() => setExpandedTaxonomy(new Set())}>すべて閉じる</button>
+              </div>
+              {taxonomyTree.length === 0 ? (
+                <p className="knowledge-db-empty">解析済みの分類がまだありません。</p>
+              ) : taxonomyTree.map((node) => (
+                <TaxonomyNode
+                  key={node.key}
+                  node={node}
+                  depth={0}
+                  expanded={expandedTaxonomy}
+                  onToggle={(key) => setExpandedTaxonomy((current) => {
+                    const next = new Set(current);
+                    if (next.has(key)) next.delete(key); else next.add(key);
+                    return next;
+                  })}
+                  onSelect={(node) => {
+                    setSelectedTaxonomyNode(node);
+                    setSelected(() => {
+                      const next: Record<string, Set<number>> = {};
+                      for (const item of node.pages) {
+                        next[item.source.id] = new Set([...(next[item.source.id] ?? []), item.page.pageNumber]);
+                      }
+                      return next;
+                    });
+                  }}
+                />
+              ))}
+            </aside>
+          )}
           <div className="knowledge-db-results">
             {visible.map(({ source, page, score }) => {
               const checked = selected[source.id]?.has(page.pageNumber) ?? false;
@@ -745,6 +853,13 @@ export function KnowledgeDbWorkspace({ open, onClose, onOpenAi, t }: Props) {
             {visible.length === 0 && <div className="knowledge-db-empty">{t("appMenu.knowledgeDb.empty")}</div>}
           </div>
           <aside className="knowledge-db-detail">
+            {selectedTaxonomyNode && !query.trim() && (
+              <div className="knowledge-db-breadcrumb">
+                {selectedTaxonomyNode.path.map((part, index) => (
+                  <span key={part}>{index > 0 ? " → " : ""}📁 {part}</span>
+                ))}
+              </div>
+            )}
             <strong>{t("appMenu.knowledgeDb.selected")}</strong>
             <span>{t("appMenu.knowledgeDb.selectedPages", { count: selectedPages.length })}</span>
             {selectedPages.length > 0 && (
