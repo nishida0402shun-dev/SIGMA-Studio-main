@@ -563,7 +563,7 @@ export class KnowledgeDbStore {
               analysisStatus: "analyzed",
               analysisVersion: KNOWLEDGE_ANALYSIS_VERSION,
               analysisError: undefined,
-              ...(taxonomy.length ? { taxonomyNodeIds: taxonomy.map((item) => item.nodeId), taxonomyPaths: taxonomy.map((item) => item.path), taxonomyConfidence: taxonomy[0]?.confidence ?? 0 } : { taxonomyNodeIds: [], taxonomyPaths: [], taxonomyConfidence: 0 }),
+              ...(taxonomy.length ? { taxonomyNodeIds: taxonomy.map((item) => item.nodeId), taxonomyPaths: taxonomy.map((item) => item.path.slice(1)), taxonomyConfidence: taxonomy[0]?.confidence ?? 0 } : { taxonomyNodeIds: [], taxonomyPaths: [], taxonomyConfidence: 0 }),
               taxonomyVersion: KNOWLEDGE_TAXONOMY_VERSION,
               classificationReviewStatus: taxonomy.length > 1 || (taxonomy[0]?.confidence ?? 0) < 0.85 ? "pending" : undefined,
               classificationReviewPaths: undefined,
