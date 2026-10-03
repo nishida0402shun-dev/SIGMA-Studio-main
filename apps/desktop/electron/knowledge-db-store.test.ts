@@ -158,6 +158,18 @@ describe("KnowledgeDbStore", () => {
 });
 
 
+it("classifies taxonomy from content rather than the filename", async () => {
+  const dataDir = await fs.mkdtemp(path.join(os.tmpdir(), "sigma-knowledge-db-content-taxonomy-"));
+  tempDirs.push(dataDir);
+  const filePath = path.join(dataDir, "random-name.md");
+  await fs.writeFile(filePath, "# 三角関数\\n\\n数学Ⅱの三角関数について、正弦定理と余弦定理を説明する。", "utf8");
+  const store = new KnowledgeDbStore(dataDir);
+  const [source] = await store.addFiles([filePath]);
+  await store.search("正弦定理", 5);
+  const indexed = (await store.listSources()).find((item) => item.id === source?.id);
+  expect(indexed?.pages[0]?.taxonomyPaths?.some((taxonomyPath) => taxonomyPath.includes("数学Ⅱ"))).toBe(true);
+});
+
 it("imports non-PDF files into the global Knowledge DB and indexes their text", async () => {
   const dataDir = await fs.mkdtemp(path.join(os.tmpdir(), "sigma-knowledge-db-file-types-"));
   tempDirs.push(dataDir);
