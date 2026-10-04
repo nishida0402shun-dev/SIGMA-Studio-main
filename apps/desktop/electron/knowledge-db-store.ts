@@ -272,26 +272,36 @@ export class KnowledgeDbStore {
   }
 
   async getContext(query: string, limit = 8, sourceIds?: string[], maxChars = 16000): Promise<KnowledgeContextItem[]> {
+    const library = await this.readLibrary();
     const allowed = sourceIds?.length ? new Set(sourceIds) : null;
-    const results = (await this.search(query, Math.min(50, Math.max(limit * 3, limit)), sourceIds))
+    const results = (await this.search(query, Math.min(50, Math.max(limit * 4, limit)), sourceIds))
       .slice(0, Math.max(1, Math.min(limit, 20)));
+    const pagesBySource = new Map(library.sources.map((source) => [source.id, source.pages]));
     const items: KnowledgeContextItem[] = [];
     const seenPages = new Set<string>();
     let usedChars = 0;
-    for (const result of results) {
+
+    const appendItem = async (
+      result: KnowledgeSearchResult,
+      relation: "primary" | "related",
+      relatedTo?: string,
+    ): Promise<boolean> => {
       const pageKey = `${result.sourceId}:${result.pageNumber}`;
-      if (seenPages.has(pageKey)) continue;
+      if (seenPages.has(pageKey) || (allowed && !allowed.has(result.sourceId))) return false;
       const { source, page } = await this.getPage(result.sourceId, result.pageNumber);
       const structureText = page.structureBlocks?.map((block) => `[${block.type}] ${block.text}`).join("\n") ?? "";
       const analysisText = [
         page.title ? `[title] ${page.title}` : "",
         page.semanticType !== "unknown" ? `[type] ${page.semanticType}` : "",
         page.keywords?.length ? `[keywords] ${page.keywords.join(", ")}` : "",
+        page.taxonomyPaths?.[0]?.length ? `[classification] ${page.taxonomyPaths[0].join(" → ")}` : "",
+        relation === "related" ? "[relation] 関連ページ" : "",
       ].filter(Boolean).join("\n");
       const text = [analysisText, result.text.trim() || page.text?.trim() || structureText]
         .filter(Boolean)
         .join("\n");
-      if (!text) continue;
+      if (!text) return false;
+
       const item: KnowledgeContextItem = {
         id: result.id,
         sourceId: source.id,
@@ -303,22 +313,57 @@ export class KnowledgeDbStore {
         taxonomyConfidence: page.taxonomyConfidence,
         analysisStatus: page.analysisStatus,
         score: result.score,
+        relation,
+        relatedTo,
         text: text.slice(0, 5000),
         citation: `[${source.name} p${page.pageNumber}](sigma://knowledge-db/${encodeURIComponent(source.id)}/p/${page.pageNumber})`,
-        matchReasons: result.matchReasons,
-        citationRegions: selectCitationRegions(page, result.text),
+        matchReasons: relation === "related" ? ["関連ページ"] : result.matchReasons,
+        citationRegions: selectCitationRegions(page, result.text || page.text || ""),
         citationRef: { sourceId: source.id, pageId: page.id, pageNumber: page.pageNumber },
       };
       const remaining = Math.max(0, maxChars - usedChars);
-      if (remaining <= 0) break;
+      if (remaining <= 0) return false;
       const boundedText = item.text.slice(0, remaining);
-      if (!boundedText.trim()) break;
+      if (!boundedText.trim()) return false;
       item.text = boundedText;
       item.contextChars = boundedText.length;
       items.push(item);
       seenPages.add(pageKey);
       usedChars += boundedText.length;
-      if (usedChars >= maxChars) break;
+      return true;
+    };
+
+    for (const result of results) {
+      if (usedChars >= maxChars || items.length >= Math.max(1, Math.min(limit, 20))) break;
+      const primaryKey = `${result.sourceId}:${result.pageNumber}`;
+      if (!(await appendItem(result, "primary"))) continue;
+
+      const sourcePages = pagesBySource.get(result.sourceId) ?? [];
+      const primaryPage = sourcePages.find((page) => page.pageNumber === result.pageNumber);
+      const primaryTaxonomy = primaryPage?.taxonomyPaths?.[0]?.join(" → ") ?? "";
+      const candidates = sourcePages
+        .filter((page) => Math.abs(page.pageNumber - result.pageNumber) <= 1 && page.pageNumber !== result.pageNumber)
+        .filter((page) => {
+          const taxonomy = page.taxonomyPaths?.[0]?.join(" → ") ?? "";
+          return primaryTaxonomy && taxonomy ? taxonomy === primaryTaxonomy : true;
+        })
+        .filter((page) => Boolean(page.text?.trim()))
+        .sort((a, b) => Math.abs(a.pageNumber - result.pageNumber) - Math.abs(b.pageNumber - result.pageNumber));
+
+      for (const page of candidates.slice(0, 1)) {
+        if (usedChars >= maxChars || items.length >= Math.max(1, Math.min(limit, 20))) break;
+        await appendItem({
+          id: `${page.id}_related`,
+          sourceId: page.sourceId,
+          pageNumber: page.pageNumber,
+          chunkIndex: 0,
+          text: page.text ?? "",
+          score: Math.max(0, result.score * 0.82),
+          semanticType: page.semanticType,
+          title: page.title,
+          keywords: page.keywords,
+        }, "related", primaryKey);
+      }
     }
     return items;
   }
@@ -750,6 +795,8 @@ export interface KnowledgeContextItem {
     bbox?: [number, number, number, number];
     confidence?: number;
   }>;
+  relation?: "primary" | "related";
+  relatedTo?: string;
   citationRef?: {
     sourceId: string;
     pageId: string;
