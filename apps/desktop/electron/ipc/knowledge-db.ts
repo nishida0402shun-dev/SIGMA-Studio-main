@@ -41,11 +41,11 @@ export function registerKnowledgeDbIpc(deps: RegisterKnowledgeDbIpcDeps): void {
   }
 
   ipcMain.handle("knowledge-db:choose-files", (event) =>
-    chooseSourcePaths(event, ["openFile", "multiSelections"], "Knowledge DBにファイルを追加"),
+    chooseSourcePaths(event, ["openFile", "multiSelections"], "Add files to Knowledge DB"),
   );
 
   ipcMain.handle("knowledge-db:choose-folder", (event) =>
-    chooseSourcePaths(event, ["openDirectory"], "Knowledge DBにフォルダを追加"),
+    chooseSourcePaths(event, ["openDirectory"], "Add folder to Knowledge DB"),
   );
 
   // Legacy mixed picker kept for compatibility with older renderer builds.
