@@ -10,7 +10,7 @@ export interface KnowledgeCorpusConflict { key:string; sourceIds:string[]; seman
 export interface KnowledgeCorpusAnalysis { pages:Array<KnowledgeAnalysisResult & {sourceId:string;pageNumber:number;text:string}>; concepts:KnowledgeConceptNode[]; relations:KnowledgeConceptRelation[]; conflicts:KnowledgeCorpusConflict[]; confidence:number; }
 const KEYWORD_NORMALIZATION = /[^\p{L}\p{N}_-]+/gu;
 const CONCEPT_ALIASES: Record<string, string> = {
-  "三角関数": "三角関数", "連続関数": "連続関数", "加法定理": "加法定理", "定義": "定義", "問題": "問題", "例題": "例題", "解答": "解答", "解説": "解説",
+  "\u4e09\u89d2\u95a2\u6570": "\u4e09\u89d2\u95a2\u6570", "\u9023\u7d9a\u95a2\u6570": "\u9023\u7d9a\u95a2\u6570", "\u52a0\u6cd5\u5b9a\u7406": "\u52a0\u6cd5\u5b9a\u7406", "\u5b9a\u7fa9": "\u5b9a\u7fa9", "\u554f\u984c": "\u554f\u984c", "\u4f8b\u984c": "\u4f8b\u984c", "\u89e3\u7b54": "\u89e3\u7b54", "\u89e3\u8aac": "\u89e3\u8aac",
 };
 
 export function analyzeKnowledgeCorpus(pages: KnowledgeCorpusPage[]): KnowledgeCorpusAnalysis {
