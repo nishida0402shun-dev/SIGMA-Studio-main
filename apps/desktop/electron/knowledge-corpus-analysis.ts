@@ -9,13 +9,16 @@ export interface KnowledgeConceptRelation { from:string; to:string; weight:numbe
 export interface KnowledgeCorpusConflict { key:string; sourceIds:string[]; semanticTypes:KnowledgeAnalysisSemanticType[]; reason:"semantic-type-disagreement"; }
 export interface KnowledgeCorpusAnalysis { pages:Array<KnowledgeAnalysisResult & {sourceId:string;pageNumber:number}>; concepts:KnowledgeConceptNode[]; relations:KnowledgeConceptRelation[]; conflicts:KnowledgeCorpusConflict[]; confidence:number; }
 const KEYWORD_NORMALIZATION = /[^\p{L}\p{N}_-]+/gu;
+const CONCEPT_ALIASES: Record<string, string> = {
+  "三角関数": "三角関数", "連続関数": "連続関数", "加法定理": "加法定理", "定義": "定義", "問題": "問題", "例題": "例題", "解答": "解答", "解説": "解説",
+};
 
 export function analyzeKnowledgeCorpus(pages: KnowledgeCorpusPage[]): KnowledgeCorpusAnalysis {
   const analyzed = pages.map((page) => ({ ...analyzeKnowledgePage(page.text, page.blocks), sourceId: page.sourceId, pageNumber: page.pageNumber }));
   const nodes = new Map<string, KnowledgeConceptNode>();
   const relationWeights = new Map<string, {weight:number; sourceIds:Set<string>}>();
   analyzed.forEach((page) => {
-    const uniqueKeywords = [...new Set(page.keywords.map(normalizeConcept).filter(Boolean))];
+    const uniqueKeywords = [...new Set([...page.keywords, ...extractDomainConcepts(page.text)].map(normalizeConcept).filter(Boolean))];
     for (const key of uniqueKeywords) {
       const existing = nodes.get(key); const pageKey = `${page.sourceId}#${page.pageNumber}`;
       if (existing) { existing.occurrences += 1; if (!existing.sourceIds.includes(page.sourceId)) existing.sourceIds.push(page.sourceId); if (!existing.pageKeys.includes(pageKey)) existing.pageKeys.push(pageKey); if (!existing.semanticTypes.includes(page.semanticType)) existing.semanticTypes.push(page.semanticType); }
@@ -33,4 +36,5 @@ export function analyzeKnowledgeCorpus(pages: KnowledgeCorpusPage[]): KnowledgeC
   const confidence=Number(Math.max(0,Math.min(1,0.5+coverage*0.4-conflictPenalty*0.25)).toFixed(3));
   return {pages:analyzed,concepts,relations,conflicts,confidence};
 }
-function normalizeConcept(value:string):string { return value.normalize("NFKC").toLocaleLowerCase().replace(KEYWORD_NORMALIZATION,"").trim(); }
+function normalizeConcept(value:string):string { const normalized=value.normalize("NFKC").toLocaleLowerCase().replace(KEYWORD_NORMALIZATION,"").trim(); return CONCEPT_ALIASES[normalized] ?? normalized; }
+function extractDomainConcepts(text:string): string[] { return Object.keys(CONCEPT_ALIASES).filter((term)=>text.includes(term)); }
