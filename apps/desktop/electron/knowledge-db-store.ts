@@ -630,7 +630,7 @@ export class KnowledgeDbStore {
             const text = extractedContent;
             const analysis = analyzeKnowledgePage(text, blocks);
             const classifiedTaxonomy = classifyKnowledgeTaxonomy(text, analysis.keywords);
-            const taxonomy = classifiedTaxonomy.length ? classifiedTaxonomy : [{ nodeId: "other", path: ["その他"], score: 0, confidence: 0 }];
+            const taxonomy = classifiedTaxonomy;
             return {
               ...page,
               text: text || undefined,
