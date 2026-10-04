@@ -31,4 +31,9 @@ describe("preload bridge surface", () => {
     expect(preloadSource).toMatch(/workspace-preview:get/u);
     expect(preloadSource).toMatch(/workspace-preview:put/u);
   });
+
+  it("exposes the Knowledge DB structure parser status bridge", () => {
+    expect(preloadSource).toMatch(/knowledge-db:structure-status/u);
+    expect(preloadSource).toMatch(/getStructureParserStatus/u);
+  });
 });
