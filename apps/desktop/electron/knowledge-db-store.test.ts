@@ -350,7 +350,7 @@ describe("Knowledge DB analysis lifecycle", () => {
       sources: Array<{ id: string; pages: KnowledgePage[] }>;
     };
     library.sources[0]!.pages[0]!.text = "三角関数の定理を説明する本文。";
-    library.sources[1]!.pages[0]!.text = "三角関数の公式と証明を別資料から補足する本文。";
+    library.sources[1]!.pages[0]!.text = "三角関数の定理と公式を別資料から補足する本文。";
     await fs.writeFile(libraryPath, JSON.stringify(library), "utf8");
 
     const index = new LocalVectorIndex(path.join(dataDir, "knowledge-db", "vector-index"));
