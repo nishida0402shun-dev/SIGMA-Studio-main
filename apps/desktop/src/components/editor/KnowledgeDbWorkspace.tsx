@@ -810,8 +810,8 @@ export function KnowledgeDbWorkspace({ open, onClose, onOpenAi, t }: Props) {
           </div>
         </header>
         <div className="knowledge-db-toolbar">
-          <button type="button" className="knowledge-db-add-button" onClick={addFiles} aria-label={`${t("chrome.appMenu.knowledgeDb.add")}（ファイル）`}><FilePlus2 size={16} />ファイル追加</button>
-          <button type="button" className="knowledge-db-add-button" onClick={addFolder} aria-label={`${t("chrome.appMenu.knowledgeDb.add")}（フォルダ）`}><FolderPlus size={16} />フォルダ追加</button>
+          <button type="button" className="knowledge-db-add-button" onClick={addFiles} aria-label={`${t("appMenu.knowledgeDb.add")}（ファイル）`}><FilePlus2 size={16} />ファイル追加</button>
+          <button type="button" className="knowledge-db-add-button" onClick={addFolder} aria-label={`${t("appMenu.knowledgeDb.add")}（フォルダ）`}><FolderPlus size={16} />フォルダ追加</button>
           <label className="knowledge-db-search"><Search size={16} /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder={t("appMenu.knowledgeDb.searchPlaceholder")} /></label>
           <select value={typeFilter} onChange={(event) => setTypeFilter(event.target.value as KnowledgeSemanticType | "all")}>
             <option value="all">{t("appMenu.knowledgeDb.allTypes")}</option>
