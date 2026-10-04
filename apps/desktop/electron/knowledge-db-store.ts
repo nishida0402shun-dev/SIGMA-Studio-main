@@ -359,7 +359,8 @@ export class KnowledgeDbStore {
           chunkIndex: 0,
           text: page.text ?? "",
           score: Math.max(0, result.score * 0.82),
-
+          sourceName: sourcePages === pagesBySource.get(page.sourceId) ? (await this.findSource(page.sourceId)).name : page.sourceId,
+          matchReasons: ["関連ページ"],
         }, "related", primaryKey);
       }
     }
