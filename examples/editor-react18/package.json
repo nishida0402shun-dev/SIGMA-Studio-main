@@ -8,7 +8,7 @@
     "build": "tsc --noEmit && vite build"
   },
   "dependencies": {
-    "@sigma-studio/editor": "0.469.70",
+    "@sigma-studio/editor": "0.469.71",
     "react": "^18.3.1",
     "react-dom": "^18.3.1"
   },
