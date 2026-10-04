@@ -30,14 +30,26 @@ function extractChannels(source: string, expression: RegExp): string[] {
     .filter((channel): channel is string => Boolean(channel));
 }
 
+const electronSources = collectTypeScriptSources(electronDir).map((filePath) =>
+  readFileSync(filePath, "utf8"),
+);
+
 const registeredIpcChannels = new Set(
-  collectTypeScriptSources(electronDir).flatMap((filePath) =>
+  electronSources.flatMap((source) =>
     extractChannels(
-      readFileSync(filePath, "utf8"),
-      /ipcMain\.handle\(\s*["'`]([^"'`]+)["'`]/gu,
+      source,
+      /ipcMain\\.handle\\(\\s*["']([^"']+)["']/gu,
     ),
   ),
 );
+
+for (const source of electronSources) {
+  for (const match of source.matchAll(/registerCliBinIpc\\(\\s*\\{[\\s\\S]*?prefix:\\s*["']([^"']+)["']/gu)) {
+    for (const suffix of ["get-status", "set-bin", "select-bin", "open-install-page"]) {
+      registeredIpcChannels.add(match[1] + ":" + suffix);
+    }
+  }
+}
 
 const invokedPreloadChannels = extractChannels(
   preloadSource,
