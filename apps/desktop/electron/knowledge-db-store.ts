@@ -359,7 +359,6 @@ export class KnowledgeDbStore {
           chunkIndex: 0,
           text: page.text ?? "",
           score: Math.max(0, result.score * 0.82),
-          semanticType: page.semanticType,
           title: page.title,
           keywords: page.keywords,
         }, "related", primaryKey);
