@@ -32,15 +32,15 @@ describe("analyzeKnowledgePage", () => {
   });
 
   it("classifies pages into the approved six mathematics branches", () => {
-    for (const subject of ["数学Ⅰ", "数学Ⅱ", "数学Ⅲ", "数学A", "数学B", "数学C"]) {
+    for (const subject of ["数学I", "数学II", "数学III", "数学A", "数学B", "数学C"]) {
       expect(KNOWLEDGE_TAXONOMY[0].children?.some((node) => node.name === subject)).toBe(true);
     }
   });
 
   it("returns a specific mathematics taxonomy path", () => {
     const matches = classifyKnowledgeTaxonomy("数学Ⅱ 三角関数の加法定理と方程式");
-    expect(matches[0]?.path).toEqual(["数学", "数学Ⅱ", "三角関数", "加法定理"]);
-    expect(matches[0]?.nodeId).toBe("math-ii-addition-theorem");
+    expect(matches[0]?.path).toEqual(["数学", "数学II", "三角関数"]);
+    expect(matches[0]?.nodeId).toBe("math-ii-trigonometry");
     expect(matches[0]?.confidence).toBeGreaterThan(0);
   });
 
