@@ -37,7 +37,6 @@ export const chrome = {
     },
     knowledgeDb: {
       title: "教材DB",
-      add: "追加",
       extractPdf: "PDF抽出",
       handoffAi: "AIに渡す",
       close: "DBを閉じる",

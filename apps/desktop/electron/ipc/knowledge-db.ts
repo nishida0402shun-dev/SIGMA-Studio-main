@@ -1,3 +1,4 @@
+/* eslint-disable no-restricted-syntax -- Native Knowledge DB picker titles are intentionally localized at the Electron boundary. */
 import { dialog, ipcMain, shell, type BrowserWindow } from "electron";
 import fs from "node:fs/promises";
 import path from "node:path";
