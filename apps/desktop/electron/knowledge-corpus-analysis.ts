@@ -21,7 +21,7 @@ const CONCEPT_ALIASES: Record<string, string> = Object.fromEntries([
   [concept(0x89e3,0x8aac), concept(0x89e3,0x8aac)],
 ]);
 export function analyzeKnowledgeCorpus(pages: KnowledgeCorpusPage[]): KnowledgeCorpusAnalysis {
-  const analyzed = pages.map((page) => ({ ...analyzeKnowledgePage(page.text, page.blocks), sourceId: page.sourceId, pageNumber: page.pageNumber }));
+  const analyzed = pages.map((page) => ({ ...analyzeKnowledgePage(page.text, page.blocks), sourceId: page.sourceId, pageNumber: page.pageNumber, text: page.text }));
   const nodes = new Map<string, KnowledgeConceptNode>();
   const relationWeights = new Map<string, { weight: number; sourceIds: Set<string> }>();
   for (const page of analyzed) {
