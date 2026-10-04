@@ -75,4 +75,11 @@ describe("preload bridge surface", () => {
     expect(preloadSource).toMatch(/knowledge-db:structure-status/u);
     expect(preloadSource).toMatch(/getStructureParserStatus/u);
   });
+
+  it("keeps every preload invoke channel backed by a registered IPC handler", () => {
+    const missingChannels = invokedPreloadChannels.filter(
+      (channel) => !registeredIpcChannels.has(channel),
+    );
+    expect(missingChannels).toEqual([]);
+  });
 });
