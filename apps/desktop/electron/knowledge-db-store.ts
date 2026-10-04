@@ -238,7 +238,7 @@ export class KnowledgeDbStore {
     const vectorPageKeys = new Set(vectorMatches.map((match) => `${match.sourceId}:${match.pageNumber}`));
     const metadataQueryTokens = tokenizeForSearch(trimmed);
     const metadataMatches = library.sources.flatMap((source) => source.pages
-      .filter((page) => !allowedSources || allowedSources.has(source.id))
+      .filter(() => !allowedSources || allowedSources.has(source.id))
       .filter((page) => metadataScore(page, trimmed, metadataQueryTokens) > 0)
       .filter((page) => !vectorPageKeys.has(`${source.id}:${page.pageNumber}`))
       .map((page) => ({
