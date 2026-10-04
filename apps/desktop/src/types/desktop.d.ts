@@ -874,6 +874,8 @@ export interface DesktopResearchSessionsAPI {
 }
 
 export interface DesktopKnowledgeDbAPI {
+  chooseFiles(): Promise<{ paths: string[] } | null>;
+  chooseFolder(): Promise<{ paths: string[] } | null>;
   chooseSources(): Promise<{ paths: string[] } | null>;
   list(): Promise<unknown[]>;
   getIndexStatus(): Promise<unknown>;

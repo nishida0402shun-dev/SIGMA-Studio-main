@@ -342,6 +342,12 @@ const desktopAPI = {
   },
 
   knowledgeDb: {
+    chooseFiles(): Promise<{ paths: string[] } | null> {
+      return ipcRenderer.invoke("knowledge-db:choose-files");
+    },
+    chooseFolder(): Promise<{ paths: string[] } | null> {
+      return ipcRenderer.invoke("knowledge-db:choose-folder");
+    },
     chooseSources(): Promise<{ paths: string[] } | null> {
       return ipcRenderer.invoke("knowledge-db:choose-sources");
     },
