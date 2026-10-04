@@ -335,6 +335,40 @@ describe("Knowledge DB analysis lifecycle", () => {
     expect(context[0]?.matchReasons?.length).toBeGreaterThan(0);
   });
 
+  it("adds cross-source evidence without spending a second database search", async () => {
+    const dataDir = await fs.mkdtemp(path.join(os.tmpdir(), "sigma-knowledge-db-cross-source-"));
+    tempDirs.push(dataDir);
+    const firstPath = await createPdf("first.pdf", 1);
+    const secondPath = await createPdf("second.pdf", 1);
+    const store = new KnowledgeDbStore(dataDir);
+    const sources = await store.addFiles([firstPath, secondPath]);
+    expect(sources).toHaveLength(2);
+    await store.search("warmup", 2);
+
+    const libraryPath = path.join(dataDir, "knowledge-db", "library.json");
+    const library = JSON.parse(await fs.readFile(libraryPath, "utf8")) as {
+      sources: Array<{ id: string; pages: KnowledgePage[] }>;
+    };
+    library.sources[0]!.pages[0]!.text = "三角関数の定理を説明する本文。";
+    library.sources[1]!.pages[0]!.text = "三角関数の公式と証明を別資料から補足する本文。";
+    await fs.writeFile(libraryPath, JSON.stringify(library), "utf8");
+
+    const index = new LocalVectorIndex(path.join(dataDir, "knowledge-db", "vector-index"));
+    await index.removeSource(sources[0]!.id);
+    await index.removeSource(sources[1]!.id);
+    await index.upsertMany([
+      { id: sources[0]!.id + "_p1_c0", sourceId: sources[0]!.id, pageNumber: 1, chunkIndex: 0, text: "三角関数の定理を説明する本文。" },
+      { id: sources[1]!.id + "_p1_c0", sourceId: sources[1]!.id, pageNumber: 1, chunkIndex: 0, text: "三角関数の公式と証明を別資料から補足する本文。" },
+    ]);
+
+    const context = await store.getContext("三角関数の定理", 2, undefined, 4000);
+    expect(context).toHaveLength(2);
+    expect(context[0]?.relation).toBe("primary");
+    expect(context[1]?.relation).toBe("related");
+    expect(context[1]?.matchReasons).toContain("関連ソース");
+    expect(context[1]?.sourceId).not.toBe(context[0]?.sourceId);
+  });
+
   it("adds a nearby page as related evidence when it shares the local context", async () => {
     const dataDir = await fs.mkdtemp(path.join(os.tmpdir(), "sigma-knowledge-db-related-context-"));
     tempDirs.push(dataDir);
