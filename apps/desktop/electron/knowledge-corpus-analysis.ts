@@ -19,4 +19,4 @@ const CONCEPT_ALIASES: Record<string, string> = Object.fromEntries([
   [concept(0x4f8b,0x984c), concept(0x4f8b,0x984c)],
   [concept(0x89e3,0x7b54), concept(0x89e3,0x7b54)],
   [concept(0x89e3,0x8aac), concept(0x89e3,0x8aac)],
-]);}
+]);
