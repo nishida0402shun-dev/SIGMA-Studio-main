@@ -22,6 +22,7 @@ export const KNOWLEDGE_TAXONOMY: KnowledgeTaxonomyNode[] = [
       {
         id: "math-i",
         name: "数学I",
+        aliases: ["数学Ⅰ"],
         children: [
           { id: "math-i-expressions", name: "数と式" },
           { id: "math-i-geometry-measurement", name: "図形と計量" },
@@ -41,6 +42,7 @@ export const KNOWLEDGE_TAXONOMY: KnowledgeTaxonomyNode[] = [
       {
         id: "math-ii",
         name: "数学II",
+        aliases: ["数学Ⅱ"],
         children: [
           { id: "math-ii-proofs", name: "式と証明" },
           { id: "math-ii-complex-equations", name: "複素数と方程式" },
@@ -63,6 +65,7 @@ export const KNOWLEDGE_TAXONOMY: KnowledgeTaxonomyNode[] = [
       {
         id: "math-iii",
         name: "数学III",
+        aliases: ["数学Ⅲ"],
         children: [
           { id: "math-iii-limits", name: "極限" },
           { id: "math-iii-differentiation", name: "微分法" },
