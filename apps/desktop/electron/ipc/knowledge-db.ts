@@ -27,18 +27,31 @@ async function collectSourceFiles(paths: string[]): Promise<string[]> {
 export function registerKnowledgeDbIpc(deps: RegisterKnowledgeDbIpcDeps): void {
   const { getMainWindow, store } = deps;
 
-  ipcMain.handle("knowledge-db:choose-sources", async (event) => {
+  async function chooseSourcePaths(
+    event: Electron.IpcMainInvokeEvent,
+    properties: Electron.OpenDialogOptions["properties"],
+    title: string,
+  ): Promise<{ paths: string[] } | null> {
     if (event.sender !== getMainWindow()?.webContents) return null;
     const mainWindow = getMainWindow();
     if (!mainWindow) return null;
-    const result = await dialog.showOpenDialog(mainWindow, {
-      title: "Add to DB",
-      properties: ["openFile", "openDirectory", "multiSelections"],
-    });
+    const result = await dialog.showOpenDialog(mainWindow, { title, properties });
     if (result.canceled) return null;
-    const paths = await collectSourceFiles(result.filePaths);
-    return { paths };
-  });
+    return { paths: await collectSourceFiles(result.filePaths) };
+  }
+
+  ipcMain.handle("knowledge-db:choose-files", (event) =>
+    chooseSourcePaths(event, ["openFile", "multiSelections"], "Knowledge DBにファイルを追加"),
+  );
+
+  ipcMain.handle("knowledge-db:choose-folder", (event) =>
+    chooseSourcePaths(event, ["openDirectory"], "Knowledge DBにフォルダを追加"),
+  );
+
+  // Legacy mixed picker kept for compatibility with older renderer builds.
+  ipcMain.handle("knowledge-db:choose-sources", (event) =>
+    chooseSourcePaths(event, ["openFile", "openDirectory", "multiSelections"], "Add to DB"),
+  );
 
   ipcMain.handle("knowledge-db:index-status", async (event) => {
     if (event.sender !== getMainWindow()?.webContents) return { state: "idle", total: 0, completed: 0 };
