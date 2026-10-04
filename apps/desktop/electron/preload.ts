@@ -357,6 +357,9 @@ const desktopAPI = {
     getAnalysisStatus(): Promise<unknown> {
       return ipcRenderer.invoke("knowledge-db:analysis-status");
     },
+    getStructureParserStatus(): Promise<unknown> {
+      return ipcRenderer.invoke("knowledge-db:structure-status");
+    },
     reanalyze(sourceIds?: string[]): Promise<unknown> {
       return ipcRenderer.invoke("knowledge-db:reanalyze", sourceIds ? { sourceIds } : {});
     },
