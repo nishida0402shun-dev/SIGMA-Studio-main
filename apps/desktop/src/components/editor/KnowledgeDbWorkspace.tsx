@@ -90,7 +90,7 @@ interface TaxonomyTreeNode {
 
 function buildTaxonomyTreeStable(sources: KnowledgeSource[]): TaxonomyTreeNode[] {
   const roots: TaxonomyTreeNode[] = [];
-  const subjects = ["数学", "英語", "国語", "物理", "化学", "生物", "地理", "日本史", "世界史", "公民", "その他"];
+  const subjects = ["数学", "英語", "国語", "理科", "社会", "情報"];
   for (const subject of subjects) {
     roots.push({ key: subject, name: subject, path: [subject], children: [], pages: [] });
   }
@@ -810,8 +810,8 @@ export function KnowledgeDbWorkspace({ open, onClose, onOpenAi, t }: Props) {
           </div>
         </header>
         <div className="knowledge-db-toolbar">
-          <button type="button" className="knowledge-db-add-button" onClick={addFiles}><FilePlus2 size={16} />ファイル追加</button>
-          <button type="button" className="knowledge-db-add-button" onClick={addFolder}><FolderPlus size={16} />フォルダ追加</button>
+          <button type="button" className="knowledge-db-add-button" onClick={addFiles} aria-label={`${t("chrome.appMenu.knowledgeDb.add")}（ファイル）`}><FilePlus2 size={16} />ファイル追加</button>
+          <button type="button" className="knowledge-db-add-button" onClick={addFolder} aria-label={`${t("chrome.appMenu.knowledgeDb.add")}（フォルダ）`}><FolderPlus size={16} />フォルダ追加</button>
           <label className="knowledge-db-search"><Search size={16} /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder={t("appMenu.knowledgeDb.searchPlaceholder")} /></label>
           <select value={typeFilter} onChange={(event) => setTypeFilter(event.target.value as KnowledgeSemanticType | "all")}>
             <option value="all">{t("appMenu.knowledgeDb.allTypes")}</option>
