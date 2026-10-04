@@ -310,7 +310,7 @@ export class KnowledgeDbStore {
         page.semanticType !== "unknown" ? `[type] ${page.semanticType}` : "",
         page.keywords?.length ? `[keywords] ${page.keywords.join(", ")}` : "",
         page.taxonomyPaths?.[0]?.length ? `[classification] ${page.taxonomyPaths[0].join(" → ")}` : "",
-        relation === "related" ? "[relation] 関連ページ" : "",
+        relation === "related" ? `[relation] ${result.matchReasons?.includes("関連ソース") ? "関連ソース" : "関連ページ"}` : "",
       ].filter(Boolean).join("\n");
       const text = [analysisText, result.text.trim() || page.text?.trim() || structureText]
         .filter(Boolean)
@@ -332,7 +332,7 @@ export class KnowledgeDbStore {
         relatedTo,
         text: text.slice(0, 5000),
         citation: `[${source.name} p${page.pageNumber}](sigma://knowledge-db/${encodeURIComponent(source.id)}/p/${page.pageNumber})`,
-        matchReasons: relation === "related" ? ["関連ページ"] : result.matchReasons,
+        matchReasons: relation === "related" ? (result.matchReasons?.length ? result.matchReasons : ["関連ページ"]) : result.matchReasons,
         citationRegions: selectCitationRegions(page, result.text || page.text || ""),
         citationRef: { sourceId: source.id, pageId: page.id, pageNumber: page.pageNumber },
       };
