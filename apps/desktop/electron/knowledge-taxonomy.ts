@@ -25,7 +25,7 @@ export const KNOWLEDGE_TAXONOMY: KnowledgeTaxonomyNode[] = [
         aliases: ["数学Ⅰ"],
         children: [
           { id: "math-i-expressions", name: "数と式" },
-          { id: "math-i-geometry-measurement", name: "図形と計量" },
+          { id: "math-i-geometry-measurement", name: "図形と計量", aliases: ["三角比", "正弦定理", "余弦定理"] },
           { id: "math-i-quadratic", name: "二次関数" },
           { id: "math-i-data-analysis", name: "データの分析" },
         ],
