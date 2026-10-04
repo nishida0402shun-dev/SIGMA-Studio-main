@@ -20,6 +20,12 @@ type IntentionalJapaneseRule = {
  */
 export const INTENTIONAL_RUNTIME_JAPANESE: readonly IntentionalJapaneseRule[] = [
   {
+    path: /^electron\\/main\\.ts$/,
+    value: /^説明なし$/,
+    classification: "MCP tool metadata fallback",
+    reason: "The string is a deterministic fallback returned through the MCP tool metadata contract, not a renderer-facing interface label.",
+  },
+  {
     path: /^src\/lib\/heading-numbering\.ts$/,
     value: /^(?:第|章)$/,
     classification: "document numbering format",
