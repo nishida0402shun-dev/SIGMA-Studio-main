@@ -82,7 +82,7 @@ describe("KnowledgeDbStore", () => {
 
     const index = new LocalVectorIndex(path.join(dataDir, "knowledge-db", "vector-index"));
     await index.upsertMany([
-      { id: sourceId + "_p1_c0", sourceId, pageNumber: 1, chunkIndex: 0, text: "shared neutral content" },
+      { id: sourceId + "_p1_c0", sourceId, pageNumber: 1, chunkIndex: 0, text: "shared neutral content 定理" },
       { id: sourceId + "_p2_c0", sourceId, pageNumber: 2, chunkIndex: 0, text: "shared neutral content" },
     ]);
 
