@@ -102,6 +102,26 @@ const invokedPreloadChannels = extractChannels(
   /ipcRenderer\.invoke\(\s*["'`]([^"'`]+)["'`]/gu,
 );
 
+const listenedPreloadChannels = extractChannels(
+  preloadSource,
+  /ipcRenderer\.on\(\s*["']([^"']+)["']/gu,
+);
+
+const sentIpcEventChannels = new Set(
+  electronSources.flatMap((source) =>
+    extractChannels(
+      source,
+      /(?:webContents|(?:event\.)?sender)\.send\(\s*["']([^"']+)["']/gu,
+    ),
+  ),
+);
+
+for (const source of electronSources) {
+  for (const match of source.matchAll(/registerCliBinIpc\(\s*\{[\s\S]*?prefix:\s*["']([^"']+)["']/gu)) {
+    sentIpcEventChannels.add(match[1] + ":status-changed");
+  }
+}
+
 describe("preload bridge surface", () => {
   it("does not expose cloud workspace IPC channels", () => {
     expect(preloadSource).not.toMatch(/cloud-workspace:/u);
@@ -161,6 +181,13 @@ describe("preload bridge surface", () => {
         `missing preload methods in ${namespace}`,
       ).toEqual([]);
     }
+  });
+
+  it("keeps every literal preload event channel backed by an Electron sender", () => {
+    const missingChannels = listenedPreloadChannels.filter(
+      (channel) => !sentIpcEventChannels.has(channel),
+    );
+    expect(missingChannels).toEqual([]);
   });
 
   it("keeps every preload invoke channel backed by a registered IPC handler", () => {
