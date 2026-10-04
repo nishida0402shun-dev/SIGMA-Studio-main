@@ -357,7 +357,7 @@ describe("Knowledge DB analysis lifecycle", () => {
     await index.removeSource(sources[0]!.id);
     await index.removeSource(sources[1]!.id);
     await index.upsertMany([
-      { id: sources[0]!.id + "_p1_c0", sourceId: sources[0]!.id, pageNumber: 1, chunkIndex: 0, text: "三角関数の定理を説明する本文。" },
+      { id: sources[0]!.id + "_p1_c0", sourceId: sources[0]!.id, pageNumber: 1, chunkIndex: 0, text: "三角関数を説明する本文。" },
       { id: sources[1]!.id + "_p1_c0", sourceId: sources[1]!.id, pageNumber: 1, chunkIndex: 0, text: "三角関数の公式と証明を別資料から補足する本文。" },
     ]);
 
@@ -391,7 +391,7 @@ describe("Knowledge DB analysis lifecycle", () => {
     const index = new LocalVectorIndex(path.join(dataDir, "knowledge-db", "vector-index"));
     await index.removeSource(source!.id);
     await index.upsertMany([
-      { id: source!.id + "_p1_c0", sourceId: source!.id, pageNumber: 1, chunkIndex: 0, text: "三角関数の定理を説明する本文。" },
+      { id: source!.id + "_p1_c0", sourceId: source!.id, pageNumber: 1, chunkIndex: 0, text: "三角関数を説明する本文。" },
       { id: source!.id + "_p2_c0", sourceId: source!.id, pageNumber: 2, chunkIndex: 0, text: "三角関数の公式と証明を補足する本文。" },
     ]);
 
