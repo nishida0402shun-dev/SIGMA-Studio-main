@@ -142,12 +142,12 @@ describe("preload bridge surface", () => {
     );
     const typedApis = extractTopLevelMethods(
       typeSource,
-      /export interface (Desktop[A-Za-z0-9]+API) \\{/gu,
+      /export interface (Desktop[A-Za-z0-9]+API) \{/gu,
       2,
     );
     const preloadApis = extractTopLevelMethods(
       preloadSource,
-      /  ([A-Za-z][A-Za-z0-9]*): \\{/gu,
+      /  ([A-Za-z][A-Za-z0-9]*): \{/gu,
       4,
     );
 
