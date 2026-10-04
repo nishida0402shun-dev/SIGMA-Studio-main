@@ -1,6 +1,6 @@
 {
   "name": "@sigma-studio/editor",
-  "version": "0.469.83",
+  "version": "0.469.84",
   "description": "Embeddable React editor for SigmaDoc teaching materials.",
   "keywords": [
     "sigma-studio",
@@ -52,7 +52,7 @@
     "prepack": "npm run build"
   },
   "dependencies": {
-    "@sigma-studio/viewer": "0.469.83",
+    "@sigma-studio/viewer": "0.469.84",
     "zustand": "^5.0.15"
   },
   "peerDependencies": {
