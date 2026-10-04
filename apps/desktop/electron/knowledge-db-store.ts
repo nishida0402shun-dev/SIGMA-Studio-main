@@ -225,14 +225,16 @@ export class KnowledgeDbStore {
     return added;
   }
 
-  async search(query: string, limit = 12): Promise<KnowledgeSearchResult[]> {
+  async search(query: string, limit = 12, sourceIds?: string[]): Promise<KnowledgeSearchResult[]> {
     const trimmed = query.trim();
     if (!trimmed) return [];
     if (this.indexPromise) await this.indexPromise;
     else await this.ensureIndexed();
     const library = await this.readLibrary();
+    const allowedSources = sourceIds?.length ? new Set(sourceIds) : null;
     const safeLimit = Math.max(1, Math.min(limit, 50));
-    const matches = await this.vectorIndex().search(trimmed, Math.min(50, safeLimit * 5));
+    const matches = (await this.vectorIndex().search(trimmed, Math.min(50, safeLimit * 5)))
+      .filter((match) => !allowedSources || allowedSources.has(match.sourceId));
     const bestByPage = new Map<string, (typeof matches)[number]>();
     for (const match of matches) {
       const current = bestByPage.get(`${match.sourceId}:${match.pageNumber}`);
@@ -246,12 +248,13 @@ export class KnowledgeDbStore {
     return [...bestByPage.values()]
       .map((match) => {
         const lexical = lexicalScore(match.text, queryTokens);
+        const exact = exactPhraseScore(match.text, trimmed);
         const page = pages.get(`${match.sourceId}:${match.pageNumber}`);
         const metadata = page ? metadataScore(page, trimmed, queryTokens) : 0;
         const matchReasons = page ? retrievalMatchReasons(page, trimmed, queryTokens, match.score, lexical, metadata) : [];
         return {
           ...match,
-          score: match.score * 0.65 + lexical * 0.20 + metadata * 0.15,
+          score: match.score * 0.58 + lexical * 0.17 + metadata * 0.15 + exact * 0.10,
           matchReasons,
           ...(page ? {
             semanticType: page.semanticType,
@@ -270,8 +273,7 @@ export class KnowledgeDbStore {
 
   async getContext(query: string, limit = 8, sourceIds?: string[], maxChars = 16000): Promise<KnowledgeContextItem[]> {
     const allowed = sourceIds?.length ? new Set(sourceIds) : null;
-    const results = (await this.search(query, Math.min(50, Math.max(limit * 3, limit))))
-      .filter((result) => !allowed || allowed.has(result.sourceId))
+    const results = (await this.search(query, Math.min(50, Math.max(limit * 3, limit)), sourceIds))
       .slice(0, Math.max(1, Math.min(limit, 20)));
     const items: KnowledgeContextItem[] = [];
     const seenPages = new Set<string>();
@@ -806,6 +808,16 @@ function mimeTypeForExtension(extension: string): string {
   return types[extension] ?? "application/octet-stream";
 }
 
+function exactPhraseScore(text: string, query: string): number {
+  const normalizedText = text.normalize("NFKC").toLocaleLowerCase().replace(/\\s+/gu, " ").trim();
+  const normalizedQuery = query.normalize("NFKC").toLocaleLowerCase().replace(/\\s+/gu, " ").trim();
+  if (!normalizedText || !normalizedQuery) return 0;
+  if (normalizedText.includes(normalizedQuery)) return 1;
+  const compactText = normalizedText.replace(/\\s+/gu, "");
+  const compactQuery = normalizedQuery.replace(/\\s+/gu, "");
+  return compactQuery.length >= 4 && compactText.includes(compactQuery) ? 0.7 : 0;
+}
+
 function lexicalScore(text: string, queryTokens: string[]): number {
   if (queryTokens.length === 0) return 0;
   const normalized = text.normalize("NFKC").toLocaleLowerCase();
@@ -870,6 +882,7 @@ function retrievalMatchReasons(
 ): string[] {
   const reasons: string[] = [];
   if (vector >= 0.65) reasons.push("意味類似度が高い");
+  if (exactPhraseScore(page.text ?? "", query) > 0) reasons.push("完全一致");
   if (lexical > 0) reasons.push(`本文一致 ${Math.round(lexical * 100)}%`);
   if (page.title && queryTokens.some((token) => page.title!.toLocaleLowerCase().includes(token))) reasons.push("タイトル一致");
   if ((page.keywords ?? []).some((keyword) => queryTokens.some((token) => keyword.toLocaleLowerCase().includes(token)))) reasons.push("キーワード一致");
