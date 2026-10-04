@@ -173,6 +173,21 @@ export const INTENTIONAL_RUNTIME_JAPANESE: readonly IntentionalJapaneseRule[] = 
     reason: "Proposal-index maintenance warnings are written only to the developer console.",
   },
   {
+    path: /^electron\\/knowledge-analysis-engine\\.ts$/,
+    classification: "Knowledge DB analysis vocabulary",
+    reason: "Japanese stopwords and classification terms are language-matching data used by the analysis engine, not renderer interface copy.",
+  },
+  {
+    path: /^electron\\/knowledge-taxonomy\\.ts$/,
+    classification: "Knowledge DB taxonomy data",
+    reason: "Japanese taxonomy labels are persisted classification data and model-facing retrieval metadata, not locale-dependent renderer copy.",
+  },
+  {
+    path: /^electron\\/knowledge-db-store\\.ts$/,
+    classification: "Knowledge DB retrieval contract",
+    reason: "Search reasons, metadata labels, and extraction diagnostics are machine-facing Knowledge DB context data; renderer-facing copy is localized separately.",
+  },
+  {
     path: /^electron\/local-sigma-doc-store\.ts$/,
     value: /^(?:ロック順序不変条件違反:|"\) を|新規に取得しようとしました。)/,
     classification: "developer invariant",
