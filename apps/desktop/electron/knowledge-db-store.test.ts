@@ -358,7 +358,7 @@ describe("Knowledge DB analysis lifecycle", () => {
     await index.removeSource(sources[1]!.id);
     await index.upsertMany([
       { id: sources[0]!.id + "_p1_c0", sourceId: sources[0]!.id, pageNumber: 1, chunkIndex: 0, text: "三角関数を説明する本文。" },
-      { id: sources[1]!.id + "_p1_c0", sourceId: sources[1]!.id, pageNumber: 1, chunkIndex: 0, text: "三角関数の公式と証明を別資料から補足する本文。" },
+      { id: sources[1]!.id + "_p1_c0", sourceId: sources[1]!.id, pageNumber: 1, chunkIndex: 0, text: "三角関数を別資料から補足する本文。" },
     ]);
 
     const context = await store.getContext("三角関数", 2, undefined, 4000);
