@@ -233,8 +233,23 @@ export class KnowledgeDbStore {
     const library = await this.readLibrary();
     const allowedSources = sourceIds?.length ? new Set(sourceIds) : null;
     const safeLimit = Math.max(1, Math.min(limit, 50));
-    const matches = (await this.vectorIndex().search(trimmed, Math.min(50, safeLimit * 5)))
+    const vectorMatches = (await this.vectorIndex().search(trimmed, Math.min(50, safeLimit * 5)))
       .filter((match) => !allowedSources || allowedSources.has(match.sourceId));
+    const vectorPageKeys = new Set(vectorMatches.map((match) => `${match.sourceId}:${match.pageNumber}`));
+    const metadataQueryTokens = tokenizeForSearch(trimmed);
+    const metadataMatches = library.sources.flatMap((source) => source.pages
+      .filter((page) => !allowedSources || allowedSources.has(source.id))
+      .filter((page) => metadataScore(page, trimmed, metadataQueryTokens) > 0)
+      .filter((page) => !vectorPageKeys.has(`${source.id}:${page.pageNumber}`))
+      .map((page) => ({
+        id: `${page.id}_metadata`,
+        sourceId: source.id,
+        pageNumber: page.pageNumber,
+        chunkIndex: 0,
+        text: page.text ?? "",
+        score: 0,
+      })));
+    const matches = [...vectorMatches, ...metadataMatches];
     const bestByPage = new Map<string, (typeof matches)[number]>();
     for (const match of matches) {
       const current = bestByPage.get(`${match.sourceId}:${match.pageNumber}`);
