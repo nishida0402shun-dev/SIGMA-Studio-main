@@ -2,7 +2,7 @@ import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
 const electronDir=path.dirname(new URL(import.meta.url).pathname);
-const root=path.resolve(electronDir,"../..");
+const root=path.resolve(electronDir,"..");
 const source=(relativePath:string)=>path.join(root,relativePath);
 describe("SIGMA Studio v1 completion gate",()=>{
   it("has implementation anchors for all 16 roadmap phases",()=>{
