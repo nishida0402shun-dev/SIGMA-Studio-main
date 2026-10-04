@@ -38,13 +38,13 @@ const registeredIpcChannels = new Set(
   electronSources.flatMap((source) =>
     extractChannels(
       source,
-      /ipcMain\\.handle\\(\\s*["']([^"']+)["']/gu,
+      /ipcMain\.handle\(\s*["']([^"']+)["']/gu,
     ),
   ),
 );
 
 for (const source of electronSources) {
-  for (const match of source.matchAll(/registerCliBinIpc\\(\\s*\\{[\\s\\S]*?prefix:\\s*["']([^"']+)["']/gu)) {
+  for (const match of source.matchAll(/registerCliBinIpc\(\s*\{[\s\S]*?prefix:\s*["']([^"']+)["']/gu)) {
     for (const suffix of ["get-status", "set-bin", "select-bin", "open-install-page"]) {
       registeredIpcChannels.add(match[1] + ":" + suffix);
     }
