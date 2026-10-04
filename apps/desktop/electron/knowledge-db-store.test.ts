@@ -90,6 +90,52 @@ describe("KnowledgeDbStore", () => {
   });
 
 
+
+  it("prioritizes exact phrase matches and can scope retrieval to selected sources", async () => {
+    const dataDir = await fs.mkdtemp(path.join(os.tmpdir(), "sigma-knowledge-db-exact-"));
+    tempDirs.push(dataDir);
+    const store = new KnowledgeDbStore(dataDir);
+    const sourceA = "src_exact_a";
+    const sourceB = "src_exact_b";
+    const libraryPath = path.join(dataDir, "knowledge-db", "library.json");
+    await fs.mkdir(path.dirname(libraryPath), { recursive: true });
+    const now = new Date().toISOString();
+    const page = (sourceId: string, pageNumber: number, text: string) => ({
+      id: sourceId + "_p" + pageNumber,
+      sourceId,
+      pageNumber,
+      semanticType: "unknown" as const,
+      text,
+      extractionStatus: "text" as const,
+      analysisStatus: "analyzed" as const,
+      analysisVersion: 2,
+    });
+    await fs.writeFile(libraryPath, JSON.stringify({
+      version: 3,
+      sources: [
+        { id: sourceA, name: "a.md", originalPath: "", storedPath: "", mimeType: "text/markdown", sizeBytes: 0, pageCount: 1, importedAt: now, updatedAt: now, extractionStatus: "complete", pages: [page(sourceA, 1, "exact phrase: 三角関数の加法定理")] },
+        { id: sourceB, name: "b.md", originalPath: "", storedPath: "", mimeType: "text/markdown", sizeBytes: 0, pageCount: 1, importedAt: now, updatedAt: now, extractionStatus: "complete", pages: [page(sourceB, 1, "三角関数について一般的に説明する")] },
+      ],
+    }), "utf8");
+    const index = new LocalVectorIndex(path.join(dataDir, "knowledge-db", "vector-index"));
+    await index.upsertMany([
+      { id: sourceA + "_p1_c0", sourceId: sourceA, pageNumber: 1, chunkIndex: 0, text: "exact phrase: 三角関数の加法定理" },
+      { id: sourceB + "_p1_c0", sourceId: sourceB, pageNumber: 1, chunkIndex: 0, text: "三角関数について一般的に説明する" },
+    ]);
+
+    const results = await store.search("三角関数の加法定理", 2);
+    expect(results[0]?.sourceId).toBe(sourceA);
+    expect(results[0]?.matchReasons).toContain("完全一致");
+
+    const scoped = await store.search("三角関数", 10, [sourceB]);
+    expect(scoped.length).toBeGreaterThan(0);
+    expect(scoped.every((result) => result.sourceId === sourceB)).toBe(true);
+
+    const context = await store.getContext("三角関数", 10, [sourceA]);
+    expect(context.length).toBeGreaterThan(0);
+    expect(context.every((item) => item.sourceId === sourceA)).toBe(true);
+  });
+
   it("attaches structure-aware citation regions to search/context results", async () => {
     const dataDir = await fs.mkdtemp(path.join(os.tmpdir(), "sigma-knowledge-db-citation-"));
     tempDirs.push(dataDir);
