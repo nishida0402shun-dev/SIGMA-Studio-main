@@ -350,14 +350,24 @@ export class KnowledgeDbStore {
 
     const representedSources = new Set<string>();
     const normalizedLimit = Math.max(1, Math.min(limit, 20));
-    const hasCrossSourceEvidence = new Set(results.map((result) => result.sourceId)).size > 1;
-    const primaryLimit = hasCrossSourceEvidence ? Math.max(1, normalizedLimit - 1) : normalizedLimit;
+    const primaryLimit = normalizedLimit;
 
     for (const result of results) {
       if (usedChars >= maxChars || items.length >= primaryLimit) break;
       const primaryKey = `${result.sourceId}:${result.pageNumber}`;
       if (!(await appendItem(result, "primary"))) continue;
       representedSources.add(result.sourceId);
+
+      if (usedChars < maxChars && items.length < normalizedLimit) {
+        const crossSource = results.find((candidate) => !representedSources.has(candidate.sourceId));
+        if (crossSource) {
+          await appendItem({
+            ...crossSource,
+            score: Math.max(0, crossSource.score * 0.9),
+            matchReasons: ["関連ソース", ...crossSource.matchReasons.filter((reason) => reason !== "関連ソース")],
+          }, "related", `${crossSource.sourceId}:${crossSource.pageNumber}`);
+        }
+      }
 
       const sourcePages = pagesBySource.get(result.sourceId) ?? [];
       const primaryPage = sourcePages.find((page) => page.pageNumber === result.pageNumber);
@@ -383,20 +393,6 @@ export class KnowledgeDbStore {
           sourceName: result.sourceName,
           matchReasons: ["関連ページ"],
         }, "related", primaryKey);
-      }
-    }
-
-    // Reserve one slot for evidence from a different source when the query
-    // already produced a strong cross-source match. This broadens AI context
-    // without performing a second full-database search.
-    if (usedChars < maxChars && items.length < Math.max(1, Math.min(limit, 20))) {
-      const crossSource = results.find((result) => !representedSources.has(result.sourceId));
-      if (crossSource) {
-        await appendItem({
-          ...crossSource,
-          score: Math.max(0, crossSource.score * 0.9),
-          matchReasons: ["関連ソース", ...crossSource.matchReasons.filter((reason) => reason !== "関連ソース")],
-        }, "related", `${crossSource.sourceId}:${crossSource.pageNumber}`);
       }
     }
 
