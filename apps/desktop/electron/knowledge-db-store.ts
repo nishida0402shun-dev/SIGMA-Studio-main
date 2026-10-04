@@ -349,9 +349,12 @@ export class KnowledgeDbStore {
     };
 
     const representedSources = new Set<string>();
+    const normalizedLimit = Math.max(1, Math.min(limit, 20));
+    const hasCrossSourceEvidence = new Set(results.map((result) => result.sourceId)).size > 1;
+    const primaryLimit = hasCrossSourceEvidence ? Math.max(1, normalizedLimit - 1) : normalizedLimit;
 
     for (const result of results) {
-      if (usedChars >= maxChars || items.length >= Math.max(1, Math.min(limit, 20))) break;
+      if (usedChars >= maxChars || items.length >= primaryLimit) break;
       const primaryKey = `${result.sourceId}:${result.pageNumber}`;
       if (!(await appendItem(result, "primary"))) continue;
       representedSources.add(result.sourceId);
@@ -369,7 +372,7 @@ export class KnowledgeDbStore {
         .sort((a, b) => Math.abs(a.pageNumber - result.pageNumber) - Math.abs(b.pageNumber - result.pageNumber));
 
       for (const page of candidates.slice(0, 1)) {
-        if (usedChars >= maxChars || items.length >= Math.max(1, Math.min(limit, 20))) break;
+        if (usedChars >= maxChars || items.length >= normalizedLimit) break;
         await appendItem({
           id: `${page.id}_related`,
           sourceId: page.sourceId,
