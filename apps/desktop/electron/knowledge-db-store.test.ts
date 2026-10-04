@@ -71,8 +71,8 @@ describe("KnowledgeDbStore", () => {
         updatedAt: new Date().toISOString(),
         extractionStatus: "complete",
         pages: [
-          { id: sourceId + "_p1", sourceId, pageNumber: 1, semanticType: "theorem", text: "shared neutral content", extractionStatus: "text", title: "定理の証明", keywords: ["証明", "数学"] },
-          { id: sourceId + "_p2", sourceId, pageNumber: 2, semanticType: "unknown", text: "shared neutral content", extractionStatus: "text" },
+          { id: sourceId + "_p1", sourceId, pageNumber: 1, semanticType: "theorem", text: "shared neutral content", extractionStatus: "text", analysisStatus: "analyzed", analysisVersion: 2, taxonomyVersion: 2, title: "定理の証明", keywords: ["証明", "数学"] },
+          { id: sourceId + "_p2", sourceId, pageNumber: 2, semanticType: "unknown", text: "shared neutral content", extractionStatus: "text", analysisStatus: "analyzed", analysisVersion: 2, taxonomyVersion: 2 },
         ],
       }],
     };
