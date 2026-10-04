@@ -210,12 +210,12 @@ it("classifies taxonomy from content rather than the filename", async () => {
   const dataDir = await fs.mkdtemp(path.join(os.tmpdir(), "sigma-knowledge-db-content-taxonomy-"));
   tempDirs.push(dataDir);
   const filePath = path.join(dataDir, "random-name.md");
-  await fs.writeFile(filePath, "# 三角関数\\n\\n数学Ⅱの三角関数について、正弦定理と余弦定理を説明する。", "utf8");
+  await fs.writeFile(filePath, "# 三角関数\\n\\n数学IIの三角関数について、正弦定理と余弦定理を説明する。", "utf8");
   const store = new KnowledgeDbStore(dataDir);
   const [source] = await store.addFiles([filePath]);
   await store.search("正弦定理", 5);
   const indexed = (await store.listSources()).find((item) => item.id === source?.id);
-  expect(indexed?.pages[0]?.taxonomyPaths?.some((taxonomyPath) => taxonomyPath.includes("数学Ⅱ"))).toBe(true);
+  expect(indexed?.pages[0]?.taxonomyPaths?.some((taxonomyPath) => taxonomyPath.includes("数学II"))).toBe(true);
 });
 
 it("imports non-PDF files into the global Knowledge DB and indexes their text", async () => {
@@ -263,7 +263,7 @@ describe("Knowledge DB analysis lifecycle", () => {
 
     const libraryPath = path.join(dataDir, "knowledge-db", "library.json");
     const library = JSON.parse(await fs.readFile(libraryPath, "utf8")) as { sources: Array<{ pages: KnowledgePage[] }> };
-    library.sources[0].pages[0].text = "数学Ⅱ 三角関数 定理";
+    library.sources[0].pages[0].text = "数学II 三角関数 定理";
     library.sources[0].pages[0].analysisStatus = "stale";
     library.sources[0].pages[0].analysisVersion = 0;
     await fs.writeFile(libraryPath, JSON.stringify(library), "utf8");
@@ -273,7 +273,7 @@ describe("Knowledge DB analysis lifecycle", () => {
     const page = refreshed[0]!.pages[0]!;
     expect(page.analysisStatus).toBe("analyzed");
     expect(page.analysisVersion).toBeGreaterThan(0);
-    expect(page.taxonomyPaths?.some((path) => path.includes("数学Ⅱ"))).toBe(true);
+    expect(page.taxonomyPaths?.some((path) => path.includes("数学II"))).toBe(true);
   });
 
   it("reports analysis lifecycle state and can reanalyze without reimporting the PDF", async () => {
@@ -319,7 +319,7 @@ describe("Knowledge DB analysis lifecycle", () => {
         }>;
       }>;
     };
-    const longText = "数学Ⅱ 三角関数の定理について説明します。".repeat(80);
+    const longText = "数学II 三角関数の定理について説明します。".repeat(80);
     for (const page of library.sources[0].pages) {
       page.text = longText;
       page.analysisStatus = "stale";
@@ -327,7 +327,7 @@ describe("Knowledge DB analysis lifecycle", () => {
     }
     await fs.writeFile(libraryPath, JSON.stringify(library), "utf8");
 
-    const context = await store.getContext("数学Ⅱ 三角関数 定理", 8, undefined, 600);
+    const context = await store.getContext("数学II 三角関数 定理", 8, undefined, 600);
     expect(context.length).toBeGreaterThan(0);
     expect(context.reduce((sum, item) => sum + item.text.length, 0)).toBeLessThanOrEqual(600);
     expect(new Set(context.map((item) => `${item.sourceId}:${item.pageNumber}`)).size).toBe(context.length);
@@ -385,9 +385,9 @@ describe("Knowledge DB analysis lifecycle", () => {
       sources: Array<{ pages: KnowledgePage[] }>;
     };
     library.sources[0]!.pages[0]!.text = "三角関数の定理を説明する本文。";
-    library.sources[0]!.pages[0]!.taxonomyPaths = [["数学Ⅱ", "三角関数"]];
+    library.sources[0]!.pages[0]!.taxonomyPaths = [["数学II", "三角関数"]];
     library.sources[0]!.pages[1]!.text = "公式と証明を補足する本文。";
-    library.sources[0]!.pages[1]!.taxonomyPaths = [["数学Ⅱ", "三角関数"]];
+    library.sources[0]!.pages[1]!.taxonomyPaths = [["数学II", "三角関数"]];
     await fs.writeFile(libraryPath, JSON.stringify(library), "utf8");
 
     const index = new LocalVectorIndex(path.join(dataDir, "knowledge-db", "vector-index"));
@@ -411,20 +411,20 @@ describe("Knowledge DB classification review", () => {
     const dataDir = await fs.mkdtemp(path.join(os.tmpdir(), "sigma-knowledge-db-review-"));
     tempDirs.push(dataDir);
     const filePath = path.join(dataDir, "review.md");
-    await fs.writeFile(filePath, "# 三角関数\n\n数学Ⅱの三角関数について説明する。", "utf8");
+    await fs.writeFile(filePath, "# 三角関数\n\n数学IIの三角関数について説明する。", "utf8");
     const store = new KnowledgeDbStore(dataDir);
     const [source] = await store.addFiles([filePath]);
     await store.search("三角関数", 5);
     const page = (await store.listSources()).find((item) => item.id === source?.id)?.pages[0];
-    expect(page?.taxonomyPaths?.[0]).toEqual(["数学Ⅱ", "三角関数"]);
+    expect(page?.taxonomyPaths?.[0]).toEqual(["数学II", "三角関数"]);
 
     const confirmed = await store.applyClassificationReview({
       sourceId: source!.id,
       pageNumber: 1,
-      paths: [["数学Ⅱ", "三角関数"]],
+      paths: [["数学II", "三角関数"]],
       confidence: 0.94,
-      reason: "本文に数学Ⅱと三角関数が明記されている。",
-      evidence: ["数学Ⅱの三角関数について説明する。"],
+      reason: "本文に数学IIと三角関数が明記されている。",
+      evidence: ["数学IIの三角関数について説明する。"],
     });
     expect(confirmed.status).toBe("confirmed");
 
@@ -436,7 +436,7 @@ describe("Knowledge DB classification review", () => {
     });
     expect(conflict.status).toBe("needs-review");
     const after = (await store.listSources()).find((item) => item.id === source?.id)?.pages[0];
-    expect(after?.taxonomyPaths?.[0]).toEqual(["数学Ⅱ", "三角関数"]);
+    expect(after?.taxonomyPaths?.[0]).toEqual(["数学II", "三角関数"]);
     expect(after?.classificationReviewStatus).toBe("needs-review");
   });
 });
