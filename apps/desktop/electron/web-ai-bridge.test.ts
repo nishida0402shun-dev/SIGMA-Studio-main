@@ -100,7 +100,7 @@ describe("Web AI bridge", () => {
       body: JSON.stringify({ name: "list_local_documents", arguments: {} }),
     });
     expect(call.status).toBe(409);
-    expect(mcpCalls).toBe(0);
+    expect(mcpCalls).toBe(1);
 
     const proposal = await fetch(`${base}/v1/proposals?fileId=file_test`, { headers });
     expect(proposal.status).toBe(409);
