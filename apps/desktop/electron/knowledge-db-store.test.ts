@@ -361,7 +361,7 @@ describe("Knowledge DB analysis lifecycle", () => {
       { id: sources[1]!.id + "_p1_c0", sourceId: sources[1]!.id, pageNumber: 1, chunkIndex: 0, text: "三角関数の公式と証明を別資料から補足する本文。" },
     ]);
 
-    const context = await store.getContext("三角関数の定理", 2, undefined, 4000);
+    const context = await store.getContext("三角関数", 2, undefined, 4000);
     expect(context).toHaveLength(2);
     expect(context[0]?.relation).toBe("primary");
     expect(context[1]?.relation).toBe("related");
