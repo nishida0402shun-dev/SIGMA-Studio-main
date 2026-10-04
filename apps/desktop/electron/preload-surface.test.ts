@@ -51,6 +51,52 @@ for (const source of electronSources) {
   }
 }
 
+
+function extractBraceBlock(source: string, openingBraceIndex: number): string {
+  let depth = 0;
+  let quote: string | null = null;
+  let escaped = false;
+
+  for (let index = openingBraceIndex; index < source.length; index += 1) {
+    const char = source[index];
+    if (quote) {
+      if (escaped) {
+        escaped = false;
+      } else if (char === "\\") {
+        escaped = true;
+      } else if (char === quote) {
+        quote = null;
+      }
+      continue;
+    }
+    if (char === '"' || char === "'" || char === "`") {
+      quote = char;
+      continue;
+    }
+    if (char === "{") depth += 1;
+    if (char === "}") {
+      depth -= 1;
+      if (depth === 0) return source.slice(openingBraceIndex + 1, index);
+    }
+  }
+  return "";
+}
+
+function extractTopLevelMethods(source: string, declarationPattern: RegExp, methodIndent: number): Map<string, Set<string>> {
+  const result = new Map<string, Set<string>>();
+  for (const match of source.matchAll(declarationPattern)) {
+    const name = match[1];
+    const openingBraceIndex = source.indexOf("{", match.index ?? 0);
+    if (openingBraceIndex < 0) continue;
+    const block = extractBraceBlock(source, openingBraceIndex);
+    const methods = [...block.matchAll(new RegExp(`^\\s{${methodIndent},${methodIndent}}([A-Za-z][A-Za-z0-9]*)\\??\\s*\\(`, "gmu"))].map(
+      (method) => method[1],
+    );
+    result.set(name, new Set(methods));
+  }
+  return result;
+}
+
 const invokedPreloadChannels = extractChannels(
   preloadSource,
   /ipcRenderer\.invoke\(\s*["'`]([^"'`]+)["'`]/gu,
@@ -86,6 +132,35 @@ describe("preload bridge surface", () => {
   it("exposes the Knowledge DB structure parser status bridge", () => {
     expect(preloadSource).toMatch(/knowledge-db:structure-status/u);
     expect(preloadSource).toMatch(/getStructureParserStatus/u);
+  });
+
+
+  it("keeps every typed desktop API namespace and method backed by preload", () => {
+    const typeSource = readFileSync(
+      path.resolve(electronDir, "../src/types/desktop.d.ts"),
+      "utf8",
+    );
+    const typedApis = extractTopLevelMethods(
+      typeSource,
+      /export interface (Desktop[A-Za-z0-9]+API) \\{/gu,
+      2,
+    );
+    const preloadApis = extractTopLevelMethods(
+      preloadSource,
+      /  ([A-Za-z][A-Za-z0-9]*): \\{/gu,
+      4,
+    );
+
+    for (const [interfaceName, methods] of typedApis) {
+      if (interfaceName === "DesktopAPI") continue;
+      const namespace = interfaceName.replace(/^Desktop/u, "").replace(/API$/u, "");
+      const preloadMethods = preloadApis.get(namespace.charAt(0).toLowerCase() + namespace.slice(1));
+      expect(preloadMethods, `missing preload namespace: ${namespace}`).toBeDefined();
+      expect(
+        [...methods].filter((method) => !preloadMethods?.has(method)),
+        `missing preload methods in ${namespace}`,
+      ).toEqual([]);
+    }
   });
 
   it("keeps every preload invoke channel backed by a registered IPC handler", () => {
