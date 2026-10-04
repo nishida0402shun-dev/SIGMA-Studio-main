@@ -338,8 +338,10 @@ describe("Knowledge DB analysis lifecycle", () => {
   it("adds cross-source evidence without spending a second database search", async () => {
     const dataDir = await fs.mkdtemp(path.join(os.tmpdir(), "sigma-knowledge-db-cross-source-"));
     tempDirs.push(dataDir);
-    const firstPath = await createPdf("first.pdf", 1);
-    const secondPath = await createPdf("second.pdf", 1);
+    const firstPath = path.join(dataDir, "first.md");
+    const secondPath = path.join(dataDir, "second.md");
+    await fs.writeFile(firstPath, "三角関数を説明する本文。", "utf8");
+    await fs.writeFile(secondPath, "三角関数を別資料から補足する本文。", "utf8");
     const store = new KnowledgeDbStore(dataDir);
     const sources = await store.addFiles([firstPath, secondPath]);
     expect(sources).toHaveLength(2);
@@ -384,7 +386,7 @@ describe("Knowledge DB analysis lifecycle", () => {
     };
     library.sources[0]!.pages[0]!.text = "三角関数の定理を説明する本文。";
     library.sources[0]!.pages[0]!.taxonomyPaths = [["数学Ⅱ", "三角関数"]];
-    library.sources[0]!.pages[1]!.text = "三角関数の公式と証明を補足する本文。";
+    library.sources[0]!.pages[1]!.text = "公式と証明を補足する本文。";
     library.sources[0]!.pages[1]!.taxonomyPaths = [["数学Ⅱ", "三角関数"]];
     await fs.writeFile(libraryPath, JSON.stringify(library), "utf8");
 
@@ -392,7 +394,7 @@ describe("Knowledge DB analysis lifecycle", () => {
     await index.removeSource(source!.id);
     await index.upsertMany([
       { id: source!.id + "_p1_c0", sourceId: source!.id, pageNumber: 1, chunkIndex: 0, text: "三角関数を説明する本文。" },
-      { id: source!.id + "_p2_c0", sourceId: source!.id, pageNumber: 2, chunkIndex: 0, text: "三角関数の公式と証明を補足する本文。" },
+      { id: source!.id + "_p2_c0", sourceId: source!.id, pageNumber: 2, chunkIndex: 0, text: "公式と証明を補足する本文。" },
     ]);
 
     const context = await store.getContext("三角関数の定理", 4, undefined, 2000);
