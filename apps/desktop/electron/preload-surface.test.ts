@@ -1,9 +1,48 @@
-import { readFileSync } from "node:fs";
+import { readFileSync, readdirSync } from "node:fs";
+import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { describe, expect, it } from "vitest";
 
-const preloadSource = readFileSync(fileURLToPath(new URL("./preload.ts", import.meta.url)), "utf8");
+const electronDir = fileURLToPath(new URL(".", import.meta.url));
+const preloadSource = readFileSync(path.join(electronDir, "preload.ts"), "utf8");
+
+function collectTypeScriptSources(directory: string): string[] {
+  const files: string[] = [];
+  for (const entry of readdirSync(directory, { withFileTypes: true })) {
+    const entryPath = path.join(directory, entry.name);
+    if (entry.isDirectory()) {
+      files.push(...collectTypeScriptSources(entryPath));
+    } else if (
+      entry.isFile() &&
+      /\.tsx?$/u.test(entry.name) &&
+      !/\.test\.tsx?$/u.test(entry.name)
+    ) {
+      files.push(entryPath);
+    }
+  }
+  return files;
+}
+
+function extractChannels(source: string, expression: RegExp): string[] {
+  return [...source.matchAll(expression)]
+    .map((match) => match[1])
+    .filter((channel): channel is string => Boolean(channel));
+}
+
+const registeredIpcChannels = new Set(
+  collectTypeScriptSources(electronDir).flatMap((filePath) =>
+    extractChannels(
+      readFileSync(filePath, "utf8"),
+      /ipcMain\.handle\(\s*["'`]([^"'`]+)["'`]/gu,
+    ),
+  ),
+);
+
+const invokedPreloadChannels = extractChannels(
+  preloadSource,
+  /ipcRenderer\.invoke\(\s*["'`]([^"'`]+)["'`]/gu,
+);
 
 describe("preload bridge surface", () => {
   it("does not expose cloud workspace IPC channels", () => {
