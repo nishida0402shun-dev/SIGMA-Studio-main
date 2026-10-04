@@ -2,7 +2,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { BookmarkPlus, ChevronDown, ChevronRight, Database, Download, ExternalLink, FilePlus2, FileText, Folder, History, MessageSquare, Search, Trash2, X } from "lucide-react";
+import { BookmarkPlus, ChevronDown, ChevronRight, Database, Download, ExternalLink, FilePlus2, FileText, Folder, FolderPlus, History, MessageSquare, Search, Trash2, X } from "lucide-react";
 import { KnowledgePdfPageViewer, type KnowledgeRegion } from "./KnowledgePdfPageViewer";
 import { getDesktopBridge } from "@/lib/desktop-bridge";
 import type { KnowledgeDbAiContext, KnowledgeSearchResult, KnowledgeSemanticType, KnowledgeSource } from "@/types/knowledge-db";
@@ -292,12 +292,22 @@ export function KnowledgeDbWorkspace({ open, onClose, onOpenAi, t }: Props) {
     });
   }
 
-  async function addSources(): Promise<void> {
+  async function addSources(pathsPromise: Promise<{ paths: string[] } | null>): Promise<void> {
     if (!knowledgeDb) return;
-    const picked = await knowledgeDb.chooseSources();
+    const picked = await pathsPromise;
     if (!picked?.paths?.length) return;
     const added = await knowledgeDb.importSources({ paths: picked.paths });
     setSources((current) => [...(added as KnowledgeSource[]), ...current]);
+  }
+
+  function addFiles(): void {
+    if (!knowledgeDb) return;
+    void addSources(knowledgeDb.chooseFiles());
+  }
+
+  function addFolder(): void {
+    if (!knowledgeDb) return;
+    void addSources(knowledgeDb.chooseFolder());
   }
 
   async function extractPdf(): Promise<void> {
@@ -800,7 +810,8 @@ export function KnowledgeDbWorkspace({ open, onClose, onOpenAi, t }: Props) {
           </div>
         </header>
         <div className="knowledge-db-toolbar">
-          <button type="button" className="knowledge-db-add-button" onClick={() => void addSources()} ><FilePlus2 size={16} />{t("appMenu.knowledgeDb.add")}</button>
+          <button type="button" className="knowledge-db-add-button" onClick={addFiles}><FilePlus2 size={16} />ファイル追加</button>
+          <button type="button" className="knowledge-db-add-button" onClick={addFolder}><FolderPlus size={16} />フォルダ追加</button>
           <label className="knowledge-db-search"><Search size={16} /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder={t("appMenu.knowledgeDb.searchPlaceholder")} /></label>
           <select value={typeFilter} onChange={(event) => setTypeFilter(event.target.value as KnowledgeSemanticType | "all")}>
             <option value="all">{t("appMenu.knowledgeDb.allTypes")}</option>
