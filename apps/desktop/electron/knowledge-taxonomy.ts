@@ -267,5 +267,9 @@ export function classifyKnowledgeTaxonomy(text: string, keywords: string[] = [])
 
   return candidates
     .sort((a, b) => b.score - a.score || b.path.length - a.path.length)
-    .slice(0, 4);
+    .slice(0, 4)
+    .map((candidate) => {
+      const parent = candidate.path.length >= 2 ? KNOWLEDGE_TAXONOMY.find((root) => root.name === candidate.path[0]) : undefined;
+      return parent ? { ...candidate, path: candidate.path } : candidate;
+    });
 }
