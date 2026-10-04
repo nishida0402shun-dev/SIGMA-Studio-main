@@ -189,8 +189,7 @@ export class AppUpdateController {
     }
     this.configured = true;
 
-    autoUpdater.autoDownload = false;
-    autoUpdater.autoInstallOnAppQuit = false;
+    // Updates are downloaded in the background and installed automatically on the next app quit/restart.\n    // Keep the explicit quitAndInstall IPC for the existing manual UI, but normal restarts should not require another click.\n    autoUpdater.autoDownload = false;\n    autoUpdater.autoInstallOnAppQuit = true;
     const isBetaBuild = isBetaVersion(app.getVersion());
     autoUpdater.allowPrerelease = isBetaBuild;
     if (isBetaBuild) {
