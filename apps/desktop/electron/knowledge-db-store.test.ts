@@ -332,6 +332,40 @@ describe("Knowledge DB analysis lifecycle", () => {
     expect(context[0]?.citation).toContain("sigma://knowledge-db/");
     expect(context[0]?.matchReasons?.length).toBeGreaterThan(0);
   });
+
+  it("adds a nearby page as related evidence when it shares the local context", async () => {
+    const dataDir = await fs.mkdtemp(path.join(os.tmpdir(), "sigma-knowledge-db-related-context-"));
+    tempDirs.push(dataDir);
+    const sourcePath = await createPdf("related.pdf", 2);
+    const store = new KnowledgeDbStore(dataDir);
+    const [source] = await store.addFiles([sourcePath]);
+    expect(source).toBeTruthy();
+    await store.search("warmup", 1);
+
+    const libraryPath = path.join(dataDir, "knowledge-db", "library.json");
+    const library = JSON.parse(await fs.readFile(libraryPath, "utf8")) as {
+      sources: Array<{ pages: KnowledgePage[] }>;
+    };
+    library.sources[0]!.pages[0]!.text = "三角関数の定理を説明する本文。";
+    library.sources[0]!.pages[0]!.taxonomyPaths = [["数学Ⅱ", "三角関数"]];
+    library.sources[0]!.pages[1]!.text = "三角関数の公式と証明を補足する本文。";
+    library.sources[0]!.pages[1]!.taxonomyPaths = [["数学Ⅱ", "三角関数"]];
+    await fs.writeFile(libraryPath, JSON.stringify(library), "utf8");
+
+    const index = new LocalVectorIndex(path.join(dataDir, "knowledge-db", "vector-index"));
+    await index.removeSource(source!.id);
+    await index.upsertMany([
+      { id: source!.id + "_p1_c0", sourceId: source!.id, pageNumber: 1, chunkIndex: 0, text: "三角関数の定理を説明する本文。" },
+      { id: source!.id + "_p2_c0", sourceId: source!.id, pageNumber: 2, chunkIndex: 0, text: "三角関数の公式と証明を補足する本文。" },
+    ]);
+
+    const context = await store.getContext("三角関数の定理", 4, undefined, 2000);
+    expect(context.length).toBe(2);
+    expect(context[0]?.relation).toBe("primary");
+    expect(context[1]?.relation).toBe("related");
+    expect(context[1]?.relatedTo).toBe(`${source!.id}:1`);
+    expect(context[1]?.pageNumber).toBe(2);
+  });
 });
 
 describe("Knowledge DB classification review", () => {
