@@ -49,6 +49,7 @@ export const MCP_TOOL_CATEGORY_MAP = {
     "knowledge_db_get_context",
     "knowledge_db_get_related_sources",
     "knowledge_db_route_query",
+    "knowledge_db_rag_query",
     "knowledge_db_list_sources",
     "knowledge_db_search",
     "knowledge_db_pdf_import_preview",
