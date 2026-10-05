@@ -101,4 +101,21 @@ declare global {
       };
     };
   }
+}import type { PdfStagingApi } from './staging';
+
+export * from './staging';
+
+declare global {
+  interface Window {
+    api?: {
+      questions: {
+        search: (filter: QuestionFilter) => Promise<SearchResponse>;
+        save: (question: Question) => Promise<{ success: boolean; id: string }>;
+        delete: (questionId: string) => Promise<{ success: boolean }>;
+        startImport: (filePath: string) => Promise<{ jobId: string }>;
+        onImportProgress: (callback: (progress: ImportProgress) => void) => () => void;
+      };
+      pdfStaging?: PdfStagingApi;
+    };
+  }
 }
