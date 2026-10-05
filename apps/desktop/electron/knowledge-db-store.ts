@@ -275,7 +275,14 @@ export class KnowledgeDbStore {
     const metadataQueryTokens = tokenizeForSearch(trimmed);
     const metadataMatches = library.sources.flatMap((source) => source.pages
       .filter(() => !allowedSources || allowedSources.has(source.id))
-      .filter((page) => metadataScore(page, trimmed, metadataQueryTokens) > 0)
+      .filter((page) => {
+        const metadataHit = metadataScore(page, trimmed, metadataQueryTokens) > 0;
+        const text = page.text?.normalize("NFKC").toLocaleLowerCase() ?? "";
+        const lexicalHit = metadataQueryTokens.some((token) =>
+          searchTokenVariants(token).some((variant) => text.includes(variant)),
+        );
+        return metadataHit || lexicalHit;
+      })
       .filter((page) => !vectorPageKeys.has(`${source.id}:${page.pageNumber}`))
       .map((page) => ({
         id: `${page.id}_metadata`,
@@ -1138,7 +1145,7 @@ function selectDiverseContextResults(
     // Maximize source diversity first, then let score dominate within a source.
     const sourceAlreadyRepresented = seenSources.has(result.sourceId);
     if (sourceAlreadyRepresented && primary.length < Math.min(primaryTarget, 3)) continue;
-    if (result.text.trim().length < 24 && result.citationRegions?.length === 0) continue;
+    if (!result.text.trim() && result.citationRegions?.length === 0) continue;
     primary.push(result);
     seenPages.add(key);
     seenSources.add(result.sourceId);
