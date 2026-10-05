@@ -98,5 +98,6 @@ export function KnowledgePdfImportStaging({
         </footer>
       </section>
     </div>
+    </>
   );
 }
