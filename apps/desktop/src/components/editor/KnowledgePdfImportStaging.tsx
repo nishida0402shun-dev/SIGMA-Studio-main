@@ -67,7 +67,7 @@ export function KnowledgePdfImportStaging({
                     disabled={busy || staging.status !== "draft"}
                     onChange={(event) => updateSegment(segment.id, { selected: event.target.checked })}
                   />
-                  登録
+                  {t("knowledgePdfImport.register")}
                 </label>
                 <span>{t("knowledgePdfImport.confidence", { percent: Math.round(segment.confidence * 100) })}</span>
               </div>
