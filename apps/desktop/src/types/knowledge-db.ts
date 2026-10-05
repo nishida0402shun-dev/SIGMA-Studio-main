@@ -33,6 +33,31 @@ export interface KnowledgePage {
   analysisError?: string;
 }
 
+export interface KnowledgePdfImportSegmentProposal {
+  id: string;
+  startPage: number;
+  endPage: number;
+  name: string;
+  paths: string[][];
+  confidence: number;
+  reason: string;
+  selected: boolean;
+}
+
+export interface KnowledgePdfImportStaging {
+  id: string;
+  status: "draft" | "approved" | "rejected";
+  sourcePath: string;
+  sourceName: string;
+  sourceHash: string;
+  sizeBytes: number;
+  pageCount: number;
+  createdAt: string;
+  updatedAt: string;
+  approvedAt?: string;
+  segments: KnowledgePdfImportSegmentProposal[];
+}
+
 export interface KnowledgeSource {
   id: string;
   name: string;
