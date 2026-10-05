@@ -31,6 +31,7 @@ const WEB_AI_ORIGINS = new Set([
   "https://claude.ai",
   "https://gemini.google.com",
   "https://aistudio.google.com",
+  "https://www.aistudio.google.com",
 ]);
 
 export const WebAiProviderSchema = z.enum(["chatgpt", "claude", "antigravity"]);
