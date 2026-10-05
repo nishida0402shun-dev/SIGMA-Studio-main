@@ -1297,3 +1297,55 @@ function selectCitationRegions(page: KnowledgePage, matchedText: string): Array<
       type: block.type,
       text: block.text.slice(0, 500),
       ...(block.bbox ? { bbox: block.bbox } : {}),
+
+function retrievalMatchReasons(
+  page: KnowledgePage,
+  query: string,
+  queryTokens: string[],
+  vector: number,
+  lexical: number,
+  metadata: number,
+): string[] {
+  const reasons: string[] = [];
+  if (vector >= 0.65) reasons.push("意味類似度が高い");
+  if (exactPhraseScore(page.text ?? "", query) > 0) reasons.push("完全一致");
+  if (lexical > 0) reasons.push(`本文一致 ${Math.round(lexical * 100)}%`);
+  if (page.title && queryTokens.some((token) => page.title!.toLocaleLowerCase().includes(token))) reasons.push("タイトル一致");
+  if ((page.keywords ?? []).some((keyword) => queryTokens.some((token) => keyword.toLocaleLowerCase().includes(token)))) reasons.push("キーワード一致");
+  const semanticType = semanticTypeFromQuery(query);
+  if (semanticType && page.semanticType === semanticType) reasons.push(`分類一致: ${semanticType}`);
+  if (page.taxonomyPaths?.length) reasons.push(`分類: ${page.taxonomyPaths[0]!.join(" → ")}`);
+  if (metadata >= 0.8 && reasons.length === 0) reasons.push("解析メタデータ一致");
+  return reasons.slice(0, 5);
+}
+
+function semanticTypeFromQuery(query: string): KnowledgeSemanticType | undefined {
+  const normalized = query.normalize("NFKC").toLocaleLowerCase();
+  const rules: Array<[KnowledgeSemanticType, RegExp]> = [
+    ["problem", /(?:問題|練習問題|演習|設問|例題|practice|exercise|problem|question)/u],
+    ["example", /(?:例|具体例|example|worked example)/u],
+    ["definition", /(?:定義|definition|defined as)/u],
+    ["theorem", /(?:定理|命題|補題|系|theorem|proposition|lemma|corollary)/u],
+    ["answer", /(?:解答|答え|解説付き解答|answer|solution)/u],
+    ["column", /(?:コラム|column|note|豆知識)/u],
+    ["explanation", /(?:解説|説明|考え方|ポイント|概説|explanation|overview|discussion)/u],
+    ["figure", /(?:図|画像|figure|diagram|illustration)/u],
+  ];
+  return rules.find(([, pattern]) => pattern.test(normalized))?.[0];
+}
+
+function chunkText(text: string, maxLength = 900, overlap = 140): string[] {
+  const normalized = text.replace(/\s+/g, " ").trim();
+  if (!normalized) return [];
+  if (normalized.length <= maxLength) return [normalized];
+  const chunks: string[] = [];
+  let start = 0;
+  while (start < normalized.length) {
+    const end = Math.min(normalized.length, start + maxLength);
+    const chunk = normalized.slice(start, end).trim();
+    if (chunk) chunks.push(chunk);
+    if (end >= normalized.length) break;
+    start = Math.max(start + 1, end - overlap);
+  }
+  return chunks;
+}
