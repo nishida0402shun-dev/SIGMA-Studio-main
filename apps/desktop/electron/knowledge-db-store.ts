@@ -78,6 +78,16 @@ export interface KnowledgeRegion {
   height: number;
 }
 
+export interface KnowledgeSmartSplitSegment {
+  id: string;
+  sourceId: string;
+  startPage: number;
+  endPage: number;
+  paths: string[][];
+  confidence: number;
+  reason: string;
+}
+
 export interface KnowledgeIndexStatus {
   state: "idle" | "running" | "completed" | "failed";
   total: number;
@@ -422,6 +432,75 @@ export class KnowledgeDbStore {
         };
       })
       .slice(0, Math.max(1, Math.min(limit, 20)));
+  }
+
+
+  async previewSmartSplit(sourceId: string): Promise<{ sourceId: string; sourceName: string; pageCount: number; segments: KnowledgeSmartSplitSegment[] }> {
+    const { source } = await this.getPage(sourceId, 1);
+    if (source.mimeType !== "application/pdf" || source.pageCount < 2) {
+      return { sourceId, sourceName: source.name, pageCount: source.pageCount, segments: [{ id: sourceId + ":1-" + source.pageCount, sourceId, startPage: 1, endPage: source.pageCount, paths: [], confidence: 1, reason: "分割不要な資料" }] };
+    }
+    const pages = [...source.pages].sort((a, b) => a.pageNumber - b.pageNumber);
+    const pathKey = (page: KnowledgePage) => page.taxonomyPaths?.[0]?.join(" → ") ?? "";
+    const segments: KnowledgeSmartSplitSegment[] = [];
+    let start = pages[0]?.pageNumber ?? 1;
+    let previousKey = pathKey(pages[0] ?? ({ taxonomyPaths: [] } as KnowledgePage));
+    for (let index = 1; index < pages.length; index += 1) {
+      const current = pages[index];
+      const currentKey = pathKey(current);
+      if (currentKey && previousKey && currentKey !== previousKey) {
+        const previousPage = pages[index - 1];
+        const nextPage = pages[index + 1];
+        const previousSubject = previousKey.split(" → ")[0];
+        const currentSubject = currentKey.split(" → ")[0];
+        const stableBoundary = previousSubject !== currentSubject || Boolean(nextPage && pathKey(nextPage) === currentKey);
+        if (stableBoundary) {
+          const segmentPages = pages.filter((page) => page.pageNumber >= start && page.pageNumber <= previousPage.pageNumber);
+          const paths = [...new Map(segmentPages.flatMap((page) => (page.taxonomyPaths ?? []).map((taxonomyPath) => [taxonomyPath.join("\u001f"), taxonomyPath] as const))).values()].slice(0, 4);
+          segments.push({ id: sourceId + ":" + start + "-" + previousPage.pageNumber, sourceId, startPage: start, endPage: previousPage.pageNumber, paths, confidence: Math.min(1, segmentPages.reduce((sum, page) => sum + (page.taxonomyConfidence ?? 0), 0) / Math.max(1, segmentPages.length)), reason: "連続ページの分類が変化した境界を検出" });
+          start = current.pageNumber;
+        }
+      }
+      if (currentKey) previousKey = currentKey;
+    }
+    const last = pages[pages.length - 1];
+    if (last) {
+      const segmentPages = pages.filter((page) => page.pageNumber >= start && page.pageNumber <= last.pageNumber);
+      const paths = [...new Map(segmentPages.flatMap((page) => (page.taxonomyPaths ?? []).map((taxonomyPath) => [taxonomyPath.join("\u001f"), taxonomyPath] as const))).values()].slice(0, 4);
+      segments.push({ id: sourceId + ":" + start + "-" + last.pageNumber, sourceId, startPage: start, endPage: last.pageNumber, paths, confidence: Math.min(1, segmentPages.reduce((sum, page) => sum + (page.taxonomyConfidence ?? 0), 0) / Math.max(1, segmentPages.length)), reason: "ページ内容と分類の連続性から分割範囲を推定" });
+    }
+    return { sourceId, sourceName: source.name, pageCount: source.pageCount, segments };
+  }
+
+  async materializeSmartSplit(sourceId: string, segments: Array<{ startPage: number; endPage: number; name?: string }>): Promise<KnowledgeSource[]> {
+    const source = (await this.getPage(sourceId, 1)).source;
+    if (source.mimeType !== "application/pdf") throw new Error("smart split requires PDF");
+    const input = await fs.readFile(source.storedPath);
+    const library = await this.readLibrary();
+    const paths = this.paths();
+    const created: KnowledgeSource[] = [];
+    for (const segment of segments) {
+      const start = Math.max(1, Math.min(source.pageCount, Math.floor(segment.startPage)));
+      const end = Math.max(start, Math.min(source.pageCount, Math.floor(segment.endPage)));
+      const output = await PDFDocument.create();
+      const sourcePdf = await PDFDocument.load(input);
+      const copied = await output.copyPages(sourcePdf, Array.from({ length: end - start + 1 }, (_, offset) => start - 1 + offset));
+      copied.forEach((page) => output.addPage(page));
+      const id = "src_" + randomUUID();
+      const storedPath = path.join(paths.sourcesDir, id + ".pdf");
+      const bytes = await output.save();
+      const now = new Date().toISOString();
+      const name = segment.name?.trim() || (path.basename(source.name, path.extname(source.name)) + " p" + start + "-" + end + ".pdf");
+      const contentHash = createHash("sha256").update(bytes).digest("hex");
+      const child: KnowledgeSource = { id, name, originalPath: source.originalPath, storedPath, mimeType: "application/pdf", sizeBytes: bytes.byteLength, pageCount: end - start + 1, importedAt: now, updatedAt: now, contentHash, extractionStatus: "ocr-needed", pages: Array.from({ length: end - start + 1 }, (_, index) => ({ id: id + "_p" + (index + 1), sourceId: id, pageNumber: index + 1, semanticType: "unknown", extractionStatus: "ocr-needed", wordCount: 0, analysisStatus: "pending", analysisVersion: 0 })) };
+      await fs.mkdir(paths.sourcesDir, { recursive: true });
+      await fs.writeFile(storedPath, bytes);
+      library.sources.unshift(child);
+      created.push(child);
+    }
+    if (created.length) await this.writeLibrary(library);
+    this.startBackgroundIndexing();
+    return created;
   }
 
   async getPage(sourceId: string, pageNumber: number): Promise<{ source: KnowledgeSource; page: KnowledgePage }> {
