@@ -478,7 +478,7 @@ describe("Knowledge DB RAG retrieval quality", () => {
     const dataDir = await fs.mkdtemp(path.join(os.tmpdir(), "sigma-knowledge-db-alias-"));
     tempDirs.push(dataDir);
     const filePath = path.join(dataDir, "ai.md");
-    await fs.writeFile(filePath, "人工知能と検索拡張生成（RAG）について説明する。", "utf8");
+    await fs.writeFile(filePath, "AI（人工知能）と検索拡張生成（RAG）について説明する。", "utf8");
     const store = new KnowledgeDbStore(dataDir);
     const [source] = await store.addFiles([filePath]);
     const results = await store.search("AI", 5);
