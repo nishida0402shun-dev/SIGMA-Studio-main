@@ -128,6 +128,10 @@ export function registerKnowledgeDbIpc(deps: RegisterKnowledgeDbIpcDeps): void {
     if (!payload || typeof payload !== "object") throw new Error(te("invalid source paths"));
     const filePaths = "paths" in payload && Array.isArray(payload.paths) ? payload.paths : [];
     if (!filePaths.every((value) => typeof value === "string")) throw new Error(te("invalid source paths"));
+    const pdfPaths = (filePaths as string[]).filter((filePath) => filePath.toLowerCase().endsWith(".pdf"));
+    if (pdfPaths.length > 0) {
+      throw new Error("PDF files must go through the AI split/classification preview before Knowledge DB registration.");
+    }
     return store.addFiles(filePaths as string[]);
   });
 
