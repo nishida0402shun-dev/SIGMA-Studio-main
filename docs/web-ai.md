@@ -37,7 +37,7 @@ The file is removed when Sigma Studio exits.
 
 The application menu exposes ChatGPT Web, Claude Web, Gemini Web, and Google AI Studio Web. Their remote pages are loaded with:
 
-- Google AI Studio opens at `https://aistudio.google.com/prompts/new_chat?model=gemini-3.8-flash`.
+- Google AI Studio opens at `https://aistudio.google.com/prompts/new_chat?model=gemini-3.8-flash` by default. The Web AI panel can switch between `Gemini 3.8 Flash` (`gemini-3.8-flash`) and `Gemini 3.7 Flash` (`gemini-3.7-flash`).
 - The Google AI Studio page is connected to the same local SIGMA Bridge and WebMCP preload as the other supported Web AI pages.
 - `nodeIntegration: false`
 - `contextIsolation: true`
