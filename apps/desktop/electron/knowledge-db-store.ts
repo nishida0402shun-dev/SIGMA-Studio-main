@@ -332,8 +332,8 @@ export class KnowledgeDbStore {
   async getContext(query: string, limit = 8, sourceIds?: string[], maxChars = 16000): Promise<KnowledgeContextItem[]> {
     const library = await this.readLibrary();
     const allowed = sourceIds?.length ? new Set(sourceIds) : null;
-    const results = (await this.search(query, Math.min(50, Math.max(limit * 4, limit)), sourceIds))
-      .slice(0, Math.max(1, Math.min(limit, 20)));
+    const retrievalLimit = Math.max(12, Math.min(50, limit * 5));
+    const results = await this.search(query, retrievalLimit, sourceIds);
     const pagesBySource = new Map(library.sources.map((source) => [source.id, source.pages]));
     const items: KnowledgeContextItem[] = [];
     const seenPages = new Set<string>();
@@ -393,49 +393,20 @@ export class KnowledgeDbStore {
 
     const representedSources = new Set<string>();
     const normalizedLimit = Math.max(1, Math.min(limit, 20));
-    const primaryLimit = normalizedLimit;
+    const selected = selectDiverseContextResults(results, normalizedLimit, maxChars, pagesBySource);
+    const primaryResults = selected.primary;
+    const relatedResults = selected.related;
 
-    for (const result of results) {
-      if (usedChars >= maxChars || items.length >= primaryLimit) break;
+    for (const result of primaryResults) {
+      if (usedChars >= maxChars || items.length >= normalizedLimit) break;
       const primaryKey = `${result.sourceId}:${result.pageNumber}`;
       if (!(await appendItem(result, "primary"))) continue;
       representedSources.add(result.sourceId);
 
-      if (usedChars < maxChars && items.length < normalizedLimit) {
-        const crossSource = results.find((candidate) => !representedSources.has(candidate.sourceId));
-        if (crossSource) {
-          await appendItem({
-            ...crossSource,
-            score: Math.max(0, crossSource.score * 0.9),
-            matchReasons: ["関連ソース", ...crossSource.matchReasons.filter((reason) => reason !== "関連ソース")],
-          }, "related", `${crossSource.sourceId}:${crossSource.pageNumber}`);
-        }
-      }
-
-      const sourcePages = pagesBySource.get(result.sourceId) ?? [];
-      const primaryPage = sourcePages.find((page) => page.pageNumber === result.pageNumber);
-      const primaryTaxonomy = primaryPage?.taxonomyPaths?.[0]?.join(" → ") ?? "";
-      const candidates = sourcePages
-        .filter((page) => Math.abs(page.pageNumber - result.pageNumber) <= 1 && page.pageNumber !== result.pageNumber)
-        .filter((page) => {
-          const taxonomy = page.taxonomyPaths?.[0]?.join(" → ") ?? "";
-          return primaryTaxonomy && taxonomy ? taxonomy === primaryTaxonomy : true;
-        })
-        .filter((page) => Boolean(page.text?.trim()))
-        .sort((a, b) => Math.abs(a.pageNumber - result.pageNumber) - Math.abs(b.pageNumber - result.pageNumber));
-
-      for (const page of candidates.slice(0, 1)) {
+      const related = relatedResults.filter((candidate) => candidate.relatedTo === primaryKey);
+      for (const candidate of related) {
         if (usedChars >= maxChars || items.length >= normalizedLimit) break;
-        await appendItem({
-          id: `${page.id}_related`,
-          sourceId: page.sourceId,
-          pageNumber: page.pageNumber,
-          chunkIndex: 0,
-          text: page.text ?? "",
-          score: Math.max(0, result.score * 0.82),
-          sourceName: result.sourceName,
-          matchReasons: ["関連ページ"],
-        }, "related", primaryKey);
+        await appendItem(candidate.result, "related", primaryKey);
       }
     }
 
@@ -1144,6 +1115,71 @@ export interface KnowledgeContextItem {
   };
 }
 
+function selectDiverseContextResults(
+  results: KnowledgeSearchResult[],
+  limit: number,
+  maxChars: number,
+  pagesBySource: Map<string, KnowledgePage[]>,
+): {
+  primary: KnowledgeSearchResult[];
+  related: Array<{ result: KnowledgeSearchResult; relatedTo: string }>;
+} {
+  const primary: KnowledgeSearchResult[] = [];
+  const related: Array<{ result: KnowledgeSearchResult; relatedTo: string }> = [];
+  const seenSources = new Set<string>();
+  const seenPages = new Set<string>();
+  const estimatedBudget = Math.max(1, Math.floor(maxChars / Math.max(1, limit)));
+
+  for (const result of results) {
+    if (primary.length >= limit) break;
+    const key = `${result.sourceId}:${result.pageNumber}`;
+    if (seenPages.has(key)) continue;
+    // Maximize source diversity first, then let score dominate within a source.
+    const sourceAlreadyRepresented = seenSources.has(result.sourceId);
+    if (sourceAlreadyRepresented && primary.length < Math.min(limit, 3)) continue;
+    if (result.text.trim().length < 24 && result.citationRegions?.length === 0) continue;
+    primary.push(result);
+    seenPages.add(key);
+    seenSources.add(result.sourceId);
+
+    const sourcePages = pagesBySource.get(result.sourceId) ?? [];
+    const primaryPage = sourcePages.find((page) => page.pageNumber === result.pageNumber);
+    const primaryTaxonomy = primaryPage?.taxonomyPaths?.[0]?.join(" → ") ?? "";
+    const nearby = sourcePages
+      .filter((page) => Math.abs(page.pageNumber - result.pageNumber) <= 1 && page.pageNumber !== result.pageNumber)
+      .filter((page) => Boolean(page.text?.trim()))
+      .filter((page) => {
+        const taxonomy = page.taxonomyPaths?.[0]?.join(" → ") ?? "";
+        return primaryTaxonomy && taxonomy ? taxonomy === primaryTaxonomy : true;
+      })
+      .sort((a, b) => Math.abs(a.pageNumber - result.pageNumber) - Math.abs(b.pageNumber - result.pageNumber));
+
+    const relatedPage = nearby[0];
+    if (relatedPage) {
+      const relatedKey = `${relatedPage.sourceId}:${relatedPage.pageNumber}`;
+      if (!seenPages.has(relatedKey)) {
+        const relatedResult: KnowledgeSearchResult = {
+          id: `${relatedPage.id}_related`,
+          sourceId: relatedPage.sourceId,
+          pageNumber: relatedPage.pageNumber,
+          chunkIndex: 0,
+          text: relatedPage.text ?? "",
+          score: Math.max(0, result.score * 0.82),
+          sourceName: result.sourceName,
+          matchReasons: ["関連ページ"],
+          citationRegions: selectCitationRegions(relatedPage, relatedPage.text ?? ""),
+        };
+        related.push({ result: relatedResult, relatedTo: key });
+        seenPages.add(relatedKey);
+      }
+    }
+    // Avoid filling the context with many near-duplicate long pages.
+    if (result.text.length > estimatedBudget && primary.length >= Math.min(limit, 2)) continue;
+  }
+
+  return { primary, related };
+}
+
 function safeId(value: string): string {
   return value.replace(/[^a-zA-Z0-9._-]+/gu, "_").slice(0, 160) || "item";
 }
@@ -1153,7 +1189,16 @@ function countWords(text: string): number {
 }
 
 function tokenizeForSearch(text: string): string[] {
-  return text.normalize("NFKC").toLocaleLowerCase().match(/[\\p{L}\\p{N}][\\p{P}\\p{L}\\p{N}_-]*/gu) ?? [];
+  const normalized = text.normalize("NFKC").toLocaleLowerCase();
+  const tokens = normalized.match(/[\\p{L}\\p{N}][\\p{P}\\p{L}\\p{N}_-]*/gu) ?? [];
+  const japanese = normalized.match(/[一-龯々〆ヵヶぁ-ゖァ-ヺー]{2,}/gu) ?? [];
+  const morphemeLike: string[] = [];
+  for (const token of japanese) {
+    // Character bigrams improve recall for Japanese queries without requiring a heavyweight tokenizer.
+    if (token.length <= 4) morphemeLike.push(token);
+    for (let i = 0; i < token.length - 1; i += 1) morphemeLike.push(token.slice(i, i + 2));
+  }
+  return [...new Set([...tokens, ...morphemeLike])];
 }
 
 async function extractKnowledgeFilePageTexts(fileName: string, bytes: Uint8Array, pageCount: number): Promise<string[]> {
@@ -1229,8 +1274,9 @@ function lexicalScore(
   let score = 0;
   let weight = 0;
   for (const queryToken of queryTokens) {
-    const tf = tokenCounts.get(queryToken) ?? 0;
-    if (tf === 0 && !normalized.includes(queryToken)) continue;
+    const variants = searchTokenVariants(queryToken);
+    const tf = variants.reduce((sum, variant) => sum + (tokenCounts.get(variant) ?? 0), 0);
+    if (tf === 0 && !variants.some((variant) => normalized.includes(variant))) continue;
     const df = documentFrequency.get(queryToken) ?? 0;
     const idf = Math.log(1 + (documentCount + 1) / (df + 1));
     const tfWeight = tf > 0 ? (1 + Math.log(tf)) / lengthNorm : 0.35;
@@ -1254,12 +1300,38 @@ function semanticQueryScore(page: KnowledgePage, queryTokens: string[]): number 
   return Math.min(1, hits / queryTokens.length);
 }
 
+function normalizeSearchToken(token: string): string {
+  return token.normalize("NFKC").toLocaleLowerCase().replace(/[\\p{P}\\p{S}]/gu, "");
+}
+
+function searchTokenVariants(token: string): string[] {
+  const normalized = normalizeSearchToken(token);
+  const variants = new Set([normalized]);
+  const aliases: Record<string, string[]> = {
+    "pdf": ["portable document format"],
+    "ocr": ["文字認識", "光学文字認識"],
+    "rag": ["retrieval augmented generation", "検索拡張生成"],
+    "ai": ["人工知能"],
+    "人工知能": ["ai"],
+    "検索": ["retrieval", "search"],
+    "retrieval": ["検索"],
+    "分類": ["taxonomy", "classification"],
+    "taxonomy": ["分類"],
+    "定義": ["definition"],
+    "definition": ["定義"],
+    "解答": ["solution", "answer"],
+    "solution": ["解答", "answer"],
+  };
+  for (const alias of aliases[normalized] ?? []) variants.add(alias);
+  return [...variants];
+}
+
 function metadataScore(page: KnowledgePage, query: string, queryTokens: string[]): number {
   if (queryTokens.length === 0) return 0;
   const title = page.title?.normalize("NFKC").toLocaleLowerCase() ?? "";
   const keywords = (page.keywords ?? []).map((keyword) => keyword.normalize("NFKC").toLocaleLowerCase());
-  const keywordHits = queryTokens.filter((token) => keywords.some((keyword) => keyword === token || keyword.includes(token))).length;
-  const titleHits = queryTokens.filter((token) => title.includes(token)).length;
+  const keywordHits = queryTokens.filter((token) => searchTokenVariants(token).some((variant) => keywords.some((keyword) => keyword === variant || keyword.includes(variant)))).length;
+  const titleHits = queryTokens.filter((token) => searchTokenVariants(token).some((variant) => title.includes(variant))).length;
   let score = Math.max(
     keywordHits / queryTokens.length,
     titleHits / queryTokens.length,
@@ -1313,8 +1385,8 @@ function retrievalMatchReasons(
   if (vector >= 0.65) reasons.push("意味類似度が高い");
   if (exactPhraseScore(page.text ?? "", query) > 0) reasons.push("完全一致");
   if (lexical > 0) reasons.push(`本文一致 ${Math.round(lexical * 100)}%`);
-  if (page.title && queryTokens.some((token) => page.title!.toLocaleLowerCase().includes(token))) reasons.push("タイトル一致");
-  if ((page.keywords ?? []).some((keyword) => queryTokens.some((token) => keyword.toLocaleLowerCase().includes(token)))) reasons.push("キーワード一致");
+  if (page.title && queryTokens.some((token) => searchTokenVariants(token).some((variant) => page.title!.toLocaleLowerCase().includes(variant)))) reasons.push("タイトル一致");
+  if ((page.keywords ?? []).some((keyword) => queryTokens.some((token) => searchTokenVariants(token).some((variant) => keyword.toLocaleLowerCase().includes(variant))))) reasons.push("キーワード一致");
   const semanticType = semanticTypeFromQuery(query);
   if (semanticType && page.semanticType === semanticType) reasons.push(`分類一致: ${semanticType}`);
   if (page.taxonomyPaths?.length) reasons.push(`分類: ${page.taxonomyPaths[0]!.join(" → ")}`);
