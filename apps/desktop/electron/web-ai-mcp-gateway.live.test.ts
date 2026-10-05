@@ -131,6 +131,23 @@ describe("Web AI MCP gateway live server path", () => {
     if (!address || typeof address === "string") throw new Error("bridge did not bind");
     bridgeBase = `http://127.0.0.1:${address.port}`;
 
+    const healthResponse = await fetch(`${bridgeBase}/v1/health`, {
+      headers: {
+        Authorization: "Bearer live-test-token",
+        Origin: "https://chatgpt.com",
+      },
+    });
+    expect(healthResponse.status).toBe(200);
+    await expect(healthResponse.json()).resolves.toMatchObject({ ok: true, apiVersion: "1" });
+
+    const unauthorizedHealthResponse = await fetch(`${bridgeBase}/v1/health`, {
+      headers: {
+        Authorization: "Bearer wrong-token",
+        Origin: "https://chatgpt.com",
+      },
+    });
+    expect(unauthorizedHealthResponse.status).toBe(401);
+
     const toolsResponse = await fetch(`${bridgeBase}/v1/mcp/tools`, {
       headers: {
         Authorization: "Bearer live-test-token",
