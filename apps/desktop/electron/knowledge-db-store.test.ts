@@ -473,6 +473,40 @@ describe("Knowledge DB analysis lifecycle", () => {
   });
 });
 
+describe("Knowledge DB RAG retrieval quality", () => {
+  it("supports Japanese character-bigram recall and configured search aliases", async () => {
+    const dataDir = await fs.mkdtemp(path.join(os.tmpdir(), "sigma-knowledge-db-alias-"));
+    tempDirs.push(dataDir);
+    const filePath = path.join(dataDir, "ai.md");
+    await fs.writeFile(filePath, "人工知能と検索拡張生成（RAG）について説明する。", "utf8");
+    const store = new KnowledgeDbStore(dataDir);
+    const [source] = await store.addFiles([filePath]);
+    const results = await store.search("AI", 5);
+    expect(results.some((item) => item.sourceId === source?.id)).toBe(true);
+    const japanese = await store.search("人工知能", 5);
+    expect(japanese[0]?.sourceId).toBe(source?.id);
+  });
+
+  it("selects compact primary evidence and preserves a cross-source related citation", async () => {
+    const dataDir = await fs.mkdtemp(path.join(os.tmpdir(), "sigma-knowledge-db-diverse-context-"));
+    tempDirs.push(dataDir);
+    const firstPath = path.join(dataDir, "first.md");
+    const secondPath = path.join(dataDir, "second.md");
+    const thirdPath = path.join(dataDir, "third.md");
+    await fs.writeFile(firstPath, "検索拡張生成の基本説明と一次資料。", "utf8");
+    await fs.writeFile(secondPath, "検索拡張生成の評価方法を補足する資料。", "utf8");
+    await fs.writeFile(thirdPath, "検索拡張生成の別の実装例を紹介する資料。", "utf8");
+    const store = new KnowledgeDbStore(dataDir);
+    const sources = await store.addFiles([firstPath, secondPath, thirdPath]);
+    expect(sources).toHaveLength(3);
+    const context = await store.getContext("検索拡張生成", 4, undefined, 5000);
+    expect(context.length).toBeGreaterThan(1);
+    expect(context[0]?.relation).toBe("primary");
+    expect(context.some((item) => item.relation === "related" && item.matchReasons?.includes("関連ソース"))).toBe(true);
+    expect(new Set(context.map((item) => item.sourceId)).size).toBeGreaterThan(1);
+  });
+});
+
 describe("Knowledge DB classification review", () => {
   it("confirms matching AI classification and preserves the local taxonomy on conflict", async () => {
     const dataDir = await fs.mkdtemp(path.join(os.tmpdir(), "sigma-knowledge-db-review-"));
