@@ -3072,6 +3072,119 @@ registerTool(
 );
 
 registerTool(
+  "knowledge_db_pdf_import_preview",
+  {
+    title: "Knowledge DB PDF取込プレビュー",
+    description: "PDFをKnowledge DBへ登録する前に、上位解析エンジンでページ解析・教科→科目→単元分類・分割境界を作成します。元PDFはこの呼び出しではKnowledge DBへ登録されません。Web AIからの実行はユーザー承認が必要です。",
+    inputSchema: {
+      sourcePath: z.string().min(1).max(4096),
+    },
+  },
+  async ({ sourcePath }) => withToolErrorHandling(async () => {
+    const staging = await new KnowledgeDbStore(storeContext.dataDir).previewPdfImport(sourcePath);
+    return {
+      ok: true,
+      staging: {
+        id: staging.id,
+        status: staging.status,
+        sourceName: staging.sourceName,
+        sourceHash: staging.sourceHash,
+        sizeBytes: staging.sizeBytes,
+        pageCount: staging.pageCount,
+        createdAt: staging.createdAt,
+        updatedAt: staging.updatedAt,
+        segments: staging.segments,
+      },
+      message: "PDFはまだKnowledge DBへ登録されていません。分割案を確認・必要ならupdateで変更し、approveで登録してください。",
+    };
+  }),
+);
+
+registerTool(
+  "knowledge_db_pdf_import_staging_list",
+  {
+    title: "Knowledge DB PDF取込ステージング一覧",
+    description: "PDF取込前のAI分割・分類プレビュー一覧を取得します。Workspaceには依存しません。",
+    inputSchema: {},
+  },
+  async () => withToolErrorHandling(async () => {
+    const staging = await new KnowledgeDbStore(storeContext.dataDir).listPdfImportStaging();
+    return { ok: true, staging };
+  }),
+);
+
+registerTool(
+  "knowledge_db_pdf_import_staging_get",
+  {
+    title: "Knowledge DB PDF取込ステージング取得",
+    description: "指定したPDF取込プレビューの現在の分割・分類案を取得します。",
+    inputSchema: {
+      stagingId: z.string().min(1),
+    },
+  },
+  async ({ stagingId }) => withToolErrorHandling(async () => {
+    const staging = await new KnowledgeDbStore(storeContext.dataDir).getPdfImportStaging(stagingId);
+    if (!staging) throw new Error("PDF import staging not found.");
+    return { ok: true, staging };
+  }),
+);
+
+registerTool(
+  "knowledge_db_pdf_import_staging_update",
+  {
+    title: "Knowledge DB PDF分割案を更新",
+    description: "AIが提案したPDF分割案の選択状態・名称・ページ範囲・分類をユーザー承認前に更新します。元PDFはまだKnowledge DBへ登録されません。",
+    inputSchema: {
+      stagingId: z.string().min(1),
+      segments: z.array(z.object({
+        id: z.string().min(1),
+        startPage: z.number().int().min(1),
+        endPage: z.number().int().min(1),
+        name: z.string().min(1).max(500),
+        paths: z.array(z.array(z.string().min(1)).min(1)).min(1).max(8),
+        confidence: z.number().min(0).max(1),
+        reason: z.string().max(2000),
+        selected: z.boolean(),
+      }).strict()).max(200),
+    },
+  },
+  async ({ stagingId, segments }) => withToolErrorHandling(async () => {
+    const staging = await new KnowledgeDbStore(storeContext.dataDir).updatePdfImportStaging({ stagingId, segments });
+    return { ok: true, staging };
+  }),
+);
+
+registerTool(
+  "knowledge_db_pdf_import_approve",
+  {
+    title: "Knowledge DB PDF取込を承認",
+    description: "承認済みのPDF分割・分類案を確定し、元PDFと選択された子PDFをKnowledge DBへ登録します。プレビュー後に元ファイルが変更されていた場合は安全のため拒否します。",
+    inputSchema: {
+      stagingId: z.string().min(1),
+    },
+  },
+  async ({ stagingId }) => withToolErrorHandling(async () => {
+    const result = await new KnowledgeDbStore(storeContext.dataDir).approvePdfImport(stagingId);
+    return { ok: true, ...result };
+  }),
+);
+
+registerTool(
+  "knowledge_db_pdf_import_reject",
+  {
+    title: "Knowledge DB PDF取込を却下",
+    description: "PDF取込プレビューを却下し、Knowledge DBへ登録せずステージングを却下状態にします。",
+    inputSchema: {
+      stagingId: z.string().min(1),
+    },
+  },
+  async ({ stagingId }) => withToolErrorHandling(async () => {
+    const result = await new KnowledgeDbStore(storeContext.dataDir).rejectPdfImport(stagingId);
+    return { ok: true, ...result };
+  }),
+);
+
+registerTool(
   "knowledge_db_search",
   {
     title: "Knowledge DBを検索",
