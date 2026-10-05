@@ -88,6 +88,32 @@ export interface KnowledgeSmartSplitSegment {
   reason: string;
 }
 
+
+export interface KnowledgePdfImportSegmentProposal {
+  id: string;
+  startPage: number;
+  endPage: number;
+  name: string;
+  paths: string[][];
+  confidence: number;
+  reason: string;
+  selected: boolean;
+}
+
+export interface KnowledgePdfImportStaging {
+  id: string;
+  status: "draft" | "approved" | "rejected";
+  sourcePath: string;
+  sourceName: string;
+  sourceHash: string;
+  sizeBytes: number;
+  pageCount: number;
+  createdAt: string;
+  updatedAt: string;
+  approvedAt?: string;
+  segments: KnowledgePdfImportSegmentProposal[];
+}
+
 export interface KnowledgeIndexStatus {
   state: "idle" | "running" | "completed" | "failed";
   total: number;
@@ -434,6 +460,199 @@ export class KnowledgeDbStore {
       .slice(0, Math.max(1, Math.min(limit, 20)));
   }
 
+
+
+  async previewPdfImport(filePath: string): Promise<KnowledgePdfImportStaging> {
+    const normalizedPath = path.resolve(filePath);
+    const stat = await fs.stat(normalizedPath);
+    if (!stat.isFile() || path.extname(normalizedPath).toLowerCase() !== ".pdf") {
+      throw new Error("PDF file is required");
+    }
+    const bytes = await fs.readFile(normalizedPath);
+    const sourceHash = createHash("sha256").update(bytes).digest("hex");
+    const pdf = await PDFDocument.load(bytes, { ignoreEncryption: false });
+    const pageCount = pdf.getPageCount();
+    if (pageCount < 1) throw new Error("PDF has no pages");
+
+    const pageTexts = await extractPdfPageTexts(bytes, pageCount);
+    let structureResults: Awaited<ReturnType<KnowledgeStructureParser["parsePdf"]>> = [];
+    const parserStatus = await this.getStructureParserStatus();
+    if (parserStatus.available && pageTexts.some((text) => !text.trim())) {
+      try {
+        structureResults = await this.structureParser.parsePdf(normalizedPath);
+      } catch {
+        structureResults = [];
+      }
+    }
+    const structureByPage = new Map(structureResults.map((result) => [result.pageNumber, result]));
+    const pages: KnowledgePage[] = pageTexts.map((nativeText, index) => {
+      const pageNumber = index + 1;
+      const structured = structureByPage.get(pageNumber);
+      const blocks = structured?.blocks ?? [];
+      const text = [nativeText, structured?.text ?? "", ...blocks.map((block) => block.text)]
+        .map((value) => value.trim())
+        .filter(Boolean)
+        .join("\n");
+      const analysis = analyzeKnowledgePage(text, blocks);
+      const taxonomy = classifyKnowledgeTaxonomy(text, analysis.keywords);
+      return {
+        id: "staging_p" + pageNumber,
+        sourceId: "staging",
+        pageNumber,
+        semanticType: analysis.semanticType,
+        title: analysis.title,
+        text: text || undefined,
+        keywords: analysis.keywords,
+        analysisSignals: analysis.signals,
+        taxonomyNodeIds: taxonomy.map((item) => item.nodeId),
+        taxonomyPaths: taxonomy.map((item) => item.path),
+        taxonomyConfidence: taxonomy[0]?.confidence ?? 0,
+        analysisStatus: "analyzed",
+        analysisVersion: KNOWLEDGE_ANALYSIS_VERSION,
+        taxonomyVersion: KNOWLEDGE_TAXONOMY_VERSION,
+      };
+    });
+
+    const pathKey = (page: KnowledgePage) => page.taxonomyPaths?.[0]?.join(" → ") ?? "";
+    const segments: KnowledgePdfImportSegmentProposal[] = [];
+    let start = pages[0]?.pageNumber ?? 1;
+    let previousKey = pathKey(pages[0] ?? ({ taxonomyPaths: [] } as KnowledgePage));
+    for (let index = 1; index < pages.length; index += 1) {
+      const current = pages[index]!;
+      const currentKey = pathKey(current);
+      if (currentKey && previousKey && currentKey !== previousKey) {
+        const previousPage = pages[index - 1]!;
+        const nextPage = pages[index + 1];
+        const previousSubject = previousKey.split(" → ")[0];
+        const currentSubject = currentKey.split(" → ")[0];
+        const stableBoundary = previousSubject !== currentSubject || Boolean(nextPage && pathKey(nextPage) === currentKey);
+        if (stableBoundary) {
+          const segmentPages = pages.filter((page) => page.pageNumber >= start && page.pageNumber <= previousPage.pageNumber);
+          const paths = [...new Map(segmentPages.flatMap((page) => (page.taxonomyPaths ?? []).map((taxonomyPath) => [taxonomyPath.join("\u001f"), taxonomyPath] as const))).values()].slice(0, 4);
+          const confidence = Math.min(1, segmentPages.reduce((sum, page) => sum + (page.taxonomyConfidence ?? 0), 0) / Math.max(1, segmentPages.length));
+          const title = segmentPages.find((page) => page.title?.trim())?.title?.trim();
+          segments.push({
+            id: "seg_" + randomUUID(),
+            startPage: start,
+            endPage: previousPage.pageNumber,
+            name: title || path.basename(normalizedPath, path.extname(normalizedPath)) + " p" + start + "-" + previousPage.pageNumber,
+            paths,
+            confidence,
+            reason: "連続ページの分類が変化した境界を検出",
+            selected: true,
+          });
+          start = current.pageNumber;
+        }
+      }
+      if (currentKey) previousKey = currentKey;
+    }
+    const last = pages[pages.length - 1];
+    if (last) {
+      const segmentPages = pages.filter((page) => page.pageNumber >= start && page.pageNumber <= last.pageNumber);
+      const paths = [...new Map(segmentPages.flatMap((page) => (page.taxonomyPaths ?? []).map((taxonomyPath) => [taxonomyPath.join("\u001f"), taxonomyPath] as const))).values()].slice(0, 4);
+      const confidence = Math.min(1, segmentPages.reduce((sum, page) => sum + (page.taxonomyConfidence ?? 0), 0) / Math.max(1, segmentPages.length));
+      const title = segmentPages.find((page) => page.title?.trim())?.title?.trim();
+      segments.push({
+        id: "seg_" + randomUUID(),
+        startPage: start,
+        endPage: last.pageNumber,
+        name: title || path.basename(normalizedPath, path.extname(normalizedPath)) + " p" + start + "-" + last.pageNumber,
+        paths,
+        confidence,
+        reason: "ページ内容と分類の連続性から分割範囲を推定",
+        selected: true,
+      });
+    }
+
+    const staging: KnowledgePdfImportStaging = {
+      id: "pstg_" + randomUUID(),
+      status: "draft",
+      sourcePath: normalizedPath,
+      sourceName: path.basename(normalizedPath),
+      sourceHash,
+      sizeBytes: stat.size,
+      pageCount,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      segments,
+    };
+    const stagingDir = this.stagingPaths().root;
+    await fs.mkdir(stagingDir, { recursive: true });
+    await fs.writeFile(path.join(stagingDir, staging.id + ".json"), JSON.stringify(staging, null, 2), "utf8");
+    return staging;
+  }
+
+  async getPdfImportStaging(stagingId: string): Promise<KnowledgePdfImportStaging | null> {
+    try {
+      return JSON.parse(await fs.readFile(path.join(this.stagingPaths().root, stagingId + ".json"), "utf8")) as KnowledgePdfImportStaging;
+    } catch {
+      return null;
+    }
+  }
+
+  async listPdfImportStaging(): Promise<KnowledgePdfImportStaging[]> {
+    const entries = await fs.readdir(this.stagingPaths().root, { withFileTypes: true }).catch(() => []);
+    const items: KnowledgePdfImportStaging[] = [];
+    for (const entry of entries) {
+      if (!entry.isFile() || !entry.name.endsWith(".json")) continue;
+      try {
+        items.push(JSON.parse(await fs.readFile(path.join(this.stagingPaths().root, entry.name), "utf8")) as KnowledgePdfImportStaging);
+      } catch {}
+    }
+    return items.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
+  }
+
+  async updatePdfImportStaging(input: { stagingId: string; segments: KnowledgePdfImportSegmentProposal[] }): Promise<KnowledgePdfImportStaging> {
+    const current = await this.getPdfImportStaging(input.stagingId);
+    if (!current) throw new Error("PDF import staging not found");
+    if (current.status !== "draft") throw new Error("Only draft PDF imports can be edited");
+    for (const segment of input.segments) {
+      if (!Number.isInteger(segment.startPage) || !Number.isInteger(segment.endPage) || segment.startPage < 1 || segment.endPage < segment.startPage || segment.endPage > current.pageCount) {
+        throw new Error("Invalid PDF segment range");
+      }
+    }
+    const updated: KnowledgePdfImportStaging = { ...current, segments: input.segments, updatedAt: new Date().toISOString() };
+    await fs.writeFile(path.join(this.stagingPaths().root, current.id + ".json"), JSON.stringify(updated, null, 2), "utf8");
+    return updated;
+  }
+
+  async approvePdfImport(stagingId: string): Promise<{ stagingId: string; sourceId: string; childSourceIds: string[] }> {
+    const current = await this.getPdfImportStaging(stagingId);
+    if (!current) throw new Error("PDF import staging not found");
+    if (current.status !== "draft") throw new Error("Only draft PDF imports can be approved");
+
+    const bytes = await fs.readFile(current.sourcePath);
+    const currentHash = createHash("sha256").update(bytes).digest("hex");
+    if (currentHash !== current.sourceHash) throw new Error("Source PDF changed after preview; review is required again.");
+
+    const added = await this.addFiles([current.sourcePath]);
+    const library = await this.readLibrary();
+    const source = added[0] ?? library.sources.find((item) => item.contentHash === current.sourceHash);
+    if (!source) throw new Error("Failed to register source PDF");
+
+    const selected = current.segments.filter((segment) => segment.selected);
+    const childSources = selected.length
+      ? await this.materializeSmartSplit(source.id, selected.map((segment) => ({ startPage: segment.startPage, endPage: segment.endPage, name: segment.name })))
+      : [];
+
+    const approved: KnowledgePdfImportStaging = {
+      ...current,
+      status: "approved",
+      updatedAt: new Date().toISOString(),
+      approvedAt: new Date().toISOString(),
+    };
+    await fs.writeFile(path.join(this.stagingPaths().root, current.id + ".json"), JSON.stringify(approved, null, 2), "utf8");
+    return { stagingId, sourceId: source.id, childSourceIds: childSources.map((child) => child.id) };
+  }
+
+  async rejectPdfImport(stagingId: string): Promise<{ stagingId: string }> {
+    const current = await this.getPdfImportStaging(stagingId);
+    if (!current) throw new Error("PDF import staging not found");
+    if (current.status !== "draft") throw new Error("Only draft PDF imports can be rejected");
+    const rejected: KnowledgePdfImportStaging = { ...current, status: "rejected", updatedAt: new Date().toISOString() };
+    await fs.writeFile(path.join(this.stagingPaths().root, current.id + ".json"), JSON.stringify(rejected, null, 2), "utf8");
+    return { stagingId };
+  }
 
   async previewSmartSplit(sourceId: string): Promise<{ sourceId: string; sourceName: string; pageCount: number; segments: KnowledgeSmartSplitSegment[] }> {
     const { source } = await this.getPage(sourceId, 1);
@@ -848,6 +1067,10 @@ export class KnowledgeDbStore {
     const tmp = `${paths.libraryPath}.tmp`;
     await fs.writeFile(tmp, JSON.stringify(library, null, 2), "utf8");
     await fs.rename(tmp, paths.libraryPath);
+  }
+
+  private stagingPaths() {
+    return { root: path.join(this.dataDir, "knowledge-db", "staging") };
   }
 
   private paths() {
