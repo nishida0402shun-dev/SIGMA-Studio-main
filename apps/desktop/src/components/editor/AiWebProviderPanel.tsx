@@ -83,7 +83,7 @@ export function AiWebProviderPanel({
     };
     webview.addEventListener("ipc-message", onIpcMessage);
 
-    const allowedHosts = new Set(["chatgpt.com", "www.chatgpt.com", "claude.ai", "www.claude.ai", "gemini.google.com", "aistudio.google.com", "www.aistudio.google.com"]);
+    const allowedHosts = new Set(["chatgpt.com", "www.chatgpt.com", "claude.ai", "www.claude.ai", "gemini.google.com", "aistudio.google.com", "www.aistudio.google.com", "accounts.google.com", "www.accounts.google.com"]);
     const onNavigate = (event: Event) => {
       const url = (event as Event & { url?: string }).url;
       if (!url) return;
