@@ -171,6 +171,15 @@ describe("Web AI MCP gateway live server path", () => {
     expect(requestedWrites).toContain("knowledge_db_submit_classification_review");
   });
 
+  it("exposes PDF staging through the global Web AI scope", async () => {
+    await expect(
+      gateway.callTool("knowledge_db_pdf_import_staging_list", {}, null),
+    ).resolves.toBeTruthy();
+    await expect(
+      gateway.callTool("knowledge_db_pdf_import_staging_get", { stagingId: "missing-staging" }, null),
+    ).resolves.toBeTruthy();
+  });
+
   it("requires approval for PDF import preview and approval", async () => {
     await expect(
       gateway.callTool(
