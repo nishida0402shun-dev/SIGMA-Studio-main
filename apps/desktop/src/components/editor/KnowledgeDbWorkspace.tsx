@@ -1001,6 +1001,9 @@ export function KnowledgeDbWorkspace({ open, onClose, onOpenAi, t }: Props) {
               {sources.map((source) => (
                 <div key={source.id} className="knowledge-db-source-row" onContextMenu={(event) => { event.preventDefault(); setSelected({ [source.id]: new Set(source.pages.map((page) => page.pageNumber)) }); setRegion(null); setContextMenu({ x: event.clientX, y: event.clientY }); }}>
                   <span title={source.name}>{source.name} · {source.pageCount}p</span>
+                  {source.mimeType === "application/pdf" && source.pageCount > 1 && (
+                    <button type="button" onClick={() => void openSmartSplit(source.id)}>AI分割</button>
+                  )}
                   <button type="button" onClick={() => void deleteSource(source.id)} aria-label={`「${source.name}」を削除`}>
                     <Trash2 size={14} />
                   </button>
