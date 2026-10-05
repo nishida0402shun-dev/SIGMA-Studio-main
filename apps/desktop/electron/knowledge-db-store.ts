@@ -1297,6 +1297,9 @@ function selectCitationRegions(page: KnowledgePage, matchedText: string): Array<
       type: block.type,
       text: block.text.slice(0, 500),
       ...(block.bbox ? { bbox: block.bbox } : {}),
+      ...(block.confidence === undefined ? {} : { confidence: block.confidence }),
+    }));
+}
 
 function retrievalMatchReasons(
   page: KnowledgePage,
