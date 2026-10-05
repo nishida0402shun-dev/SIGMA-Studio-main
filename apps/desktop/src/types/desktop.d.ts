@@ -886,6 +886,12 @@ export interface DesktopKnowledgeDbAPI {
   search(payload: { query: string; limit?: number }): Promise<unknown[]>;
   related(payload: { sourceId: string; limit?: number }): Promise<unknown[]>;
   importSources(payload: { paths: string[] }): Promise<unknown[]>;
+  previewPdfImport(filePath: string): Promise<unknown>;
+  getPdfImportStaging(stagingId: string): Promise<unknown>;
+  listPdfImportStaging(): Promise<unknown[]>;
+  updatePdfImportStaging(payload: { stagingId: string; segments: unknown[] }): Promise<unknown>;
+  approvePdfImportStaging(stagingId: string): Promise<unknown>;
+  rejectPdfImportStaging(stagingId: string): Promise<unknown>;
   extractPages(payload: {
     sourceId?: string;
     pageNumbers?: number[];
