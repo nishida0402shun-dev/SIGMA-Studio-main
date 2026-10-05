@@ -378,6 +378,24 @@ const desktopAPI = {
     importSources(payload: { paths: string[] }): Promise<unknown[]> {
       return ipcRenderer.invoke("knowledge-db:import", payload);
     },
+    previewPdfImport(filePath: string): Promise<unknown> {
+      return ipcRenderer.invoke("knowledge-db:pdf-import-preview", { filePath });
+    },
+    getPdfImportStaging(stagingId: string): Promise<unknown> {
+      return ipcRenderer.invoke("knowledge-db:pdf-import-staging-get", stagingId);
+    },
+    listPdfImportStaging(): Promise<unknown[]> {
+      return ipcRenderer.invoke("knowledge-db:pdf-import-staging-list");
+    },
+    updatePdfImportStaging(payload: { stagingId: string; segments: unknown[] }): Promise<unknown> {
+      return ipcRenderer.invoke("knowledge-db:pdf-import-staging-update", payload);
+    },
+    approvePdfImportStaging(stagingId: string): Promise<unknown> {
+      return ipcRenderer.invoke("knowledge-db:pdf-import-staging-approve", stagingId);
+    },
+    rejectPdfImportStaging(stagingId: string): Promise<unknown> {
+      return ipcRenderer.invoke("knowledge-db:pdf-import-staging-reject", stagingId);
+    },
     extractPages(payload: {
       sourceId?: string;
       pageNumbers?: number[];
