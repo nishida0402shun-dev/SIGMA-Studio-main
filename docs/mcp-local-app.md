@@ -69,6 +69,12 @@ MCPからの書き込み系ツールは、既定では教材ファイルを直�
 - `knowledge_db_get_context` - グローバルKnowledge DBからAI用コンテキストを取得します。
 - `knowledge_db_get_related_sources` - 関連するKnowledge DBソースを取得します。
 - `knowledge_db_route_query` - クエリをKnowledge DB検索経路へ振り分けます。`query`(必須)、`scope`(`"all"` 既定 / `"problems"`)、`limit`(既定8、上限20)、`excludeFileId`(結果から除外するfileId。通常は現在編集中の教材)を受け取ります。`scope: "problems"` にすると問題ブロック単位でヒットし、prompt本文とtagsを含む詳しい抜粋を返すため、類題を探す用途に向きます。
+- `knowledge_db_pdf_import_preview` - PDFをKnowledge DBへ登録せずにAI分割・分類のプレビューを作成します。
+- `knowledge_db_pdf_import_staging_list` - PDF取り込みプレビューの保留中ステージング一覧を取得します。
+- `knowledge_db_pdf_import_staging_get` - PDF取り込みステージングの詳細を取得します。
+- `knowledge_db_pdf_import_staging_update` - PDF取り込みステージングの分割範囲・名称・分類候補などを更新します。
+- `knowledge_db_pdf_import_approve` - 承認済みPDFをKnowledge DBへ登録し、確定した分割結果を生成します。
+- `knowledge_db_pdf_import_reject` - PDF取り込みステージングを却下します。
 - `validate_local_document` - SigmaDoc と MathLive TeX を検証します。
 - `list_edit_proposals` - 現在のrun/チャットに帰属するMCP編集提案の軽量な一覧を返します。`draft`、変更後教材全体、内部proposal IDは含みません。
 - `get_edit_proposal` - `fileId`/`runId`から現在の作業案を読みます。既定の `detail:"summary"` は要約のみ、`detail:"full"` は再適用可能な `draft` を含みますが、内部の教材スナップショットとproposal IDは返しません。
