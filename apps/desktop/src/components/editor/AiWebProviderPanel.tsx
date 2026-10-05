@@ -40,6 +40,7 @@ export function AiWebProviderPanel({
   const webviewRef = useRef<HTMLElement | null>(null);
   const [menuOpen, setMenuOpen] = useState(false);
   const [preloadUrl, setPreloadUrl] = useState<string | null>(null);
+  const [bridgeAvailable, setBridgeAvailable] = useState<boolean | null>(null);
   const [webMcpAvailable, setWebMcpAvailable] = useState<boolean | null>(null);
   const [webviewReady, setWebviewReady] = useState(false);
   useEffect(() => {
@@ -75,7 +76,8 @@ export function AiWebProviderPanel({
     const onIpcMessage = (event: Event) => {
       const payload = (event as Event & { channel?: string; args?: unknown[] }).args?.[0];
       if ((event as Event & { channel?: string }).channel !== "sigma-web-ai-status" || !payload || typeof payload !== "object") return;
-      const status = payload as { webMcp?: unknown };
+      const status = payload as { bridge?: unknown; webMcp?: unknown };
+      if (typeof status.bridge === "boolean") setBridgeAvailable(status.bridge);
       if (typeof status.webMcp === "boolean") setWebMcpAvailable(status.webMcp);
     };
     webview.addEventListener("ipc-message", onIpcMessage);
@@ -191,7 +193,7 @@ export function AiWebProviderPanel({
         <Globe size={12} />
         <span>{t("webAi.note")}</span>
         <span aria-label="SIGMA connection status">
-          {workspaceId ? t("webAi.workspaceSelected") : t("webAi.workspaceUnselected")} · Bridge {preloadUrl ? t("webAi.bridgeConnected") : t("webAi.bridgePreparing")} · WebMCP {webMcpAvailable === true ? t("webAi.webMcpConnected") : webMcpAvailable === false ? t("webAi.webMcpUnavailable") : t("webAi.webMcpChecking")}
+          {workspaceId ? t("webAi.workspaceSelected") : t("webAi.workspaceUnselected")} · Bridge {bridgeAvailable === true ? t("webAi.bridgeConnected") : bridgeAvailable === false ? t("webAi.webMcpUnavailable") : preloadUrl ? t("webAi.bridgePreparing") : t("webAi.bridgePreparing")} · WebMCP {webMcpAvailable === true ? t("webAi.webMcpConnected") : webMcpAvailable === false ? t("webAi.webMcpUnavailable") : t("webAi.webMcpChecking")}
         </span>
       </div>
       <div className="ai-web-provider-surface">
