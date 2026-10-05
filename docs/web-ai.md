@@ -6,7 +6,7 @@ Sigma Studio exposes an authenticated loopback API for supported Web AI windows.
 
 - The HTTP server binds only to `127.0.0.1`.
 - Every request requires a per-launch random Bearer token.
-- Browser origins are restricted to ChatGPT, Claude, and Gemini origins.
+- Browser origins are restricted to ChatGPT, Claude, Gemini, and Google AI Studio origins.
 - Remote pages receive no Electron IPC object and no Node integration.
 - Web AI actions are routed through the existing Agent Runtime and Proposal/Revision safety model.
 - There is no arbitrary shell-command endpoint.
@@ -35,8 +35,10 @@ The file is removed when Sigma Studio exits.
 
 ## Web AI windows
 
-The application menu exposes ChatGPT Web, Claude Web, and Gemini Web. Their remote pages are loaded with:
+The application menu exposes ChatGPT Web, Claude Web, Gemini Web, and Google AI Studio Web. Their remote pages are loaded with:
 
+- Google AI Studio opens at `https://aistudio.google.com/prompts/new_chat?model=gemini-3.8-flash`.
+- The Google AI Studio page is connected to the same local SIGMA Bridge and WebMCP preload as the other supported Web AI pages.
 - `nodeIntegration: false`
 - `contextIsolation: true`
 - `sandbox: true`
