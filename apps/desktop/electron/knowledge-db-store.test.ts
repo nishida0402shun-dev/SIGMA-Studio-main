@@ -93,6 +93,37 @@ describe("KnowledgeDbStore", () => {
 
 
 
+  it("uses corpus-aware lexical ranking to prefer rare query terms over common terms", async () => {
+    const dataDir = await fs.mkdtemp(path.join(os.tmpdir(), "sigma-knowledge-db-hybrid-"));
+    tempDirs.push(dataDir);
+    const store = new KnowledgeDbStore(dataDir);
+    const sourceIds = ["src_hybrid_a", "src_hybrid_b", "src_hybrid_c"];
+    const libraryPath = path.join(dataDir, "knowledge-db", "library.json");
+    await fs.mkdir(path.dirname(libraryPath), { recursive: true });
+    const now = new Date().toISOString();
+    const pages = [
+      { id: sourceIds[0] + "_p1", sourceId: sourceIds[0], pageNumber: 1, semanticType: "unknown" as const, text: "数学 三角関数 共通説明", extractionStatus: "text" as const, analysisStatus: "analyzed" as const, analysisVersion: 2 },
+      { id: sourceIds[1] + "_p1", sourceId: sourceIds[1], pageNumber: 1, semanticType: "theorem" as const, text: "数学 三角関数 加法定理 特殊定理", extractionStatus: "text" as const, analysisStatus: "analyzed" as const, analysisVersion: 2, title: "加法定理", keywords: ["加法定理", "三角関数"] },
+      { id: sourceIds[2] + "_p1", sourceId: sourceIds[2], pageNumber: 1, semanticType: "unknown" as const, text: "数学 三角関数 共通説明 公式", extractionStatus: "text" as const, analysisStatus: "analyzed" as const, analysisVersion: 2 },
+    ];
+    await fs.writeFile(libraryPath, JSON.stringify({
+      version: 3,
+      sources: sourceIds.map((id, index) => ({
+        id, name: `hybrid-${index}.md`, originalPath: "", storedPath: "", mimeType: "text/markdown",
+        sizeBytes: 0, pageCount: 1, importedAt: now, updatedAt: now, extractionStatus: "complete",
+        pages: [pages[index]],
+      })),
+    }), "utf8");
+    const index = new LocalVectorIndex(path.join(dataDir, "knowledge-db", "vector-index"));
+    await index.upsertMany(pages.map((page) => ({
+      id: page.id + "_c0", sourceId: page.sourceId, pageNumber: 1, chunkIndex: 0, text: page.text,
+    })));
+
+    const results = await store.search("三角関数 加法定理", 3);
+    expect(results[0]?.sourceId).toBe(sourceIds[1]);
+    expect(results[0]?.matchReasons?.length).toBeGreaterThan(0);
+  });
+
   it("prioritizes exact phrase matches and can scope retrieval to selected sources", async () => {
     const dataDir = await fs.mkdtemp(path.join(os.tmpdir(), "sigma-knowledge-db-exact-"));
     tempDirs.push(dataDir);
