@@ -70,6 +70,25 @@ export function initializeDatabaseSchema(db: Database.Database): void {
       END;
     `);
 
+
+    // 5. PDF取り込みステージング。原本PDFは保存せず、原本参照とAI提案だけを保持する。
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS pdf_import_staging (
+        id TEXT PRIMARY KEY,
+        source_path TEXT NOT NULL,
+        source_sha256 TEXT NOT NULL,
+        file_name TEXT NOT NULL,
+        page_count INTEGER NOT NULL CHECK(page_count > 0),
+        status TEXT NOT NULL CHECK(status IN ('draft', 'approved', 'rejected')),
+        proposals_json TEXT NOT NULL,
+        created_at DATETIME NOT NULL,
+        updated_at DATETIME NOT NULL,
+        approved_at DATETIME
+      );
+      CREATE INDEX IF NOT EXISTS idx_pdf_import_staging_status ON pdf_import_staging(status);
+      CREATE INDEX IF NOT EXISTS idx_pdf_import_staging_source_sha ON pdf_import_staging(source_sha256);
+    `);
+
     // デフォルトマスターデータ初期化
     const checkStmt = db.prepare('SELECT COUNT(*) as count FROM taxonomy');
     const { count } = checkStmt.get() as { count: number };
