@@ -203,6 +203,42 @@ describe("KnowledgeDbStore", () => {
 
     expect(output.getPageCount()).toBe(3);
   });
+  it("keeps PDF outside the Knowledge DB until staging is approved", async () => {
+    const dataDir = await fs.mkdtemp(path.join(os.tmpdir(), "sigma-knowledge-db-staging-"));
+    tempDirs.push(dataDir);
+    const sourcePath = await createPdf("staging.pdf", 3);
+    const store = new KnowledgeDbStore(dataDir);
+
+    const staging = await store.previewPdfImport(sourcePath);
+    expect(staging.status).toBe("draft");
+    expect(staging.pageCount).toBe(3);
+    expect(staging.sourceHash).toHaveLength(64);
+    expect(await store.listSources()).toHaveLength(0);
+
+    const updated = {
+      ...staging,
+      segments: staging.segments.map((segment) => ({ ...segment, name: "承認済み子PDF", selected: true })),
+    };
+    await store.updatePdfImportStaging({ stagingId: staging.id, segments: updated.segments });
+    const committed = await store.approvePdfImport(staging.id);
+
+    expect(committed.sourceId).toBeTruthy();
+    expect(await store.listSources()).toHaveLength(2);
+    expect((await store.getPdfImportStaging(staging.id))?.status).toBe("approved");
+  });
+
+  it("refuses approval when the source PDF changed after preview", async () => {
+    const dataDir = await fs.mkdtemp(path.join(os.tmpdir(), "sigma-knowledge-db-staging-hash-"));
+    tempDirs.push(dataDir);
+    const sourcePath = await createPdf("mutable.pdf", 1);
+    const store = new KnowledgeDbStore(dataDir);
+    const staging = await store.previewPdfImport(sourcePath);
+
+    await fs.appendFile(sourcePath, Buffer.from("changed"));
+    await expect(store.approvePdfImport(staging.id)).rejects.toThrow("Source PDF changed after preview");
+    expect(await store.listSources()).toHaveLength(0);
+  });
+
 });
 
 
