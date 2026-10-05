@@ -30,6 +30,8 @@ The file is removed when Sigma Studio exits.
 - `POST /v1/agent/runs/:runId/cancel`
 - `POST /v1/proposals/:proposalId/approve`
 - `POST /v1/proposals/:proposalId/reject`
+- `GET /v1/mcp/tools`
+- `POST /v1/mcp/call`
 
 ## Web AI windows
 
@@ -43,3 +45,16 @@ The application menu exposes ChatGPT Web, Claude Web, and Gemini Web. Their remo
 - a dedicated preload that registers Sigma tools through WebMCP when the loaded site exposes `document.modelContext`.
 
 WebMCP availability is browser/provider dependent. The local API remains the deterministic integration surface even when a provider does not expose WebMCP.
+
+
+## Knowledge DB PDF staging
+
+Web AI can use the same global Knowledge DB MCP surface as the desktop AI. PDF registration is intentionally staged:
+
+1. `knowledge_db_pdf_import_preview` reads the selected local PDF, analyzes pages, proposes split segments and taxonomy classification, and creates a staging record. The original PDF is **not** registered yet.
+2. `knowledge_db_pdf_import_staging_get` / `knowledge_db_pdf_import_staging_list` inspect pending proposals.
+3. `knowledge_db_pdf_import_staging_update` lets the AI revise selected segments, page ranges, names, taxonomy paths, confidence, and reasons before approval.
+4. `knowledge_db_pdf_import_approve` registers the original PDF and materializes the selected child PDFs. The source hash is rechecked so a changed file cannot be approved accidentally.
+5. `knowledge_db_pdf_import_reject` discards the pending import without registering the PDF.
+
+The preview, update, approve, and reject operations are consequential Web AI tools and are routed through SIGMA Studio's existing user-approval gate. Workspace selection is not required because the Knowledge DB is global.
