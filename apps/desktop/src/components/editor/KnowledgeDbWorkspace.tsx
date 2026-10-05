@@ -1118,7 +1118,7 @@ export function KnowledgeDbWorkspace({ open, onClose, onOpenAi, t }: Props) {
         </div>
       )}
 
-      {contextMenu && selectedPages.length > 0 && (      {contextMenu && selectedPages.length > 0 && (
+      {contextMenu && selectedPages.length > 0 && (
         <div className="knowledge-db-context-menu" style={{ left: contextMenu.x, top: contextMenu.y }} onMouseLeave={() => setContextMenu(null)}>
           <button type="button" onClick={() => void handoffAi(selectedPages.length > 1 ? "選択した資料・ページをまとめて確認する" : undefined)}>AIに送る</button>
           {region && <button type="button" onClick={() => void extractRegionPdf()}>選択範囲をPDF抽出</button>}
