@@ -436,6 +436,8 @@ export class KnowledgeDbStore {
 
 
   async previewSmartSplit(sourceId: string): Promise<{ sourceId: string; sourceName: string; pageCount: number; segments: KnowledgeSmartSplitSegment[] }> {
+    if (this.indexPromise) await this.indexPromise;
+    else await this.ensureIndexed();
     const { source } = await this.getPage(sourceId, 1);
     if (source.mimeType !== "application/pdf" || source.pageCount < 2) {
       return { sourceId, sourceName: source.name, pageCount: source.pageCount, segments: [{ id: sourceId + ":1-" + source.pageCount, sourceId, startPage: 1, endPage: source.pageCount, paths: [], confidence: 1, reason: "分割不要な資料" }] };
