@@ -159,7 +159,7 @@ function setCorsHeaders(res: http.ServerResponse, origin: string | undefined): v
     res.setHeader("Vary", "Origin");
   }
   res.setHeader("Access-Control-Allow-Private-Network", "true");
-  res.setHeader("Access-Control-Allow-Headers", "Authorization, Content-Type");
+  res.setHeader("Access-Control-Allow-Headers", "Authorization, Content-Type, X-Sigma-Workspace-Id");
   res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
 }
 
