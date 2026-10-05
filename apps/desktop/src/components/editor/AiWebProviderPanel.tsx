@@ -8,6 +8,12 @@ import { getDesktopBridge } from "@/lib/desktop-bridge";
 import { useT } from "@/lib/i18n/react";
 
 export type AiWebProvider = "chatgpt" | "claude" | "gemini" | "google-ai-studio";
+export type GoogleAiStudioModel = "gemini-3.8-flash" | "gemini-3.7-flash";
+
+const GOOGLE_AI_STUDIO_MODELS: Array<{ id: GoogleAiStudioModel; label: string }> = [
+  { id: "gemini-3.8-flash", label: "Gemini 3.8 Flash" },
+  { id: "gemini-3.7-flash", label: "Gemini 3.7 Flash" },
+];
 
 const PROVIDERS: Array<{ id: AiWebProvider; label: string; url: string }> = [
   { id: "chatgpt", label: "ChatGPT", url: "https://chatgpt.com/" },
@@ -40,6 +46,7 @@ export function AiWebProviderPanel({
   const t = useT("common");
   const webviewRef = useRef<HTMLElement | null>(null);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [googleAiStudioModel, setGoogleAiStudioModel] = useState<GoogleAiStudioModel>("gemini-3.8-flash");
   const [preloadUrl, setPreloadUrl] = useState<string | null>(null);
   const [bridgeAvailable, setBridgeAvailable] = useState<boolean | null>(null);
   const [webMcpAvailable, setWebMcpAvailable] = useState<boolean | null>(null);
@@ -58,6 +65,12 @@ export function AiWebProviderPanel({
   const selected = useMemo(
     () => PROVIDERS.find((item) => item.id === provider) ?? PROVIDERS[0],
     [provider],
+  );
+  const selectedUrl = useMemo(
+    () => provider === "google-ai-studio"
+      ? "https://aistudio.google.com/prompts/new_chat?model=" + encodeURIComponent(googleAiStudioModel)
+      : selected.url,
+    [googleAiStudioModel, provider, selected.url],
   );
 
   useEffect(() => {
@@ -169,6 +182,20 @@ export function AiWebProviderPanel({
             </div>
           )}
         </div>
+        {provider === "google-ai-studio" && (
+          <label className="ai-web-provider-model-select">
+            <span className="sr-only">Google AI Studio model</span>
+            <select
+              value={googleAiStudioModel}
+              aria-label="Google AI Studio model"
+              onChange={(event) => setGoogleAiStudioModel(event.target.value as GoogleAiStudioModel)}
+            >
+              {GOOGLE_AI_STUDIO_MODELS.map((model) => (
+                <option key={model.id} value={model.id}>{model.label}</option>
+              ))}
+            </select>
+          </label>
+        )}
         <div className="ai-web-provider-actions">
           <button type="button" className="ai-web-provider-icon-button" onClick={reload} title="Reload" aria-label="Reload">
             <RefreshCw size={13} />
@@ -176,7 +203,7 @@ export function AiWebProviderPanel({
           <button
             type="button"
             className="ai-web-provider-icon-button"
-            onClick={() => window.open(selected.url, "_blank", "noopener,noreferrer")}
+            onClick={() => window.open(selectedUrl, "_blank", "noopener,noreferrer")}
             title="Open in browser"
             aria-label="Open in browser"
           >
@@ -205,8 +232,8 @@ export function AiWebProviderPanel({
               ref={(node: HTMLElement | null) => {
                 webviewRef.current = node;
               }}
-              key={`${provider}:${preloadUrl}`}
-              src={selected.url}
+              key={`${provider}:${googleAiStudioModel}:${preloadUrl}`}
+              src={selectedUrl}
               preload={preloadUrl}
               partition="persist:sigma-studio-ai-web"
               allowpopups=""
