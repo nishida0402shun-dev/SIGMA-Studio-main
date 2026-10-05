@@ -67,6 +67,7 @@ MCPからの書き込み系ツールは、既定では教材ファイルを直�
 - `knowledge_db_get_classification_review_context` - 分類確認に必要な本文・OCR・構造情報を取得します。
 - `knowledge_db_submit_classification_review` - AI分類の確認結果を承認ゲート経由で反映します。
 - `knowledge_db_get_context` - グローバルKnowledge DBからAI用コンテキストを取得します。
+- `knowledge_db_rag_query` - Knowledge DB参照要否の判定からハイブリッド検索、重複除去、関連資料選定、citation領域付きContext Pack生成までを一度に実行します。
 - `knowledge_db_get_related_sources` - 関連するKnowledge DBソースを取得します。
 - `knowledge_db_route_query` - クエリをKnowledge DB検索経路へ振り分けます。`query`(必須)、`scope`(`"all"` 既定 / `"problems"`)、`limit`(既定8、上限20)、`excludeFileId`(結果から除外するfileId。通常は現在編集中の教材)を受け取ります。`scope: "problems"` にすると問題ブロック単位でヒットし、prompt本文とtagsを含む詳しい抜粋を返すため、類題を探す用途に向きます。
 - `knowledge_db_pdf_import_preview` - PDFをKnowledge DBへ登録せずにAI分割・分類のプレビューを作成します。
