@@ -76,6 +76,12 @@ describe("Web AI MCP gateway live server path", () => {
     expect(names.has("knowledge_db_list_classification_reviews")).toBe(true);
     expect(names.has("knowledge_db_get_classification_review_context")).toBe(true);
     expect(names.has("knowledge_db_submit_classification_review")).toBe(true);
+    expect(names.has("knowledge_db_pdf_import_preview")).toBe(true);
+    expect(names.has("knowledge_db_pdf_import_staging_list")).toBe(true);
+    expect(names.has("knowledge_db_pdf_import_staging_get")).toBe(true);
+    expect(names.has("knowledge_db_pdf_import_staging_update")).toBe(true);
+    expect(names.has("knowledge_db_pdf_import_approve")).toBe(true);
+    expect(names.has("knowledge_db_pdf_import_reject")).toBe(true);
     const reviewTool = tools.find((tool) => tool.name === "knowledge_db_submit_classification_review");
     expect(reviewTool?.annotations?.readOnlyHint).toBe(false);
     expect(reviewTool?.annotations?.destructiveHint).toBe(false);
@@ -89,6 +95,9 @@ describe("Web AI MCP gateway live server path", () => {
     expect(globalNames.has("knowledge_db_list_classification_reviews")).toBe(true);
     expect(globalNames.has("knowledge_db_get_classification_review_context")).toBe(true);
     expect(globalNames.has("knowledge_db_submit_classification_review")).toBe(true);
+    expect(globalNames.has("knowledge_db_pdf_import_preview")).toBe(true);
+    expect(globalNames.has("knowledge_db_pdf_import_staging_list")).toBe(true);
+    expect(globalNames.has("knowledge_db_pdf_import_staging_get")).toBe(true);
     expect(globalNames.has("list_local_documents")).toBe(false);
   });
 
@@ -160,6 +169,26 @@ describe("Web AI MCP gateway live server path", () => {
       ),
     ).resolves.toMatchObject({ isError: true });
     expect(requestedWrites).toContain("knowledge_db_submit_classification_review");
+  });
+
+  it("requires approval for PDF import preview and approval", async () => {
+    await expect(
+      gateway.callTool(
+        "knowledge_db_pdf_import_preview",
+        { sourcePath: path.join(userDataPath, "missing.pdf") },
+        null,
+      ),
+    ).resolves.toMatchObject({ isError: true });
+    expect(requestedWrites).toContain("knowledge_db_pdf_import_preview");
+
+    await expect(
+      gateway.callTool(
+        "knowledge_db_pdf_import_approve",
+        { stagingId: "missing-staging" },
+        null,
+      ),
+    ).resolves.toMatchObject({ isError: true });
+    expect(requestedWrites).toContain("knowledge_db_pdf_import_approve");
   });
 
   it("allows global Knowledge DB tools without a selected Workspace", async () => {
