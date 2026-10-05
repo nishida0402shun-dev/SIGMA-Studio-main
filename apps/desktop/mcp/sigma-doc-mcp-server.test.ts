@@ -67,6 +67,12 @@ const DOCUMENTED_KNOWLEDGE_DB_TOOL_NAMES = [
   "knowledge_db_get_region",
   "knowledge_db_list_sources",
   "knowledge_db_search",
+  "knowledge_db_pdf_import_preview",
+  "knowledge_db_pdf_import_staging_list",
+  "knowledge_db_pdf_import_staging_get",
+  "knowledge_db_pdf_import_staging_update",
+  "knowledge_db_pdf_import_approve",
+  "knowledge_db_pdf_import_reject",
 ] as const;
 
 const ENV_KEYS = [
