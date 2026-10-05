@@ -388,6 +388,15 @@ const desktopAPI = {
     setPageType(payload: { sourceId: string; pageNumber: number; semanticType: string; title?: string }): Promise<unknown> {
       return ipcRenderer.invoke("knowledge-db:set-page-type", payload);
     },
+    previewSmartSplit(payload: { sourceId: string }): Promise<unknown> {
+      return ipcRenderer.invoke("knowledge-db:smart-split-preview", payload);
+    },
+    materializeSmartSplit(payload: { sourceId: string; segments: Array<{ startPage: number; endPage: number; name?: string }> }): Promise<unknown[]> {
+      return ipcRenderer.invoke("knowledge-db:smart-split-materialize", payload);
+    },
+    applyClassificationReview(payload: { sourceId: string; pageNumber: number; paths: string[][]; confidence: number; reason?: string; evidence?: string[] }): Promise<unknown> {
+      return ipcRenderer.invoke("knowledge-db:classification-review", payload);
+    },
     deleteSource(payload: { sourceId: string }): Promise<{ ok: boolean }> {
       return ipcRenderer.invoke("knowledge-db:delete-source", payload);
     },
