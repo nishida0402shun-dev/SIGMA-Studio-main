@@ -381,6 +381,129 @@ async function registerSigmaWebAiTools(): Promise<void> {
   }, { signal: controller.signal });
 
   await modelContext.registerTool({
+    name: "sigma_knowledge_pdf_import_preview",
+    description: "Preview a PDF before it enters SIGMA's global Knowledge DB. AI analyzes pages, proposes subject/course/unit classification and split segments, and does not register the original PDF until approval. Requires user approval in SIGMA Studio.",
+    inputSchema: {
+      type: "object",
+      properties: { sourcePath: { type: "string" } },
+      required: ["sourcePath"],
+    },
+    annotations: { readOnlyHint: false, consequentialHint: true, untrustedContentHint: true },
+    execute: async (input) => callApi("/v1/mcp/call", {
+      method: "POST",
+      body: JSON.stringify({
+        name: "knowledge_db_pdf_import_preview",
+        arguments: { sourcePath: String(input.sourcePath) },
+      }),
+    }),
+  }, { signal: controller.signal });
+
+  await modelContext.registerTool({
+    name: "sigma_knowledge_pdf_import_staging_list",
+    description: "List pending PDF import previews. PDFs in this list are not yet registered in the global Knowledge DB.",
+    inputSchema: { type: "object", properties: {} },
+    annotations: { readOnlyHint: true, untrustedContentHint: true },
+    execute: async () => callApi("/v1/mcp/call", {
+      method: "POST",
+      body: JSON.stringify({ name: "knowledge_db_pdf_import_staging_list", arguments: {} }),
+    }),
+  }, { signal: controller.signal });
+
+  await modelContext.registerTool({
+    name: "sigma_knowledge_pdf_import_staging_get",
+    description: "Read one pending PDF import preview, including the current AI split/classification proposal and selected segments.",
+    inputSchema: {
+      type: "object",
+      properties: { stagingId: { type: "string" } },
+      required: ["stagingId"],
+    },
+    annotations: { readOnlyHint: true, untrustedContentHint: true },
+    execute: async (input) => callApi("/v1/mcp/call", {
+      method: "POST",
+      body: JSON.stringify({
+        name: "knowledge_db_pdf_import_staging_get",
+        arguments: { stagingId: String(input.stagingId) },
+      }),
+    }),
+  }, { signal: controller.signal });
+
+  await modelContext.registerTool({
+    name: "sigma_knowledge_pdf_import_staging_update",
+    description: "Update a pending PDF split proposal before approval. You can select/unselect segments and adjust names, page ranges, taxonomy paths, confidence and reasons. This still does not register the PDF.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        stagingId: { type: "string" },
+        segments: {
+          type: "array",
+          items: {
+            type: "object",
+            properties: {
+              id: { type: "string" },
+              startPage: { type: "number" },
+              endPage: { type: "number" },
+              name: { type: "string" },
+              paths: { type: "array", items: { type: "array", items: { type: "string" } } },
+              confidence: { type: "number" },
+              reason: { type: "string" },
+              selected: { type: "boolean" },
+            },
+            required: ["id", "startPage", "endPage", "name", "paths", "confidence", "reason", "selected"],
+          },
+        },
+      },
+      required: ["stagingId", "segments"],
+    },
+    annotations: { readOnlyHint: false, consequentialHint: true, untrustedContentHint: true },
+    execute: async (input) => callApi("/v1/mcp/call", {
+      method: "POST",
+      body: JSON.stringify({
+        name: "knowledge_db_pdf_import_staging_update",
+        arguments: {
+          stagingId: String(input.stagingId),
+          segments: Array.isArray(input.segments) ? input.segments : [],
+        },
+      }),
+    }),
+  }, { signal: controller.signal });
+
+  await modelContext.registerTool({
+    name: "sigma_knowledge_pdf_import_approve",
+    description: "Approve a reviewed PDF import proposal. This registers the original PDF in the global Knowledge DB and materializes the selected child PDFs. Requires user approval in SIGMA Studio.",
+    inputSchema: {
+      type: "object",
+      properties: { stagingId: { type: "string" } },
+      required: ["stagingId"],
+    },
+    annotations: { readOnlyHint: false, consequentialHint: true, destructiveHint: false, untrustedContentHint: true },
+    execute: async (input) => callApi("/v1/mcp/call", {
+      method: "POST",
+      body: JSON.stringify({
+        name: "knowledge_db_pdf_import_approve",
+        arguments: { stagingId: String(input.stagingId) },
+      }),
+    }),
+  }, { signal: controller.signal });
+
+  await modelContext.registerTool({
+    name: "sigma_knowledge_pdf_import_reject",
+    description: "Reject a pending PDF import proposal without registering the PDF. Requires user approval in SIGMA Studio.",
+    inputSchema: {
+      type: "object",
+      properties: { stagingId: { type: "string" } },
+      required: ["stagingId"],
+    },
+    annotations: { readOnlyHint: false, consequentialHint: true, destructiveHint: false, untrustedContentHint: true },
+    execute: async (input) => callApi("/v1/mcp/call", {
+      method: "POST",
+      body: JSON.stringify({
+        name: "knowledge_db_pdf_import_reject",
+        arguments: { stagingId: String(input.stagingId) },
+      }),
+    }),
+  }, { signal: controller.signal });
+
+  await modelContext.registerTool({
     name: "sigma_knowledge_classification_reviews",
     description: "List pages in SIGMA's global Knowledge DB that need AI classification double-checking. Process pending and needs-review items from this queue using the review context tool.",
     inputSchema: {
