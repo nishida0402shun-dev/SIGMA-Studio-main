@@ -18,7 +18,7 @@ const BRIDGE_FILE_NAME = "web-ai-bridge.json";
 const API_VERSION = "1";
 
 const KNOWLEDGE_DB_MCP_TOOLS = new Set([
-  "knowledge_db_list_sources","knowledge_db_search","knowledge_db_get_context","knowledge_db_get_page","knowledge_db_get_region",
+  "knowledge_db_list_sources","knowledge_db_search","knowledge_db_route_query","knowledge_db_rag_query","knowledge_db_get_context","knowledge_db_get_page","knowledge_db_get_region",
   "knowledge_db_get_related_sources","knowledge_db_get_analysis_status","knowledge_db_list_classification_reviews",
   "knowledge_db_get_classification_review_context","knowledge_db_submit_classification_review",
   "knowledge_db_pdf_import_preview","knowledge_db_pdf_import_staging_list","knowledge_db_pdf_import_staging_get",
