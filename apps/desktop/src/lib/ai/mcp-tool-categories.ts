@@ -51,6 +51,12 @@ export const MCP_TOOL_CATEGORY_MAP = {
     "knowledge_db_route_query",
     "knowledge_db_list_sources",
     "knowledge_db_search",
+    "knowledge_db_pdf_import_preview",
+    "knowledge_db_pdf_import_staging_list",
+    "knowledge_db_pdf_import_staging_get",
+    "knowledge_db_pdf_import_staging_update",
+    "knowledge_db_pdf_import_approve",
+    "knowledge_db_pdf_import_reject",
   ],
   "教材管理": [
     "create_local_document",
