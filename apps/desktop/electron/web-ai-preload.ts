@@ -217,12 +217,22 @@ async function registerSigmaWebAiTools(): Promise<void> {
     reportWebAiStatus(false, false);
     return;
   }
-  const modelContext = await waitForModelContext();
-  if (!modelContext) {
-    reportWebAiStatus(false, true);
+
+  let bridgeHealthy = false;
+  try {
+    await callApi("/v1/health");
+    bridgeHealthy = true;
+  } catch {
+    reportWebAiStatus(false, false);
     return;
   }
-  reportWebAiStatus(true, true);
+
+  const modelContext = await waitForModelContext();
+  if (!modelContext) {
+    reportWebAiStatus(false, bridgeHealthy);
+    return;
+  }
+  reportWebAiStatus(true, bridgeHealthy);
 
   const controller = new AbortController();
 
