@@ -293,6 +293,31 @@ export function KnowledgeDbWorkspace({ open, onClose, onOpenAi, t }: Props) {
     });
   }
 
+  async function openSmartSplit(sourceId: string): Promise<void> {
+    if (!knowledgeDb) return;
+    const preview = await knowledgeDb.previewSmartSplit({ sourceId });
+    if (!preview || typeof preview !== "object") return;
+    const value = preview as {
+      sourceId: string;
+      sourceName: string;
+      pageCount: number;
+      segments: Array<{ id: string; sourceId: string; startPage: number; endPage: number; paths: string[][]; confidence: number; reason: string }>;
+    };
+    setSmartSplit({ ...value, previewPage: value.segments[0]?.startPage ?? 1 });
+  }
+
+  async function materializeSmartSplit(): Promise<void> {
+    if (!knowledgeDb || !smartSplit) return;
+    const segments = smartSplit.segments.map((segment) => ({
+      startPage: segment.startPage,
+      endPage: segment.endPage,
+      name: segment.paths[0]?.slice(-1)[0],
+    }));
+    const created = await knowledgeDb.materializeSmartSplit({ sourceId: smartSplit.sourceId, segments });
+    setSources((current) => [...(created as KnowledgeSource[]), ...current]);
+    setSmartSplit(null);
+  }
+
   async function addSources(pathsPromise: Promise<{ paths: string[] } | null>): Promise<void> {
     if (!knowledgeDb) return;
     const picked = await pathsPromise;
