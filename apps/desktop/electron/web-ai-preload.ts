@@ -22,6 +22,7 @@ const ORIGIN_ALLOWLIST = new Set([
   "https://chat.openai.com",
   "https://claude.ai",
   "https://gemini.google.com",
+  "https://aistudio.google.com",
 ]);
 
 function arg(name: string): string {
@@ -60,7 +61,7 @@ function apiUrl(path: string): string {
 function currentWebProvider(): "chatgpt" | "claude" | "antigravity" {
   const host = window.location.hostname;
   if (host === "claude.ai" || host.endsWith(".claude.ai")) return "claude";
-  if (host === "gemini.google.com" || host.endsWith(".gemini.google.com")) return "antigravity";
+  if (host === "gemini.google.com" || host.endsWith(".gemini.google.com") || host === "aistudio.google.com" || host.endsWith(".aistudio.google.com")) return "antigravity";
   return "chatgpt";
 }
 
