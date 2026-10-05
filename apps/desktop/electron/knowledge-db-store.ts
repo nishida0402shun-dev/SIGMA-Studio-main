@@ -1129,14 +1129,15 @@ function selectDiverseContextResults(
   const seenSources = new Set<string>();
   const seenPages = new Set<string>();
   const estimatedBudget = Math.max(1, Math.floor(maxChars / Math.max(1, limit)));
+  const primaryTarget = Math.max(1, Math.min(limit, Math.ceil(limit / 2)));
 
   for (const result of results) {
-    if (primary.length >= limit) break;
+    if (primary.length >= primaryTarget) break;
     const key = `${result.sourceId}:${result.pageNumber}`;
     if (seenPages.has(key)) continue;
     // Maximize source diversity first, then let score dominate within a source.
     const sourceAlreadyRepresented = seenSources.has(result.sourceId);
-    if (sourceAlreadyRepresented && primary.length < Math.min(limit, 3)) continue;
+    if (sourceAlreadyRepresented && primary.length < Math.min(primaryTarget, 3)) continue;
     if (result.text.trim().length < 24 && result.citationRegions?.length === 0) continue;
     primary.push(result);
     seenPages.add(key);
@@ -1153,6 +1154,22 @@ function selectDiverseContextResults(
         return primaryTaxonomy && taxonomy ? taxonomy === primaryTaxonomy : true;
       })
       .sort((a, b) => Math.abs(a.pageNumber - result.pageNumber) - Math.abs(b.pageNumber - result.pageNumber));
+
+    const crossSource = results.find((candidate) =>
+      candidate.sourceId !== result.sourceId &&
+      !seenPages.has(`${candidate.sourceId}:${candidate.pageNumber}`)
+    );
+    if (crossSource && !related.some((item) => item.result.id === crossSource.id)) {
+      related.push({
+        result: {
+          ...crossSource,
+          score: Math.max(0, crossSource.score * 0.9),
+          matchReasons: ["関連ソース", ...crossSource.matchReasons.filter((reason) => reason !== "関連ソース")],
+        },
+        relatedTo: key,
+      });
+      seenPages.add(`${crossSource.sourceId}:${crossSource.pageNumber}`);
+    }
 
     const relatedPage = nearby[0];
     if (relatedPage) {
