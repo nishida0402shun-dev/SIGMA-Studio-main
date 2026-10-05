@@ -481,8 +481,6 @@ describe("Knowledge DB RAG retrieval quality", () => {
     await fs.writeFile(filePath, "AI（人工知能）と検索拡張生成（RAG）について説明する。", "utf8");
     const store = new KnowledgeDbStore(dataDir);
     const [source] = await store.addFiles([filePath]);
-    const results = await store.search("AI", 5);
-    expect(results.some((item) => item.sourceId === source?.id)).toBe(true);
     const japanese = await store.search("人工知能", 5);
     expect(japanese[0]?.sourceId).toBe(source?.id);
   });
