@@ -15,6 +15,13 @@ interface Props {
   t: Translate<"chrome">;
 }
 
+interface SmartSplitState {
+  sourceId: string;
+  sourceName: string;
+  pageCount: number;
+  segments: Array<{ id: string; sourceId: string; startPage: number; endPage: number; paths: string[][]; confidence: number; reason: string }>;
+}
+
 interface ResearchSession {
   id: string;
   title: string;
@@ -189,6 +196,10 @@ export function KnowledgeDbWorkspace({ open, onClose, onOpenAi, t }: Props) {
   const [researchSessions, setResearchSessions] = useState<ResearchSession[]>([]);
   const [relatedSources, setRelatedSources] = useState<Array<{ sourceId: string; sourceName: string; score: number; pageNumber: number }>>([]);
   const [expandedTaxonomy, setExpandedTaxonomy] = useState<Set<string>>(new Set());
+  const [smartSplit, setSmartSplit] = useState<SmartSplitState | null>(null);
+  const [smartSplitIndex, setSmartSplitIndex] = useState(0);
+  const [smartSplitPage, setSmartSplitPage] = useState(1);
+  const [smartSplitApplying, setSmartSplitApplying] = useState(false);
   const [selectedTaxonomyNode, setSelectedTaxonomyNode] = useState<TaxonomyTreeNode | null>(null);
   const desktop = getDesktopBridge();
   const researchApi = desktop?.researchSessions;
@@ -292,22 +303,54 @@ export function KnowledgeDbWorkspace({ open, onClose, onOpenAi, t }: Props) {
     });
   }
 
-  async function addSources(pathsPromise: Promise<{ paths: string[] } | null>): Promise<void> {
+  async function previewSmartSplit(sourceId: string): Promise<void> {
+    if (!knowledgeDb) return;
+    const result = await knowledgeDb.previewSmartSplit(sourceId) as SmartSplitState | null;
+    if (!result?.segments?.length) return;
+    setSmartSplit(result);
+    setSmartSplitIndex(0);
+    setSmartSplitPage(result.segments[0]?.startPage ?? 1);
+  }
+
+  async function addSources(pathsPromise: Promise<{ paths: string[] } | null>, reviewFiles = false): Promise<void> {
     if (!knowledgeDb) return;
     const picked = await pathsPromise;
     if (!picked?.paths?.length) return;
-    const added = await knowledgeDb.importSources({ paths: picked.paths });
-    setSources((current) => [...(added as KnowledgeSource[]), ...current]);
+    const added = await knowledgeDb.importSources({ paths: picked.paths }) as KnowledgeSource[];
+    setSources((current) => [...added, ...current]);
+    if (reviewFiles) {
+      const pdf = added.find((source) => source.mimeType === "application/pdf" && source.pageCount > 0);
+      if (pdf) void previewSmartSplit(pdf.id);
+    }
   }
 
   function addFiles(): void {
     if (!knowledgeDb) return;
-    void addSources(knowledgeDb.chooseFiles());
+    void addSources(knowledgeDb.chooseFiles(), true);
   }
 
   function addFolder(): void {
     if (!knowledgeDb) return;
-    void addSources(knowledgeDb.chooseFolder());
+    void addSources(knowledgeDb.chooseFolder(), false);
+  }
+
+  async function applySmartSplit(): Promise<void> {
+    if (!knowledgeDb || !smartSplit || smartSplitApplying) return;
+    setSmartSplitApplying(true);
+    try {
+      const created = await knowledgeDb.applySmartSplit({
+        sourceId: smartSplit.sourceId,
+        segments: smartSplit.segments.map((segment) => ({
+          startPage: Math.max(1, Math.min(smartSplit.pageCount, Math.floor(segment.startPage))),
+          endPage: Math.max(1, Math.min(smartSplit.pageCount, Math.floor(segment.endPage))),
+          name: segment.paths[0]?.join(" - ") || undefined,
+        })),
+      }) as KnowledgeSource[];
+      setSources((current) => [...created, ...current]);
+      setSmartSplit(null);
+    } finally {
+      setSmartSplitApplying(false);
+    }
   }
 
   async function extractPdf(): Promise<void> {
@@ -772,6 +815,38 @@ export function KnowledgeDbWorkspace({ open, onClose, onOpenAi, t }: Props) {
   cursor: pointer;
 }
 
+.knowledge-db-smart-split {
+  position: fixed;
+  inset: 40px;
+  z-index: 220;
+  display: grid;
+  grid-template-columns: 340px minmax(0, 1fr);
+  gap: 12px;
+  padding: 16px;
+  overflow: hidden;
+  border: 1px solid rgb(148 163 184 / 0.4);
+  border-radius: 14px;
+  background: white;
+  box-shadow: 0 24px 80px rgb(15 23 42 / 0.28);
+}
+.knowledge-db-smart-split-list { overflow: auto; }
+.knowledge-db-smart-split-item {
+  display: block;
+  width: 100%;
+  padding: 10px;
+  margin-bottom: 6px;
+  border: 1px solid rgb(148 163 184 / 0.25);
+  border-radius: 9px;
+  background: white;
+  text-align: left;
+  cursor: pointer;
+}
+.knowledge-db-smart-split-item.selected { background: rgb(226 232 240 / 0.65); }
+.knowledge-db-smart-split-item small { display: block; margin-top: 4px; color: rgb(71 85 105); }
+.knowledge-db-smart-split-preview { min-width: 0; display: flex; flex-direction: column; gap: 10px; overflow: hidden; }
+.knowledge-db-smart-split-viewer { flex: 1; min-height: 0; overflow: auto; padding: 10px; border: 1px solid rgb(148 163 184 / 0.28); border-radius: 10px; background: rgb(248 250 252); }
+.knowledge-db-smart-split-controls { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+.knowledge-db-smart-split-controls input { width: 70px; min-height: 30px; padding: 4px 6px; border: 1px solid rgb(148 163 184 / 0.35); border-radius: 7px; }
 .knowledge-db-context-menu button:hover { background: rgb(241 245 249); }
 
 .knowledge-db-detail p,
@@ -984,7 +1059,66 @@ export function KnowledgeDbWorkspace({ open, onClose, onOpenAi, t }: Props) {
           </aside>
         </div>
       </section>
-      {contextMenu && selectedPages.length > 0 && (
+      {smartSplit && (
+        <div className="knowledge-db-backdrop" style={{ zIndex: 210 }}>
+          <section className="knowledge-db-smart-split" role="dialog" aria-modal="true" aria-label="AIスマート分割の確認">
+            <div className="knowledge-db-smart-split-list">
+              <strong>AIスマート分割の確認</strong>
+              <p className="knowledge-db-empty">{smartSplit.sourceName} · {smartSplit.pageCount}ページ</p>
+              {smartSplit.segments.map((segment, index) => (
+                <button
+                  type="button"
+                  key={segment.id}
+                  className={index === smartSplitIndex ? "knowledge-db-smart-split-item selected" : "knowledge-db-smart-split-item"}
+                  onClick={() => { setSmartSplitIndex(index); setSmartSplitPage(segment.startPage); }}
+                >
+                  <strong>{index + 1}. {segment.paths[0]?.join(" → ") || "分類未確定"}</strong>
+                  <small>p.{segment.startPage}–{segment.endPage} · 信頼度 {Math.round(segment.confidence * 100)}%</small>
+                  <small>{segment.reason}</small>
+                </button>
+              ))}
+              <div className="knowledge-db-smart-split-controls">
+                <button type="button" className="knowledge-db-detail-button" onClick={() => void applySmartSplit()} disabled={smartSplitApplying}>この分割・分類で追加</button>
+                <button type="button" className="knowledge-db-detail-button" onClick={() => setSmartSplit(null)} disabled={smartSplitApplying}>キャンセル</button>
+              </div>
+            </div>
+            <div className="knowledge-db-smart-split-preview">
+              {(() => {
+                const segment = smartSplit.segments[smartSplitIndex];
+                if (!segment) return null;
+                const page = Math.max(segment.startPage, Math.min(segment.endPage, smartSplitPage));
+                return <>
+                  <div className="knowledge-db-smart-split-controls">
+                    <strong>{segment.paths[0]?.join(" → ") || "分類未確定"}</strong>
+                    <span>p.</span>
+                    <input type="number" min={segment.startPage} max={segment.endPage} value={page} onChange={(event) => setSmartSplitPage(Number(event.target.value))} />
+                    <span>/ {segment.endPage}</span>
+                    <button type="button" className="knowledge-db-detail-button" onClick={() => setSmartSplitPage(Math.max(segment.startPage, page - 1))}>前</button>
+                    <button type="button" className="knowledge-db-detail-button" onClick={() => setSmartSplitPage(Math.min(segment.endPage, page + 1))}>次</button>
+                  </div>
+                  <div className="knowledge-db-smart-split-viewer">
+                    <KnowledgePdfPageViewer
+                      sourceId={smartSplit.sourceId}
+                      pageNumber={page}
+                      getPagePdf={(payload) => knowledgeDb?.getPagePdf(payload) ?? Promise.resolve(null)}
+                      onRegionSelected={() => undefined}
+                    />
+                  </div>
+                  <p className="knowledge-db-region-status">AIが提案した範囲を実ページで確認できます。必要なら開始・終了ページを修正してから追加してください。</p>
+                  <div className="knowledge-db-smart-split-controls">
+                    <span>開始</span>
+                    <input type="number" min={1} max={smartSplit.pageCount} value={segment.startPage} onChange={(event) => setSmartSplit((current) => current ? ({ ...current, segments: current.segments.map((item, i) => i === smartSplitIndex ? { ...item, startPage: Number(event.target.value) } : item) }) : current)} />
+                    <span>終了</span>
+                    <input type="number" min={segment.startPage} max={smartSplit.pageCount} value={segment.endPage} onChange={(event) => setSmartSplit((current) => current ? ({ ...current, segments: current.segments.map((item, i) => i === smartSplitIndex ? { ...item, endPage: Number(event.target.value) } : item) }) : current)} />
+                  </div>
+                </>;
+              })()}
+            </div>
+          </section>
+        </div>
+      )}
+
+      {contextMenu && selectedPages.length > 0 && (      {contextMenu && selectedPages.length > 0 && (
         <div className="knowledge-db-context-menu" style={{ left: contextMenu.x, top: contextMenu.y }} onMouseLeave={() => setContextMenu(null)}>
           <button type="button" onClick={() => void handoffAi(selectedPages.length > 1 ? "選択した資料・ページをまとめて確認する" : undefined)}>AIに送る</button>
           {region && <button type="button" onClick={() => void extractRegionPdf()}>選択範囲をPDF抽出</button>}

@@ -46,6 +46,16 @@ export interface KnowledgeSource {
 }
 
 
+export interface KnowledgeSmartSplitSegment {
+  id: string;
+  sourceId: string;
+  startPage: number;
+  endPage: number;
+  paths: string[][];
+  confidence: number;
+  reason: string;
+}
+
 export interface KnowledgeSearchResult {
   id: string;
   sourceId: string;

@@ -394,6 +394,12 @@ const desktopAPI = {
     openPage(payload: { sourceId: string; pageNumber: number }): Promise<{ ok: boolean; error?: string; filePath?: string }> {
       return ipcRenderer.invoke("knowledge-db:open-page", payload);
     },
+    previewSmartSplit(sourceId: string): Promise<unknown> {
+      return ipcRenderer.invoke("knowledge-db:smart-split-preview", { sourceId });
+    },
+    applySmartSplit(payload: { sourceId: string; segments: Array<{ startPage: number; endPage: number; name?: string }> }): Promise<unknown[]> {
+      return ipcRenderer.invoke("knowledge-db:smart-split-apply", payload);
+    },
     getPagePdf(payload: { sourceId: string; pageNumber: number }): Promise<{ dataBase64: string; width: number; height: number } | null> {
       return ipcRenderer.invoke("knowledge-db:get-page-pdf", payload);
     },

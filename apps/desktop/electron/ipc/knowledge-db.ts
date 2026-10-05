@@ -110,6 +110,29 @@ export function registerKnowledgeDbIpc(deps: RegisterKnowledgeDbIpcDeps): void {
     return store.getRelatedSources(sourceId, limit);
   });
 
+  ipcMain.handle("knowledge-db:smart-split-preview", async (event, payload: unknown) => {
+    if (event.sender !== getMainWindow()?.webContents) return null;
+    if (!payload || typeof payload !== "object") throw new Error("invalid smart split request");
+    const sourceId = "sourceId" in payload && typeof payload.sourceId === "string" ? payload.sourceId.trim() : "";
+    if (!sourceId) throw new Error("invalid source id");
+    return store.previewSmartSplit(sourceId);
+  });
+
+  ipcMain.handle("knowledge-db:smart-split-apply", async (event, payload: unknown) => {
+    if (event.sender !== getMainWindow()?.webContents) return [];
+    if (!payload || typeof payload !== "object") throw new Error("invalid smart split request");
+    const sourceId = "sourceId" in payload && typeof payload.sourceId === "string" ? payload.sourceId.trim() : "";
+    const segments = "segments" in payload && Array.isArray(payload.segments) ? payload.segments.flatMap((value: unknown) => {
+      if (!value || typeof value !== "object") return [];
+      const startPage = "startPage" in value && typeof value.startPage === "number" ? value.startPage : 0;
+      const endPage = "endPage" in value && typeof value.endPage === "number" ? value.endPage : 0;
+      const name = "name" in value && typeof value.name === "string" ? value.name : undefined;
+      return startPage > 0 && endPage >= startPage ? [{ startPage, endPage, name }] : [];
+    }) : [];
+    if (!sourceId || segments.length === 0) throw new Error("invalid smart split segments");
+    return store.materializeSmartSplit(sourceId, segments);
+  });
+
   ipcMain.handle("knowledge-db:get-page-pdf", async (event, payload: unknown) => {
     if (event.sender !== getMainWindow()?.webContents) return null;
     if (!payload || typeof payload !== "object") throw new Error("invalid page request");
