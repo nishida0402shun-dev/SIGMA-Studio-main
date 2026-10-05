@@ -7,17 +7,18 @@ import { ClaudeMark, GeminiMark, OpenAiMark } from "@/components/branding/provid
 import { getDesktopBridge } from "@/lib/desktop-bridge";
 import { useT } from "@/lib/i18n/react";
 
-export type AiWebProvider = "chatgpt" | "claude" | "gemini";
+export type AiWebProvider = "chatgpt" | "claude" | "gemini" | "google-ai-studio";
 
 const PROVIDERS: Array<{ id: AiWebProvider; label: string; url: string }> = [
   { id: "chatgpt", label: "ChatGPT", url: "https://chatgpt.com/" },
   { id: "claude", label: "Claude", url: "https://claude.ai/" },
   { id: "gemini", label: "Gemini", url: "https://gemini.google.com/" },
+  { id: "google-ai-studio", label: "Google AI Studio", url: "https://aistudio.google.com/prompts/new_chat?model=gemini-3.8-flash" },
 ];
 
 function providerMark(provider: AiWebProvider) {
   if (provider === "claude") return <ClaudeMark size={15} />;
-  if (provider === "gemini") return <GeminiMark size={15} />;
+  if (provider === "gemini" || provider === "google-ai-studio") return <GeminiMark size={15} />;
   return <OpenAiMark size={15} />;
 }
 
@@ -82,7 +83,7 @@ export function AiWebProviderPanel({
     };
     webview.addEventListener("ipc-message", onIpcMessage);
 
-    const allowedHosts = new Set(["chatgpt.com", "www.chatgpt.com", "claude.ai", "www.claude.ai", "gemini.google.com"]);
+    const allowedHosts = new Set(["chatgpt.com", "www.chatgpt.com", "claude.ai", "www.claude.ai", "gemini.google.com", "aistudio.google.com", "www.aistudio.google.com"]);
     const onNavigate = (event: Event) => {
       const url = (event as Event & { url?: string }).url;
       if (!url) return;
