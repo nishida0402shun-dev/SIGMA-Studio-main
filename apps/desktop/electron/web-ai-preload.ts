@@ -23,6 +23,7 @@ const ORIGIN_ALLOWLIST = new Set([
   "https://claude.ai",
   "https://gemini.google.com",
   "https://aistudio.google.com",
+  "https://www.aistudio.google.com",
 ]);
 
 function arg(name: string): string {
