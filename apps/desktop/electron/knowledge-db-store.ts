@@ -271,7 +271,6 @@ export class KnowledgeDbStore {
     const safeLimit = Math.max(1, Math.min(limit, 50));
     const vectorMatches = (await this.vectorIndex().search(trimmed, Math.min(50, safeLimit * 5)))
       .filter((match) => !allowedSources || allowedSources.has(match.sourceId));
-    const vectorPageKeys = new Set(vectorMatches.map((match) => `${match.sourceId}:${match.pageNumber}`));
     const metadataQueryTokens = tokenizeForSearch(trimmed);
     const metadataMatches = library.sources.flatMap((source) => source.pages
       .filter(() => !allowedSources || allowedSources.has(source.id))
