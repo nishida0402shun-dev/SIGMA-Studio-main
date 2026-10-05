@@ -885,6 +885,8 @@ export interface DesktopKnowledgeDbAPI {
   startIndexing(): Promise<unknown>;
   search(payload: { query: string; limit?: number }): Promise<unknown[]>;
   related(payload: { sourceId: string; limit?: number }): Promise<unknown[]>;
+  previewSmartSplit(sourceId: string): Promise<unknown>;
+  applySmartSplit(payload: { sourceId: string; segments: Array<{ startPage: number; endPage: number; name?: string }> }): Promise<unknown[]>;
   importSources(payload: { paths: string[] }): Promise<unknown[]>;
   extractPages(payload: {
     sourceId?: string;

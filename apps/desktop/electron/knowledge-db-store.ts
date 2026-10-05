@@ -446,7 +446,7 @@ export class KnowledgeDbStore {
     const pathKey = (page: KnowledgePage) => page.taxonomyPaths?.[0]?.join(" → ") ?? "";
     const segments: KnowledgeSmartSplitSegment[] = [];
     let start = pages[0]?.pageNumber ?? 1;
-    let previousKey = pathKey(pages[0] ?? ({ taxonomyPaths: [] } as KnowledgePage));
+    let previousKey = pathKey(pages[0] ?? ({ taxonomyPaths: [] } as unknown as KnowledgePage));
     for (let index = 1; index < pages.length; index += 1) {
       const current = pages[index];
       const currentKey = pathKey(current);
