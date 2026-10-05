@@ -283,14 +283,13 @@ export class KnowledgeDbStore {
         );
         return metadataHit || lexicalHit;
       })
-      .filter((page) => !vectorPageKeys.has(`${source.id}:${page.pageNumber}`))
       .map((page) => ({
         id: `${page.id}_metadata`,
         sourceId: source.id,
         pageNumber: page.pageNumber,
         chunkIndex: 0,
         text: page.text ?? "",
-        score: 0,
+        score: 0.18,
       })));
     const matches = [...vectorMatches, ...metadataMatches];
     const bestByPage = new Map<string, (typeof matches)[number]>();
