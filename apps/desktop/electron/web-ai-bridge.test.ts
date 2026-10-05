@@ -61,6 +61,58 @@ describe("Web AI bridge", () => {
     expect((await ok.json()).ok).toBe(true);
   });
 
+  it("accepts Google AI Studio and workspace-scoped preflight requests", async () => {
+    const calls: Array<{ name: string; workspaceId: string | null }> = [];
+    const server = createWebAiBridgeServer({
+      token: "test-token",
+      getDocument: async () => null,
+      listDocuments: async () => [],
+      listProposals: async () => [],
+      getProposal: async () => null,
+      approveProposal: async () => null,
+      rejectProposal: async () => null,
+      startRun: async () => ({ ok: true }),
+      cancelRun: () => false,
+      mcpGateway: {
+        ...mcpGateway,
+        listTools: async () => [],
+        callTool: async (name, _args, workspaceId) => {
+          calls.push({ name, workspaceId: workspaceId ?? null });
+          return { content: [{ type: "text", text: "ok" }] };
+        },
+      },
+    });
+    servers.push(server);
+    const base = await listen(server);
+
+    const preflight = await fetch(`${base}/v1/mcp/call`, {
+      method: "OPTIONS",
+      headers: {
+        Origin: "https://aistudio.google.com",
+        "Access-Control-Request-Method": "POST",
+        "Access-Control-Request-Headers": "authorization, content-type, x-sigma-workspace-id",
+      },
+    });
+    expect(preflight.status).toBe(204);
+    expect(preflight.headers.get("access-control-allow-origin")).toBe("https://aistudio.google.com");
+    expect(preflight.headers.get("access-control-allow-headers")).toContain("X-Sigma-Workspace-Id");
+
+    const globalCall = await fetch(`${base}/v1/mcp/call`, {
+      method: "POST",
+      headers: {
+        Authorization: "Bearer test-token",
+        Origin: "https://aistudio.google.com",
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        name: "knowledge_db_pdf_import_staging_list",
+        arguments: {},
+      }),
+    });
+    expect(globalCall.status).toBe(200);
+    expect(calls).toEqual([{ name: "knowledge_db_pdf_import_staging_list", workspaceId: null }]);
+  });
+
   it("does not expose documents or MCP access without a selected workspace", async () => {
     let mcpCalls = 0;
     const server = createWebAiBridgeServer({
