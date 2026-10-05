@@ -190,6 +190,7 @@ export function KnowledgeDbWorkspace({ open, onClose, onOpenAi, t }: Props) {
   const [relatedSources, setRelatedSources] = useState<Array<{ sourceId: string; sourceName: string; score: number; pageNumber: number }>>([]);
   const [expandedTaxonomy, setExpandedTaxonomy] = useState<Set<string>>(new Set());
   const [selectedTaxonomyNode, setSelectedTaxonomyNode] = useState<TaxonomyTreeNode | null>(null);
+  const [smartSplit, setSmartSplit] = useState<{ sourceId: string; sourceName: string; pageCount: number; segments: Array<{ id: string; sourceId: string; startPage: number; endPage: number; paths: string[][]; confidence: number; reason: string }>; previewPage: number } | null>(null);
   const desktop = getDesktopBridge();
   const researchApi = desktop?.researchSessions;
   const knowledgeDb = desktop?.knowledgeDb;
