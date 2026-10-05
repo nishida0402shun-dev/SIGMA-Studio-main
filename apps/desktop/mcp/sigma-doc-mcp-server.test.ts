@@ -61,6 +61,7 @@ const DOCUMENTED_KNOWLEDGE_DB_TOOL_NAMES = [
   "knowledge_db_get_classification_review_context",
   "knowledge_db_submit_classification_review",
   "knowledge_db_get_context",
+  "knowledge_db_rag_query",
   "knowledge_db_get_related_sources",
   "knowledge_db_route_query",
   "knowledge_db_get_page",
