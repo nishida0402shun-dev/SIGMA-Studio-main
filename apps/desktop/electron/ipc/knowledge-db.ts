@@ -54,6 +54,42 @@ export function registerKnowledgeDbIpc(deps: RegisterKnowledgeDbIpcDeps): void {
     chooseSourcePaths(event, ["openFile", "openDirectory", "multiSelections"], "Add to DB"),
   );
 
+  ipcMain.handle("knowledge-db:pdf-import-preview", async (event, payload: unknown) => {
+    if (event.sender !== getMainWindow()?.webContents) return null;
+    const filePath = payload && typeof payload === "object" && "filePath" in payload && typeof payload.filePath === "string" ? payload.filePath : "";
+    if (!filePath) throw new Error("invalid PDF file path");
+    return store.previewPdfImport(filePath);
+  });
+
+  ipcMain.handle("knowledge-db:pdf-import-staging-get", async (event, stagingId: string) => {
+    if (event.sender !== getMainWindow()?.webContents) return null;
+    return store.getPdfImportStaging(stagingId);
+  });
+
+  ipcMain.handle("knowledge-db:pdf-import-staging-list", async (event) => {
+    if (event.sender !== getMainWindow()?.webContents) return [];
+    return store.listPdfImportStaging();
+  });
+
+  ipcMain.handle("knowledge-db:pdf-import-staging-update", async (event, payload: unknown) => {
+    if (event.sender !== getMainWindow()?.webContents) return null;
+    if (!payload || typeof payload !== "object") throw new Error("invalid PDF staging payload");
+    const stagingId = "stagingId" in payload && typeof payload.stagingId === "string" ? payload.stagingId : "";
+    const segments = "segments" in payload && Array.isArray(payload.segments) ? payload.segments : [];
+    if (!stagingId) throw new Error("invalid staging id");
+    return store.updatePdfImportStaging({ stagingId, segments });
+  });
+
+  ipcMain.handle("knowledge-db:pdf-import-staging-approve", async (event, stagingId: string) => {
+    if (event.sender !== getMainWindow()?.webContents) return null;
+    return store.approvePdfImport(stagingId);
+  });
+
+  ipcMain.handle("knowledge-db:pdf-import-staging-reject", async (event, stagingId: string) => {
+    if (event.sender !== getMainWindow()?.webContents) return null;
+    return store.rejectPdfImport(stagingId);
+  });
+
   ipcMain.handle("knowledge-db:index-status", async (event) => {
     if (event.sender !== getMainWindow()?.webContents) return { state: "idle", total: 0, completed: 0 };
     return store.getIndexStatus();
