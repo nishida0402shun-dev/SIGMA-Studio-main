@@ -190,6 +190,7 @@ export function KnowledgeDbWorkspace({ open, onClose, onOpenAi, t }: Props) {
   const [researchSessions, setResearchSessions] = useState<ResearchSession[]>([]);
   const [relatedSources, setRelatedSources] = useState<Array<{ sourceId: string; sourceName: string; score: number; pageNumber: number }>>([]);
   const [pdfStaging, setPdfStaging] = useState<KnowledgePdfImportStagingModel | null>(null);
+  const [pendingPdfPaths, setPendingPdfPaths] = useState<string[]>([]);
   const [expandedTaxonomy, setExpandedTaxonomy] = useState<Set<string>>(new Set());
   const [selectedTaxonomyNode, setSelectedTaxonomyNode] = useState<TaxonomyTreeNode | null>(null);
   const desktop = getDesktopBridge();
@@ -294,10 +295,9 @@ export function KnowledgeDbWorkspace({ open, onClose, onOpenAi, t }: Props) {
     });
   }
 
-  async function previewPdfImport(): Promise<void> {
+  async function previewPdfImport(filePath?: string): Promise<void> {
     if (!knowledgeDb) return;
-    const picked = await knowledgeDb.chooseFiles();
-    const pdfPath = picked?.paths?.find((candidate) => candidate.toLowerCase().endsWith(".pdf"));
+    const pdfPath = filePath;
     if (!pdfPath) return;
     try {
       const created = await knowledgeDb.previewPdfImport(pdfPath);
@@ -305,6 +305,15 @@ export function KnowledgeDbWorkspace({ open, onClose, onOpenAi, t }: Props) {
     } catch (error) {
       console.warn("Knowledge DB PDF staging preview failed:", error);
     }
+  }
+
+  async function choosePdfForPreview(): Promise<void> {
+    if (!knowledgeDb) return;
+    const picked = await knowledgeDb.chooseFiles();
+    const pdfPaths = picked?.paths?.filter((candidate) => candidate.toLowerCase().endsWith(".pdf")) ?? [];
+    if (pdfPaths.length === 0) return;
+    setPendingPdfPaths(pdfPaths);
+    await previewPdfImport(pdfPaths[0]);
   }
 
   function updatePdfStaging(next: KnowledgePdfImportStagingModel): void {
@@ -320,9 +329,14 @@ export function KnowledgeDbWorkspace({ open, onClose, onOpenAi, t }: Props) {
     if (!knowledgeDb || !pdfStaging) return;
     await knowledgeDb.updatePdfImportStaging({ stagingId: pdfStaging.id, segments: pdfStaging.segments });
     const result = await knowledgeDb.approvePdfImportStaging(pdfStaging.id);
-    if (result) {
-      const refreshed = await knowledgeDb.list();
-      setSources((Array.isArray(refreshed) ? refreshed : []) as KnowledgeSource[]);
+    if (!result) return;
+    const refreshed = await knowledgeDb.list();
+    setSources((Array.isArray(refreshed) ? refreshed : []) as KnowledgeSource[]);
+    const remaining = pendingPdfPaths.slice(1);
+    setPendingPdfPaths(remaining);
+    if (remaining.length > 0) {
+      await previewPdfImport(remaining[0]);
+    } else {
       setPdfStaging(null);
     }
   }
@@ -330,7 +344,13 @@ export function KnowledgeDbWorkspace({ open, onClose, onOpenAi, t }: Props) {
   async function rejectPdfStaging(): Promise<void> {
     if (!knowledgeDb || !pdfStaging) return;
     await knowledgeDb.rejectPdfImportStaging(pdfStaging.id);
-    setPdfStaging(null);
+    const remaining = pendingPdfPaths.slice(1);
+    setPendingPdfPaths(remaining);
+    if (remaining.length > 0) {
+      await previewPdfImport(remaining[0]);
+    } else {
+      setPdfStaging(null);
+    }
   }
 
   async function addSources(pathsPromise: Promise<{ paths: string[] } | null>): Promise<void> {
@@ -341,9 +361,20 @@ export function KnowledgeDbWorkspace({ open, onClose, onOpenAi, t }: Props) {
     setSources((current) => [...(added as KnowledgeSource[]), ...current]);
   }
 
-  function addFiles(): void {
+  async function addFiles(): Promise<void> {
     if (!knowledgeDb) return;
-    void addSources(knowledgeDb.chooseFiles());
+    const picked = await knowledgeDb.chooseFiles();
+    if (!picked?.paths?.length) return;
+    const pdfPaths = picked.paths.filter((candidate) => candidate.toLowerCase().endsWith(".pdf"));
+    const otherPaths = picked.paths.filter((candidate) => !candidate.toLowerCase().endsWith(".pdf"));
+    if (otherPaths.length > 0) {
+      const added = await knowledgeDb.importSources({ paths: otherPaths });
+      setSources((current) => [...(added as KnowledgeSource[]), ...current]);
+    }
+    if (pdfPaths.length > 0) {
+      setPendingPdfPaths(pdfPaths);
+      await previewPdfImport(pdfPaths[0]);
+    }
   }
 
   function addFolder(): void {
@@ -851,8 +882,8 @@ export function KnowledgeDbWorkspace({ open, onClose, onOpenAi, t }: Props) {
           </div>
         </header>
         <div className="knowledge-db-toolbar">
-          <button type="button" className="knowledge-db-add-button" onClick={addFiles}><FilePlus2 size={16} />ファイル追加</button>
-          <button type="button" className="knowledge-db-add-button" onClick={() => void previewPdfImport()}><FileText size={16} />AI分割プレビュー</button>
+          <button type="button" className="knowledge-db-add-button" onClick={() => void addFiles()}><FilePlus2 size={16} />ファイル追加</button>
+          <button type="button" className="knowledge-db-add-button" onClick={() => void choosePdfForPreview()}><FileText size={16} />AI分割プレビュー</button>
           <button type="button" className="knowledge-db-add-button" onClick={addFolder}><FolderPlus size={16} />フォルダ追加</button>
           <label className="knowledge-db-search"><Search size={16} /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder={t("appMenu.knowledgeDb.searchPlaceholder")} /></label>
           <select value={typeFilter} onChange={(event) => setTypeFilter(event.target.value as KnowledgeSemanticType | "all")}>
