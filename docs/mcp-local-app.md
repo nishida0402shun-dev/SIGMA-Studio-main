@@ -329,5 +329,6 @@ SIGMA also exposes persistent conversation memory, separate from the global Know
 - `conversation_memory_save` — save an important conversation entry or durable summary.
 - `conversation_memory_search` — retrieve relevant prior conversation entries.
 - `conversation_memory_recent` — retrieve recent saved entries.
+- `knowledge_db_record_feedback` — record positive, negative, or corrective feedback for RAG results in the Learning DB.
 
-The Web AI providers expose the same capability as `sigma_memory_save`, `sigma_memory_search`, and `sigma_memory_recent`. Memory is stored locally under SIGMA's data directory and is not automatically inserted into a Workspace. Web AI can read saved memory through these tools, while memory writes remain a consequential operation subject to the existing SIGMA permission gate.
+The Web AI providers expose the same capability as `sigma_memory_save`, `sigma_memory_search`, and `sigma_memory_recent`. Memory is stored locally under SIGMA's data directory and is not automatically inserted into a Workspace. WebView conversation capture can also extract explicit durable preferences into the separate long-term memory store. Web AI can read saved memory through these tools, while memory writes remain a consequential operation subject to the existing SIGMA permission gate.
