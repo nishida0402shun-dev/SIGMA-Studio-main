@@ -24,38 +24,58 @@ const MAX_CONTENT_LENGTH = 50_000;
 
 export class ConversationMemoryStore {
   private readonly filePath: string;
+  private writeQueue: Promise<void> = Promise.resolve();
 
   constructor(dataDir: string) {
     this.filePath = path.join(dataDir, "conversation-memory", "entries.json");
   }
 
   async append(input: Omit<ConversationMemoryEntry, "id" | "createdAt">): Promise<ConversationMemoryEntry> {
-    const content = input.content.trim();
-    if (!content) throw new Error("conversation memory content is empty");
-    if (content.length > MAX_CONTENT_LENGTH) throw new Error("conversation memory content is too long");
+    return this.enqueueWrite(async () => {
+      const content = input.content.trim();
+      if (!content) throw new Error("conversation memory content is empty");
+      if (content.length > MAX_CONTENT_LENGTH) throw new Error("conversation memory content is too long");
 
-    const file = await this.read();
-    const entry: ConversationMemoryEntry = {
-      ...input,
-      id: "mem_" + randomUUID(),
-      content,
-      createdAt: new Date().toISOString(),
-    };
-    file.entries.push(entry);
-    if (file.entries.length > MAX_ENTRIES) {
-      file.entries.splice(0, file.entries.length - MAX_ENTRIES);
-    }
-    await this.write(file);
-    return entry;
+      const file = await this.read();
+      const entry: ConversationMemoryEntry = {
+        ...input,
+        id: "mem_" + randomUUID(),
+        content,
+        createdAt: new Date().toISOString(),
+      };
+      file.entries.push(entry);
+      if (file.entries.length > MAX_ENTRIES) {
+        file.entries.splice(0, file.entries.length - MAX_ENTRIES);
+      }
+      await this.write(file);
+      return entry;
+    });
   }
 
   async appendCaptured(input: Omit<ConversationMemoryEntry, "id" | "createdAt"> & { captureKey: string }): Promise<ConversationMemoryEntry | null> {
-    const key = input.captureKey.trim();
-    if (!key) return this.append(input);
-    const file = await this.read();
-    if (file.entries.some((entry) => entry.metadata?.captureKey === key)) return null;
-    const { captureKey: _captureKey, ...entryInput } = input;
-    return this.append(entryInput);
+    return this.enqueueWrite(async () => {
+      const key = input.captureKey.trim();
+      if (!key) {
+        const { captureKey: _captureKey, ...entryInput } = input;
+        return this.append(entryInput);
+      }
+      const file = await this.read();
+      if (file.entries.some((entry) => entry.metadata?.captureKey === key)) return null;
+      const { captureKey: _captureKey, ...entryInput } = input;
+      const content = entryInput.content.trim();
+      if (!content) throw new Error("conversation memory content is empty");
+      if (content.length > MAX_CONTENT_LENGTH) throw new Error("conversation memory content is too long");
+      const entry: ConversationMemoryEntry = {
+        ...entryInput,
+        id: "mem_" + randomUUID(),
+        content,
+        createdAt: new Date().toISOString(),
+      };
+      file.entries.push(entry);
+      if (file.entries.length > MAX_ENTRIES) file.entries.splice(0, file.entries.length - MAX_ENTRIES);
+      await this.write(file);
+      return entry;
+    });
   }
 
   async recent(conversationId?: string, limit = 20): Promise<ConversationMemoryEntry[]> {
@@ -87,6 +107,18 @@ export class ConversationMemoryStore {
       .filter((entry) => entry.score > 0)
       .sort((a, b) => b.score - a.score)
       .slice(0, Math.max(1, Math.min(limit, 50)));
+  }
+
+  private async enqueueWrite<T>(operation: () => Promise<T>): Promise<T> {
+    const previous = this.writeQueue;
+    let release!: () => void;
+    this.writeQueue = new Promise<void>((resolve) => { release = resolve; });
+    await previous;
+    try {
+      return await operation();
+    } finally {
+      release();
+    }
   }
 
   private async read(): Promise<ConversationMemoryFile> {
