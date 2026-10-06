@@ -323,6 +323,83 @@ async function registerSigmaWebAiTools(): Promise<void> {
       }),
     }),
   }, { signal: controller.signal });
+  await modelContext.registerTool({
+    name: "sigma_memory_search",
+    description: "Search SIGMA's persistent conversation memory for relevant prior discussion. Use it when continuity with earlier decisions or explanations matters. Memory is separate from the global Knowledge DB; verify factual claims with Knowledge DB when appropriate.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        query: { type: "string" },
+        conversationId: { type: "string" },
+        limit: { type: "number" },
+      },
+      required: ["query"],
+    },
+    annotations: { readOnlyHint: true, untrustedContentHint: true },
+    execute: async (input) => callApi("/v1/mcp/call", {
+      method: "POST",
+      body: JSON.stringify({
+        name: "conversation_memory_search",
+        arguments: {
+          query: String(input.query),
+          ...(typeof input.conversationId === "string" ? { conversationId: input.conversationId } : {}),
+          ...(typeof input.limit === "number" ? { limit: input.limit } : {}),
+        },
+      }),
+    }),
+  }, { signal: controller.signal });
+
+  await modelContext.registerTool({
+    name: "sigma_memory_recent",
+    description: "Read recent saved conversation memory from SIGMA. Use conversationId when continuity with one conversation is required.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        conversationId: { type: "string" },
+        limit: { type: "number" },
+      },
+    },
+    annotations: { readOnlyHint: true, untrustedContentHint: true },
+    execute: async (input) => callApi("/v1/mcp/call", {
+      method: "POST",
+      body: JSON.stringify({
+        name: "conversation_memory_recent",
+        arguments: {
+          ...(typeof input.conversationId === "string" ? { conversationId: input.conversationId } : {}),
+          ...(typeof input.limit === "number" ? { limit: input.limit } : {}),
+        },
+      }),
+    }),
+  }, { signal: controller.signal });
+
+  await modelContext.registerTool({
+    name: "sigma_memory_save",
+    description: "Save an important user/assistant/system/tool conversation entry into SIGMA's persistent memory. Do not save secrets or sensitive credentials. Prefer concise durable summaries over every transient message.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        conversationId: { type: "string" },
+        role: { type: "string", enum: ["user", "assistant", "system", "tool"] },
+        content: { type: "string" },
+        provider: { type: "string" },
+      },
+      required: ["conversationId", "role", "content"],
+    },
+    annotations: { readOnlyHint: false, consequentialHint: true, untrustedContentHint: true },
+    execute: async (input) => callApi("/v1/mcp/call", {
+      method: "POST",
+      body: JSON.stringify({
+        name: "conversation_memory_save",
+        arguments: {
+          conversationId: String(input.conversationId),
+          role: String(input.role),
+          content: String(input.content),
+          ...(typeof input.provider === "string" ? { provider: input.provider } : {}),
+        },
+      }),
+    }),
+  }, { signal: controller.signal });
+
 
   await modelContext.registerTool({
     name: "sigma_knowledge_search",
