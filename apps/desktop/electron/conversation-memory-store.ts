@@ -55,10 +55,7 @@ export class ConversationMemoryStore {
   async appendCaptured(input: Omit<ConversationMemoryEntry, "id" | "createdAt"> & { captureKey: string }): Promise<ConversationMemoryEntry | null> {
     return this.enqueueWrite(async () => {
       const key = input.captureKey.trim();
-      if (!key) {
-        const { captureKey: _captureKey, ...entryInput } = input;
-        return this.append(entryInput);
-      }
+      if (!key) throw new Error("conversation capture key is empty");
       const file = await this.read();
       if (file.entries.some((entry) => entry.metadata?.captureKey === key)) return null;
       const { captureKey: _captureKey, ...entryInput } = input;
