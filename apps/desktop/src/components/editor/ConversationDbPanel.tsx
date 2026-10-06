@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Search, X } from "lucide-react";
 import { getDesktopBridge } from "@/lib/desktop-bridge";
 
@@ -24,7 +24,7 @@ export function ConversationDbPanel({ open, onClose }: ConversationDbPanelProps)
   const [query, setQuery] = useState("");
   const [loading, setLoading] = useState(false);
 
-  const load = async (search = "") => {
+  const load = useCallback(async (search = "") => {
     const desktop = getDesktopBridge();
     const api = desktop?.conversationMemory;
     if (!api) return;
@@ -39,11 +39,11 @@ export function ConversationDbPanel({ open, onClose }: ConversationDbPanelProps)
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
     if (open) void load();
-  }, [open]);
+  }, [load, open]);
 
   if (!open) return null;
 
