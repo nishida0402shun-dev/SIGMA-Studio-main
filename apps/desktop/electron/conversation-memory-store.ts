@@ -49,6 +49,15 @@ export class ConversationMemoryStore {
     return entry;
   }
 
+  async appendCaptured(input: Omit<ConversationMemoryEntry, "id" | "createdAt"> & { captureKey: string }): Promise<ConversationMemoryEntry | null> {
+    const key = input.captureKey.trim();
+    if (!key) return this.append(input);
+    const file = await this.read();
+    if (file.entries.some((entry) => entry.metadata?.captureKey === key)) return null;
+    const { captureKey: _captureKey, ...entryInput } = input;
+    return this.append(entryInput);
+  }
+
   async recent(conversationId?: string, limit = 20): Promise<ConversationMemoryEntry[]> {
     const file = await this.read();
     const safeLimit = Math.max(1, Math.min(limit, 100));
