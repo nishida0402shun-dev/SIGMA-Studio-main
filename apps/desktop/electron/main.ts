@@ -61,6 +61,7 @@ import { registerAiEditIpc } from "./ipc/ai-edit";
 import { registerAiResourcesIpc } from "./ipc/ai-resources";
 import { registerFileIpc } from "./ipc/file";
 import { KnowledgeDbStore } from "./knowledge-db-store";
+import { ConversationMemoryStore } from "./conversation-memory-store";
 import { registerKnowledgeDbIpc } from "./ipc/knowledge-db";
 import { ResearchSessionStore } from "./research-session-store";
 import { registerResearchSessionIpc } from "./ipc/research-session";
@@ -117,6 +118,8 @@ const WEB_AI_ALLOWED_HOSTS = new Set([
   "chat.openai.com",
   "claude.ai",
   "gemini.google.com",
+  "aistudio.google.com",
+  "www.aistudio.google.com",
 ]);
 
 ipcMain.handle("web-ai:get-preload-url", (event) => {
@@ -142,6 +145,43 @@ ipcMain.handle("web-ai:get-bridge-info", (event) => {
     url: webAiBridgeInfo.url,
     token: webAiBridgeInfo.token,
   };
+});
+
+ipcMain.handle("web-ai:capture-conversation", async (event, payload: unknown) => {
+  const frameUrl = event.senderFrame?.url ?? "";
+  let origin: string;
+  try {
+    origin = new URL(frameUrl).origin;
+  } catch {
+    throw new Error("invalid Web AI frame origin");
+  }
+  const allowed = [...WEB_AI_ALLOWED_HOSTS].some((host) => {
+    try {
+      const hostname = new URL(origin).hostname;
+      return hostname === host || hostname.endsWith("." + host);
+    } catch {
+      return false;
+    }
+  });
+  if (!allowed) throw new Error("conversation capture is not allowed for this origin");
+  if (!payload || typeof payload !== "object" || Array.isArray(payload)) throw new Error("invalid conversation capture payload");
+  const input = payload as Record<string, unknown>;
+  const conversationId = typeof input.conversationId === "string" ? input.conversationId.trim() : "";
+  const role = input.role;
+  const content = typeof input.content === "string" ? input.content.trim() : "";
+  const provider = typeof input.provider === "string" ? input.provider.trim() : "";
+  const captureKey = typeof input.captureKey === "string" ? input.captureKey.trim() : "";
+  if (!conversationId || !captureKey || !content || !["user", "assistant", "system", "tool"].includes(String(role))) {
+    throw new Error("invalid conversation capture entry");
+  }
+  return conversationMemoryStore.appendCaptured({
+    conversationId,
+    role: role as "user" | "assistant" | "system" | "tool",
+    content,
+    ...(provider ? { provider } : {}),
+    captureKey,
+    metadata: { source: "web-ai-capture", origin },
+  });
 });
 
 const externalDocumentOpenQueue = new ExternalDocumentOpenQueue(() => {
@@ -188,6 +228,7 @@ const localAiEditChatRoomStore = new LocalAiEditChatRoomStore(USER_DATA_PATH);
 const localAiResourceStore = new LocalAiResourceStore(USER_DATA_PATH);
 const SIGMA_STUDIO_DATA_PATH = path.join(USER_DATA_PATH, "data");
 const knowledgeDbStore = new KnowledgeDbStore(SIGMA_STUDIO_DATA_PATH);
+const conversationMemoryStore = new ConversationMemoryStore(SIGMA_STUDIO_DATA_PATH);
 const researchSessionStore = new ResearchSessionStore(SIGMA_STUDIO_DATA_PATH);
 const appUpdateController = new AppUpdateController({ releaseUrl: RELEASE_PAGE_URL });
 const desktopSettings = readDesktopSettingsSync(SIGMA_STUDIO_DATA_PATH);
