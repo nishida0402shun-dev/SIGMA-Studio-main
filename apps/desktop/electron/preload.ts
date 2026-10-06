@@ -72,6 +72,18 @@ const desktopAPI = {
     },
   },
 
+  conversationMemory: {
+    recent(conversationId?: string, limit?: number): Promise<unknown[]> {
+      return ipcRenderer.invoke("conversation-memory:recent", { conversationId, limit });
+    },
+    search(query: string, conversationId?: string, limit?: number): Promise<unknown[]> {
+      return ipcRenderer.invoke("conversation-memory:search", { query, conversationId, limit });
+    },
+    save(payload: unknown): Promise<unknown> {
+      return ipcRenderer.invoke("conversation-memory:save", payload);
+    },
+  },
+
   shell: {
     openExternal(url: string): Promise<{ ok: boolean; error?: string }> {
       return ipcRenderer.invoke("shell:open-external", url);
@@ -96,6 +108,9 @@ const desktopAPI = {
     },
     setAiWebSearchEnabled(value: boolean): Promise<{ ok: boolean; error?: string }> {
       return ipcRenderer.invoke("settings:set-ai-web-search-enabled", value);
+    },
+    setWebAiConversationCaptureEnabled(value: boolean): Promise<{ ok: boolean; error?: string }> {
+      return ipcRenderer.invoke("settings:set-web-ai-conversation-capture-enabled", value);
     },
     setUiLocale(value: string): Promise<{ ok: boolean; error?: string }> {
       return ipcRenderer.invoke("settings:set-ui-locale", value);
