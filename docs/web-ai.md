@@ -49,6 +49,13 @@ The application menu exposes ChatGPT Web, Claude Web, Gemini Web, and Google AI 
 WebMCP availability is browser/provider dependent. The local API remains the deterministic integration surface even when a provider does not expose WebMCP.
 
 
+## Knowledge DB RAG
+
+- Web AI exposes `sigma_knowledge_rag`, backed by the canonical `knowledge_db_rag_query` MCP tool.
+- The canonical pipeline performs retrieval routing, hybrid ranking, diverse context selection, and citation-region preservation in one call.
+- `sigma_knowledge_search` and `sigma_knowledge_context` remain available for granular/manual workflows, but grounded Web AI answers should prefer `sigma_knowledge_rag`.
+- The Knowledge DB is global and does not require a Workspace selection.
+
 ## Knowledge DB PDF staging
 
 Web AI can use the same global Knowledge DB MCP surface as the desktop AI. PDF registration is intentionally staged:
