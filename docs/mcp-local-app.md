@@ -321,3 +321,13 @@ Electron側が判定する未完了セッションは `operationCount > 0` か�
 環境変数 `SIGMA_STUDIO_MCP_PROVIDER`(`claude` / `chatgpt` / `antigravity`)を設定すると、作成される提案にそのプロバイダが付記され、デスクトップ側の承認UIにも表示されます。未設定または不正な値の場合はプロバイダなし(`null`)として扱われます。
 
 デスクトップ側で承認するとき、提案は現在の教材へ再適用されます。対象ブロック自体が削除・変更されて適用できない場合は失敗するため、その場合はMCP側でもう一度最新の `revision` と対象IDを読んで提案を作り直します。
+
+## Conversation Memory
+
+SIGMA also exposes persistent conversation memory, separate from the global Knowledge DB:
+
+- `conversation_memory_save` — save an important conversation entry or durable summary.
+- `conversation_memory_search` — retrieve relevant prior conversation entries.
+- `conversation_memory_recent` — retrieve recent saved entries.
+
+The Web AI providers expose the same capability as `sigma_memory_save`, `sigma_memory_search`, and `sigma_memory_recent`. Memory is stored locally under SIGMA's data directory and is not automatically inserted into a Workspace. Web AI can read saved memory through these tools, while memory writes remain a consequential operation subject to the existing SIGMA permission gate.
