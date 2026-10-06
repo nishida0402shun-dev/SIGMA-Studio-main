@@ -38,6 +38,7 @@ let currentWorkspaceId: string | null = null;
 const conversationCaptureId = `web-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const capturedNodes = new WeakSet<Node>();
 const capturedKeys = new Set<string>();
+let conversationCaptureEnabled = true;
 
 function captureText(value: string): string {
   return value.replace(/\\s+/g, " ").trim().slice(0, 50_000);
@@ -99,6 +100,7 @@ function captureSelectors(): string[] {
 }
 
 async function persistCapturedConversation(role: "user" | "assistant", rawContent: string, node?: Node): Promise<void> {
+  if (!conversationCaptureEnabled) return;
   const content = captureText(rawContent);
   if (content.length < 2) return;
   const provider = currentWebProvider();
@@ -139,6 +141,7 @@ function scanConversationMessages(root: ParentNode = document): void {
 }
 
 function installConversationCapture(): void {
+  if (!conversationCaptureEnabled) return;
   if (window.top !== window || document.documentElement.hasAttribute("data-sigma-conversation-capture")) return;
   document.documentElement.setAttribute("data-sigma-conversation-capture", "true");
 
@@ -361,6 +364,12 @@ function reportWebAiStatus(webMcp: boolean, bridge: boolean): void {
 
 async function registerSigmaWebAiTools(): Promise<void> {
   if (!ORIGIN_ALLOWLIST.has(window.location.origin)) return;
+  try {
+    const settings = await ipcRenderer.invoke("settings:get") as { webAiConversationCaptureEnabled?: unknown };
+    conversationCaptureEnabled = settings?.webAiConversationCaptureEnabled !== false;
+  } catch {
+    conversationCaptureEnabled = true;
+  }
   if (!(await ensureBridgeConfig())) {
     reportWebAiStatus(false, false);
     return;
