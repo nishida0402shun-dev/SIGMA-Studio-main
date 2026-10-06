@@ -44,6 +44,7 @@ import { LocalMaterialStore } from "../electron/local-material-store";
 import { KnowledgeDbStore } from "../electron/knowledge-db-store";
 import { ConversationMemoryStore } from "../electron/conversation-memory-store";
 import { KnowledgeLearningStore } from "../electron/knowledge-learning-store";
+import { LongTermMemoryStore } from "../electron/long-term-memory-store";
 import { LocalAiResourceStore } from "../electron/ai-resource-store";
 import { isAiWebSearchEnabled, readDesktopSettingsSync, writeDesktopSettings } from "../electron/desktop-settings";
 import {
@@ -3226,6 +3227,7 @@ registerTool(
     ok: true,
     query,
     memories: await new ConversationMemoryStore(storeContext.dataDir).search(query, conversationId, limit ?? 8),
+    longTermMemories: await new LongTermMemoryStore(storeContext.dataDir).search(query, limit ?? 8),
   })),
 );
 
@@ -3242,6 +3244,7 @@ registerTool(
   async ({ conversationId, limit }) => withToolErrorHandling(async () => ({
     ok: true,
     memories: await new ConversationMemoryStore(storeContext.dataDir).recent(conversationId, limit ?? 20),
+    longTermMemories: await new LongTermMemoryStore(storeContext.dataDir).recent(limit ?? 20),
   })),
 );
 
