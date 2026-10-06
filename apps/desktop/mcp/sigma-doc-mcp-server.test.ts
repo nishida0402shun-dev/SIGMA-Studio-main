@@ -74,6 +74,9 @@ const DOCUMENTED_KNOWLEDGE_DB_TOOL_NAMES = [
   "knowledge_db_pdf_import_staging_update",
   "knowledge_db_pdf_import_approve",
   "knowledge_db_pdf_import_reject",
+  "conversation_memory_save",
+  "conversation_memory_search",
+  "conversation_memory_recent",
 ] as const;
 
 const ENV_KEYS = [
