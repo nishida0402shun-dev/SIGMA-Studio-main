@@ -72,6 +72,15 @@ const desktopAPI = {
     },
   },
 
+  longTermMemory: {
+    recent(limit?: number): Promise<unknown[]> {
+      return ipcRenderer.invoke("long-term-memory:recent", { limit });
+    },
+    search(query: string, limit?: number): Promise<unknown[]> {
+      return ipcRenderer.invoke("long-term-memory:search", { query, limit });
+    },
+  },
+
   conversationMemory: {
     recent(conversationId?: string, limit?: number): Promise<unknown[]> {
       return ipcRenderer.invoke("conversation-memory:recent", { conversationId, limit });
