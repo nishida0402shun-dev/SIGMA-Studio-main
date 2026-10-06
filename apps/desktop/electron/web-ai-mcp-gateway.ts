@@ -4,7 +4,7 @@ import type { CallToolResult, Tool } from "@modelcontextprotocol/sdk/types.js";
 import { createAiPermissionGate, type AiPermissionRequester } from "./ai-permission-gate";
 
 const KNOWLEDGE_DB_TOOLS = new Set([
-  "knowledge_db_list_sources","knowledge_db_search","knowledge_db_route_query","knowledge_db_get_context",
+  "knowledge_db_list_sources","knowledge_db_search","knowledge_db_route_query","knowledge_db_rag_query","knowledge_db_get_context",
   "knowledge_db_get_page","knowledge_db_get_region","knowledge_db_get_related_sources","knowledge_db_get_analysis_status",
   "knowledge_db_get_classification_review_context","knowledge_db_list_classification_reviews","knowledge_db_submit_classification_review",
   "knowledge_db_pdf_import_preview","knowledge_db_pdf_import_staging_list","knowledge_db_pdf_import_staging_get",
@@ -16,7 +16,7 @@ const READ_ONLY_TOOLS = new Set([
   "read_local_document","get_edit_context","get_document_outline","get_block","get_blocks","search_document","search_library",
   "validate_local_document","list_materials","get_material","render_block_context","render_page","get_selected_block",
   "get_insertion_candidates","get_neighbor_blocks","get_active_reference","get_attached_media","get_mentioned_sigma_docs",
-  "list_generated_images","get_image_reference","knowledge_db_list_sources","knowledge_db_search","knowledge_db_route_query","knowledge_db_get_context","knowledge_db_get_related_sources","knowledge_db_get_page","knowledge_db_get_region","knowledge_db_get_analysis_status","knowledge_db_get_classification_review_context","knowledge_db_list_classification_reviews","knowledge_db_pdf_import_staging_list","knowledge_db_pdf_import_staging_get",
+  "list_generated_images","get_image_reference","knowledge_db_list_sources","knowledge_db_search","knowledge_db_route_query","knowledge_db_rag_query","knowledge_db_get_context","knowledge_db_get_related_sources","knowledge_db_get_page","knowledge_db_get_region","knowledge_db_get_analysis_status","knowledge_db_get_classification_review_context","knowledge_db_list_classification_reviews","knowledge_db_pdf_import_staging_list","knowledge_db_pdf_import_staging_get",
 ]);
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -124,4 +124,3 @@ export function createWebAiMcpGateway(options: WebAiMcpGatewayOptions): WebAiMcp
     },
   };
 }
-
