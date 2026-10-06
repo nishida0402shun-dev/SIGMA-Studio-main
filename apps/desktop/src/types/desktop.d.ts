@@ -395,6 +395,11 @@ export interface DesktopWebAiAPI {
   getPreloadUrl(): Promise<string>;
 }
 
+export interface DesktopLongTermMemoryAPI {
+  recent(limit?: number): Promise<unknown[]>;
+  search(query: string, limit?: number): Promise<unknown[]>;
+}
+
 export interface DesktopConversationMemoryAPI {
   recent(conversationId?: string, limit?: number): Promise<unknown[]>;
   search(query: string, conversationId?: string, limit?: number): Promise<unknown[]>;
@@ -920,6 +925,7 @@ export interface DesktopAPI {
   shell: DesktopShellAPI;
   webAi?: DesktopWebAiAPI;
   conversationMemory?: DesktopConversationMemoryAPI;
+  longTermMemory?: DesktopLongTermMemoryAPI;
   settings?: DesktopSettingsAPI;
   fonts?: DesktopFontsAPI;
   codex: DesktopCodexAPI;
