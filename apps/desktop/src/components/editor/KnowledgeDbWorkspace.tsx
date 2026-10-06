@@ -380,6 +380,7 @@ export function KnowledgeDbWorkspace({ open, onClose, onOpenAi, t }: Props) {
     setSmartSplit(null);
   }
 
+  async function addSources(pathsPromise: Promise<{ paths: string[] } | null>): Promise<void> {
     if (!knowledgeDb) return;
     const picked = await pathsPromise;
     if (!picked?.paths?.length) return;
