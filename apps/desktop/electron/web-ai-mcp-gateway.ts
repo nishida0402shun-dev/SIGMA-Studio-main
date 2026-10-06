@@ -9,7 +9,6 @@ const KNOWLEDGE_DB_TOOLS = new Set([
   "knowledge_db_get_classification_review_context","knowledge_db_list_classification_reviews","knowledge_db_submit_classification_review",
   "knowledge_db_pdf_import_preview","knowledge_db_pdf_import_staging_list","knowledge_db_pdf_import_staging_get",
   "conversation_memory_search","conversation_memory_recent",
-  "conversation_memory_search","conversation_memory_recent",
   "knowledge_db_pdf_import_staging_update","knowledge_db_pdf_import_approve","knowledge_db_pdf_import_reject",
   "conversation_memory_save","conversation_memory_search","conversation_memory_recent",
 ]);
@@ -20,6 +19,7 @@ const READ_ONLY_TOOLS = new Set([
   "validate_local_document","list_materials","get_material","render_block_context","render_page","get_selected_block",
   "get_insertion_candidates","get_neighbor_blocks","get_active_reference","get_attached_media","get_mentioned_sigma_docs",
   "list_generated_images","get_image_reference","knowledge_db_list_sources","knowledge_db_search","knowledge_db_route_query","knowledge_db_rag_query","knowledge_db_get_context","knowledge_db_get_related_sources","knowledge_db_get_page","knowledge_db_get_region","knowledge_db_get_analysis_status","knowledge_db_get_classification_review_context","knowledge_db_list_classification_reviews","knowledge_db_pdf_import_staging_list","knowledge_db_pdf_import_staging_get",
+  "conversation_memory_search","conversation_memory_recent",
 ]);
 
 function isRecord(value: unknown): value is Record<string, unknown> {
