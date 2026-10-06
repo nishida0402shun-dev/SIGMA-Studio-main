@@ -28,6 +28,8 @@ export interface DesktopSettings {
   // 他の既定値と違いキーの「不在」が「まだ選んでいない」を意味する (= OSロケール検出に
   // 委ねる) ので、既定の ja を選んだ場合もキーを消さずに書く。
   uiLocale?: AppLocale;
+  // WebView内のChatGPT/Claude/Gemini/AI Studio会話をConversation DBへ自動保存する。既定は有効。
+  webAiConversationCaptureEnabled?: boolean;
 }
 
 export interface DesktopCustomFont {
@@ -134,6 +136,10 @@ async function writeDesktopSettingsNow(dataDir: string, settings: DesktopSetting
       // 既定値 (true) はキーごと削除して設定ファイルを簡潔に保つ。
       delete next.aiWebSearchEnabled;
     }
+  }
+  if ("webAiConversationCaptureEnabled" in settings) {
+    if (settings.webAiConversationCaptureEnabled === false) next.webAiConversationCaptureEnabled = false;
+    else delete next.webAiConversationCaptureEnabled;
   }
   if ("uiLocale" in settings) {
     const uiLocale = normalizeUiLocale(settings.uiLocale);
@@ -272,6 +278,7 @@ function normalizeDesktopSettings(value: unknown): DesktopSettings {
   const aiAutoApplyVerifiedProposals = parsed.aiAutoApplyVerifiedProposals === true;
   const aiWebSearchEnabled = parsed.aiWebSearchEnabled !== false;
   const uiLocale = normalizeUiLocale(parsed.uiLocale);
+  const webAiConversationCaptureEnabled = parsed.webAiConversationCaptureEnabled !== false;
 
   if (codexBin) {
     next.codexBin = codexBin;
@@ -299,6 +306,9 @@ function normalizeDesktopSettings(value: unknown): DesktopSettings {
   }
   if (!aiWebSearchEnabled) {
     next.aiWebSearchEnabled = false;
+  }
+  if (!webAiConversationCaptureEnabled) {
+    next.webAiConversationCaptureEnabled = false;
   }
   if (uiLocale) {
     next.uiLocale = uiLocale;
