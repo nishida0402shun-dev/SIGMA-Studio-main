@@ -43,6 +43,7 @@ import {
 import { LocalMaterialStore } from "../electron/local-material-store";
 import { KnowledgeDbStore } from "../electron/knowledge-db-store";
 import { ConversationMemoryStore } from "../electron/conversation-memory-store";
+import { KnowledgeLearningStore } from "../electron/knowledge-learning-store";
 import { LocalAiResourceStore } from "../electron/ai-resource-store";
 import { isAiWebSearchEnabled, readDesktopSettingsSync, writeDesktopSettings } from "../electron/desktop-settings";
 import {
@@ -3356,6 +3357,26 @@ registerTool(
       })),
       instructions: "回答で実際に使用した根拠には返却されたcitationをそのまま保持してください。Contextにない内容をKnowledge DBの根拠として引用しないでください。",
     };
+  }),
+);
+
+registerTool(
+  "knowledge_db_record_feedback",
+  {
+    title: "Knowledge DB RAGフィードバック記録",
+    description: "Knowledge DB検索結果に対する肯定・否定・訂正をLearning DBへ保存します。検索品質の改善に使うため、Workspaceには依存しません。",
+    inputSchema: {
+      query: z.string().min(1).max(2000),
+      sourceId: z.string().min(1).max(256).optional(),
+      pageNumber: z.number().int().min(1).optional(),
+      label: z.enum(["positive", "negative", "correction"]),
+      correction: z.string().max(5000).optional(),
+    },
+  },
+  async ({ query, sourceId, pageNumber, label, correction }) => withToolErrorHandling(async () => {
+    const store = new KnowledgeLearningStore(storeContext.dataDir);
+    const entry = await store.record({ query, sourceId, pageNumber, label, correction });
+    return { ok: true, entry };
   }),
 );
 
