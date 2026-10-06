@@ -42,6 +42,7 @@ export class ConversationMemoryStore {
         id: "mem_" + randomUUID(),
         content,
         createdAt: new Date().toISOString(),
+        metadata: { ...entryInput.metadata, captureKey },
       };
       file.entries.push(entry);
       if (file.entries.length > MAX_ENTRIES) {
@@ -58,7 +59,7 @@ export class ConversationMemoryStore {
       if (!key) throw new Error("conversation capture key is empty");
       const file = await this.read();
       if (file.entries.some((entry) => entry.metadata?.captureKey === key)) return null;
-      const { captureKey: _captureKey, ...entryInput } = input;
+      const { captureKey, ...entryInput } = input;
       const content = entryInput.content.trim();
       if (!content) throw new Error("conversation memory content is empty");
       if (content.length > MAX_CONTENT_LENGTH) throw new Error("conversation memory content is too long");
