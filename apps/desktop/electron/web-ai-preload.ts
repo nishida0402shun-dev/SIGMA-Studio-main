@@ -58,6 +58,8 @@ function captureRole(node: Element): "user" | "assistant" | null {
   const testId = node.getAttribute("data-testid")?.toLowerCase() ?? "";
   if (testId.includes("user-message") || testId.includes("user_query")) return "user";
   if (testId.includes("assistant-message") || testId.includes("model-response") || testId.includes("response")) return "assistant";
+  if (node.hasAttribute("data-is-streaming") || node.tagName.toLowerCase() === "model-response") return "assistant";
+  if (node.tagName.toLowerCase() === "user-query") return "user";
   const tag = node.tagName.toLowerCase();
   if (tag === "user-query") return "user";
   if (tag === "model-response") return "assistant";
