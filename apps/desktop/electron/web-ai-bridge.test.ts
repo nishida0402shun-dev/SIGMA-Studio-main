@@ -113,6 +113,50 @@ describe("Web AI bridge", () => {
     expect(calls).toEqual([{ name: "knowledge_db_pdf_import_staging_list", workspaceId: null }]);
   });
 
+  it("allows all supported Web AI origins to call the canonical global RAG tool", async () => {
+    const origins = ["https://chatgpt.com", "https://claude.ai", "https://gemini.google.com", "https://aistudio.google.com"];
+    const calls: string[] = [];
+    const server = createWebAiBridgeServer({
+      token: "test-token",
+      getDocument: async () => null,
+      listDocuments: async () => [],
+      listProposals: async () => [],
+      getProposal: async () => null,
+      approveProposal: async () => null,
+      rejectProposal: async () => null,
+      startRun: async () => ({ ok: true }),
+      cancelRun: () => false,
+      mcpGateway: {
+        ...mcpGateway,
+        listTools: async () => [],
+        callTool: async (name) => {
+          calls.push(name);
+          return { content: [{ type: "text", text: JSON.stringify({ ok: true, shouldSearch: true, context: [], citations: [] }) }] };
+        },
+      },
+    });
+    servers.push(server);
+    const base = await listen(server);
+
+    for (const origin of origins) {
+      const response = await fetch(`${base}/v1/mcp/call`, {
+        method: "POST",
+        headers: {
+          Authorization: "Bearer test-token",
+          Origin: origin,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          name: "knowledge_db_rag_query",
+          arguments: { query: "数学の定義を確認したい" },
+        }),
+      });
+      expect(response.status).toBe(200);
+      expect(response.headers.get("access-control-allow-origin")).toBe(origin);
+    }
+    expect(calls).toEqual(["knowledge_db_rag_query", "knowledge_db_rag_query", "knowledge_db_rag_query", "knowledge_db_rag_query"]);
+  });
+
   it("does not expose documents or MCP access without a selected workspace", async () => {
     let mcpCalls = 0;
     const server = createWebAiBridgeServer({
