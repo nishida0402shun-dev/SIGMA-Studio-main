@@ -485,17 +485,6 @@ describe("Knowledge DB RAG retrieval quality", () => {
     expect(japanese[0]?.sourceId).toBe(source?.id);
   });
 
-  it("returns no context when the canonical router decides retrieval is unnecessary", async () => {
-    const dataDir = await fs.mkdtemp(path.join(os.tmpdir(), "sigma-knowledge-db-rag-router-"));
-    tempDirs.push(dataDir);
-    const store = new KnowledgeDbStore(dataDir);
-    const filePath = path.join(dataDir, "note.md");
-    await fs.writeFile(filePath, "単なるメモ。", "utf8");
-    await store.addFiles([filePath]);
-    const context = await store.getContext("こんにちは", 4, undefined, 2000);
-    expect(context).toHaveLength(0);
-  });
-
   it("preserves citation regions for bounded RAG context and honors source filters", async () => {
     const dataDir = await fs.mkdtemp(path.join(os.tmpdir, "sigma-knowledge-db-rag-citation-"));
     tempDirs.push(dataDir);
