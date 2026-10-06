@@ -480,6 +480,36 @@ async function registerSigmaWebAiTools(): Promise<void> {
     }),
   }, { signal: controller.signal });
   await modelContext.registerTool({
+    name: "sigma_knowledge_feedback",
+    description: "Record whether a Knowledge DB retrieval was useful or needs correction. This feeds SIGMA's Learning DB and improves future retrieval ranking.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        query: { type: "string" },
+        sourceId: { type: "string" },
+        pageNumber: { type: "number" },
+        label: { type: "string", enum: ["positive", "negative", "correction"] },
+        correction: { type: "string" },
+      },
+      required: ["query", "label"],
+    },
+    annotations: { readOnlyHint: false, consequentialHint: true, untrustedContentHint: true },
+    execute: async (input) => callApi("/v1/mcp/call", {
+      method: "POST",
+      body: JSON.stringify({
+        name: "knowledge_db_record_feedback",
+        arguments: {
+          query: String(input.query),
+          label: String(input.label),
+          ...(typeof input.sourceId === "string" ? { sourceId: input.sourceId } : {}),
+          ...(typeof input.pageNumber === "number" ? { pageNumber: input.pageNumber } : {}),
+          ...(typeof input.correction === "string" ? { correction: input.correction } : {}),
+        },
+      }),
+    }),
+  }, { signal: controller.signal });
+
+  await modelContext.registerTool({
     name: "sigma_memory_search",
     description: "Search SIGMA's persistent conversation memory for relevant prior discussion. Use it when continuity with earlier decisions or explanations matters. Memory is separate from the global Knowledge DB; verify factual claims with Knowledge DB when appropriate.",
     inputSchema: {
