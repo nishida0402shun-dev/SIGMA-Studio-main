@@ -1,5 +1,6 @@
 import fs from "node:fs/promises";
 import path from "node:path";
+import { KnowledgeLearningStore } from "./knowledge-learning-store";
 import { createHash, randomUUID } from "node:crypto";
 import { PDFDocument } from "pdf-lib";
 import JSZip from "jszip";
@@ -307,28 +308,30 @@ export class KnowledgeDbStore {
       .filter((page) => Boolean(page.text?.trim()));
     const documentFrequency = buildDocumentFrequency(searchablePages);
     const documentCount = Math.max(1, searchablePages.length);
-    return [...bestByPage.values()]
-      .map((match) => {
-        const lexical = lexicalScore(match.text, queryTokens, documentFrequency, documentCount);
-        const exact = exactPhraseScore(match.text, trimmed);
-        const page = pages.get(`${match.sourceId}:${match.pageNumber}`);
-        const metadata = page ? metadataScore(page, trimmed, queryTokens) : 0;
-        const semantic = page ? semanticQueryScore(page, queryTokens) : 0;
-        const matchReasons = page ? retrievalMatchReasons(page, trimmed, queryTokens, match.score, lexical, metadata) : [];
-        return {
-          ...match,
-          score: match.score * 0.48 + lexical * 0.22 + metadata * 0.15 + exact * 0.10 + semantic * 0.05,
-          matchReasons,
-          ...(page ? {
-            semanticType: page.semanticType,
-            title: page.title,
-            keywords: page.keywords,
-            analysisSignals: page.analysisSignals,
-            taxonomyPaths: page.taxonomyPaths,
-            citationRegions: selectCitationRegions(page, match.text),
-          } : {}),
-        };
-      })
+    const learningStore = new KnowledgeLearningStore(this.dataDir);
+    const ranked = await Promise.all([...bestByPage.values()].map(async (match) => {
+      const lexical = lexicalScore(match.text, queryTokens, documentFrequency, documentCount);
+      const exact = exactPhraseScore(match.text, trimmed);
+      const page = pages.get(`${match.sourceId}:${match.pageNumber}`);
+      const metadata = page ? metadataScore(page, trimmed, queryTokens) : 0;
+      const semantic = page ? semanticQueryScore(page, queryTokens) : 0;
+      const learning = await learningStore.getBoost(trimmed, match.sourceId, match.pageNumber);
+      const matchReasons = page ? retrievalMatchReasons(page, trimmed, queryTokens, match.score, lexical, metadata) : [];
+      return {
+        ...match,
+        score: match.score * 0.48 + lexical * 0.22 + metadata * 0.15 + exact * 0.10 + semantic * 0.05 + learning,
+        matchReasons,
+        ...(page ? {
+          semanticType: page.semanticType,
+          title: page.title,
+          keywords: page.keywords,
+          analysisSignals: page.analysisSignals,
+          taxonomyPaths: page.taxonomyPaths,
+          citationRegions: selectCitationRegions(page, match.text),
+        } : {}),
+      };
+    }));
+    return ranked
       .sort((a, b) => b.score - a.score)
       .slice(0, safeLimit)
       .map((match) => ({ ...match, sourceName: sourceNames.get(match.sourceId) ?? match.sourceId }));
