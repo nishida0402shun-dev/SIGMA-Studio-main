@@ -3233,7 +3233,7 @@ registerTool(
       shouldSearch,
       reason,
       suggestedQuery: query.trim(),
-      nextTool: shouldSearch ? "knowledge_db_get_context" : null,
+      nextTool: shouldSearch ? "knowledge_db_rag_query" : null,
     };
   }),
 );
