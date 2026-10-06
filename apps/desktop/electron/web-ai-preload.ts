@@ -35,6 +35,150 @@ let bridgeUrl = arg("sigma-web-ai-url");
 let bridgeToken = arg("sigma-web-ai-token");
 let currentWorkspaceId: string | null = null;
 
+const conversationCaptureId = `web-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+const capturedNodes = new WeakSet<Node>();
+const capturedKeys = new Set<string>();
+
+function captureText(value: string): string {
+  return value.replace(/\\s+/g, " ").trim().slice(0, 50_000);
+}
+
+function captureHash(value: string): string {
+  let hash = 2166136261;
+  for (let index = 0; index < value.length; index += 1) {
+    hash ^= value.charCodeAt(index);
+    hash = Math.imul(hash, 16777619);
+  }
+  return (hash >>> 0).toString(16);
+}
+
+function captureRole(node: Element): "user" | "assistant" | null {
+  const explicit = node.getAttribute("data-message-author-role") ?? node.getAttribute("data-role");
+  if (explicit === "user" || explicit === "assistant") return explicit;
+  const testId = node.getAttribute("data-testid")?.toLowerCase() ?? "";
+  if (testId.includes("user-message") || testId.includes("user_query")) return "user";
+  if (testId.includes("assistant-message") || testId.includes("model-response") || testId.includes("response")) return "assistant";
+  const tag = node.tagName.toLowerCase();
+  if (tag === "user-query") return "user";
+  if (tag === "model-response") return "assistant";
+  return null;
+}
+
+function captureSelectors(): string[] {
+  const host = window.location.hostname;
+  if (host.includes("chatgpt.com") || host.includes("chat.openai.com")) {
+    return [
+      "[data-message-author-role=\"user\"]",
+      "[data-message-author-role=\"assistant\"]",
+    ];
+  }
+  if (host.includes("claude.ai")) {
+    return [
+      '[data-testid*="user-message"]',
+      '[data-testid*="assistant-message"]',
+      '[data-is-streaming]',
+    ];
+  }
+  if (host.includes("gemini.google.com")) {
+    return [
+      "user-query",
+      "model-response",
+      '[data-message-author-role="user"]',
+      '[data-message-author-role="assistant"]',
+    ];
+  }
+  return [
+    "ms-chat-turn",
+    "user-query",
+    "model-response",
+    '[data-message-author-role="user"]',
+    '[data-message-author-role="assistant"]',
+  ];
+}
+
+async function persistCapturedConversation(role: "user" | "assistant", rawContent: string, node?: Node): Promise<void> {
+  const content = captureText(rawContent);
+  if (content.length < 2) return;
+  const provider = currentWebProvider();
+  const captureKey = `${provider}:${window.location.pathname}:${role}:${captureHash(content)}`;
+  if (capturedKeys.has(captureKey)) return;
+  capturedKeys.add(captureKey);
+  try {
+    await ipcRenderer.invoke("web-ai:capture-conversation", {
+      conversationId: conversationCaptureId,
+      role,
+      content,
+      provider,
+      captureKey,
+    });
+    if (node) capturedNodes.add(node);
+  } catch {
+    // Capture is best-effort; it must never interfere with the provider UI.
+  }
+}
+
+function scanConversationMessages(root: ParentNode = document): void {
+  for (const selector of captureSelectors()) {
+    let nodes: Element[] = [];
+    try {
+      nodes = Array.from(root.querySelectorAll(selector));
+    } catch {
+      continue;
+    }
+    for (const node of nodes) {
+      if (capturedNodes.has(node)) continue;
+      const role = captureRole(node);
+      if (!role) continue;
+      const content = node.textContent ?? "";
+      if (content.trim().length < 2) continue;
+      void persistCapturedConversation(role, content, node);
+    }
+  }
+}
+
+function installConversationCapture(): void {
+  if (window.top !== window || document.documentElement.hasAttribute("data-sigma-conversation-capture")) return;
+  document.documentElement.setAttribute("data-sigma-conversation-capture", "true");
+
+  const submitUserText = (target: EventTarget | null) => {
+    if (!(target instanceof HTMLElement)) return;
+    const text = target instanceof HTMLTextAreaElement
+      ? target.value
+      : target.isContentEditable ? target.innerText : "";
+    if (text.trim()) void persistCapturedConversation("user", text);
+  };
+
+  document.addEventListener("keydown", (event) => {
+    if (event.key !== "Enter" || event.shiftKey || event.isComposing) return;
+    submitUserText(event.target);
+    window.setTimeout(() => scanConversationMessages(), 350);
+  }, true);
+
+  document.addEventListener("click", (event) => {
+    const target = event.target;
+    if (!(target instanceof Element)) return;
+    const label = (target.getAttribute("aria-label") ?? target.textContent ?? "").toLowerCase();
+    if (label.includes("send") || label.includes("送信") || label.includes("submit")) {
+      const editor = document.querySelector("textarea, [contenteditable=\"true\"]");
+      submitUserText(editor);
+      window.setTimeout(() => scanConversationMessages(), 500);
+    }
+  }, true);
+
+  const observer = new MutationObserver((mutations) => {
+    for (const mutation of mutations) {
+      if (mutation.type === "childList") {
+        for (const node of Array.from(mutation.addedNodes)) {
+          if (node.nodeType === Node.ELEMENT_NODE) scanConversationMessages(node as Element);
+        }
+      }
+    }
+  });
+  observer.observe(document.documentElement, { childList: true, subtree: true });
+  scanConversationMessages();
+}
+
+
 ipcRenderer.on("sigma-web-ai-scope", (_event, workspaceId: unknown) => {
   currentWorkspaceId = typeof workspaceId === "string" && workspaceId.trim() ? workspaceId.trim() : null;
   window.setTimeout(installSigmaContextOverlay, 300);
@@ -235,6 +379,7 @@ async function registerSigmaWebAiTools(): Promise<void> {
     return;
   }
   reportWebAiStatus(true, bridgeHealthy);
+  installConversationCapture();
 
   const controller = new AbortController();
 
