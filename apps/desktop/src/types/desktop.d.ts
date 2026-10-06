@@ -917,6 +917,7 @@ export interface DesktopAPI {
   updater?: DesktopUpdaterAPI;
   shell: DesktopShellAPI;
   webAi?: DesktopWebAiAPI;
+  conversationMemory?: DesktopConversationMemoryAPI;
   settings?: DesktopSettingsAPI;
   fonts?: DesktopFontsAPI;
   codex: DesktopCodexAPI;
