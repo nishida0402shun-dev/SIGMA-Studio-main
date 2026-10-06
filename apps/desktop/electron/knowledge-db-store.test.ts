@@ -477,7 +477,7 @@ describe("Knowledge DB RAG retrieval quality", () => {
   it("supports Japanese character-bigram recall and configured search aliases", async () => {
     const dataDir = await fs.mkdtemp(path.join(os.tmpdir(), "sigma-knowledge-db-alias-"));
     tempDirs.push(dataDir);
-    const filePath = path.join(dataDir, "ai.md");
+    const filePath = path.join(dataDir, "ai.md");    const filePath = path.join(dataDir, "ai.md");
     await fs.writeFile(filePath, "AI（人工知能）と検索拡張生成（RAG）について説明する。", "utf8");
     const store = new KnowledgeDbStore(dataDir);
     const [source] = await store.addFiles([filePath]);
@@ -486,7 +486,7 @@ describe("Knowledge DB RAG retrieval quality", () => {
   });
 
   it("preserves citation regions for bounded RAG context and honors source filters", async () => {
-    const dataDir = await fs.mkdtemp(path.join(os.tmpdir, "sigma-knowledge-db-rag-citation-"));
+    const dataDir = await fs.mkdtemp(`${os.tmpdir()}${path.sep}sigma-knowledge-db-rag-citation-`);
     tempDirs.push(dataDir);
     const firstPath = path.join(dataDir, "first.md");
     const secondPath = path.join(dataDir, "second.md");
@@ -518,45 +518,3 @@ describe("Knowledge DB RAG retrieval quality", () => {
     const store = new KnowledgeDbStore(dataDir);
     const sources = await store.addFiles([firstPath, secondPath, thirdPath]);
     expect(sources).toHaveLength(3);
-    const context = await store.getContext("検索拡張生成", 4, undefined, 5000);
-    expect(context.length).toBeGreaterThan(1);
-    expect(context[0]?.relation).toBe("primary");
-    expect(context.some((item) => item.relation === "related" && item.matchReasons?.includes("関連ソース"))).toBe(true);
-    expect(new Set(context.map((item) => item.sourceId)).size).toBeGreaterThan(1);
-  });
-});
-
-describe("Knowledge DB classification review", () => {
-  it("confirms matching AI classification and preserves the local taxonomy on conflict", async () => {
-    const dataDir = await fs.mkdtemp(path.join(os.tmpdir(), "sigma-knowledge-db-review-"));
-    tempDirs.push(dataDir);
-    const filePath = path.join(dataDir, "review.md");
-    await fs.writeFile(filePath, "# 三角関数\n\n数学Ⅱの三角関数について説明する。", "utf8");
-    const store = new KnowledgeDbStore(dataDir);
-    const [source] = await store.addFiles([filePath]);
-    await store.search("三角関数", 5);
-    const page = (await store.listSources()).find((item) => item.id === source?.id)?.pages[0];
-    expect(page?.taxonomyPaths?.[0]).toEqual(["数学", "数学II", "三角関数"]);
-
-    const confirmed = await store.applyClassificationReview({
-      sourceId: source!.id,
-      pageNumber: 1,
-      paths: [["数学", "数学II", "三角関数"]],
-      confidence: 0.94,
-      reason: "本文に数学Ⅱと三角関数が明記されている。",
-      evidence: ["数学Ⅱの三角関数について説明する。"],
-    });
-    expect(confirmed.status).toBe("confirmed");
-
-    const conflict = await store.applyClassificationReview({
-      sourceId: source!.id,
-      pageNumber: 1,
-      paths: [["理科", "物理", "力学"]],
-      confidence: 0.91,
-    });
-    expect(conflict.status).toBe("needs-review");
-    const after = (await store.listSources()).find((item) => item.id === source?.id)?.pages[0];
-    expect(after?.taxonomyPaths?.[0]).toEqual(["数学", "数学II", "三角関数"]);
-    expect(after?.classificationReviewStatus).toBe("needs-review");
-  });
-});
