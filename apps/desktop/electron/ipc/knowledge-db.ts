@@ -135,6 +135,45 @@ export function registerKnowledgeDbIpc(deps: RegisterKnowledgeDbIpcDeps): void {
     return store.addFiles(filePaths as string[]);
   });
 
+  ipcMain.handle("knowledge-db:smart-split-preview", async (event, payload: unknown) => {
+    if (event.sender !== getMainWindow()?.webContents) return null;
+    const sourceId = payload && typeof payload === "object" && "sourceId" in payload && typeof payload.sourceId === "string" ? payload.sourceId.trim() : "";
+    if (!sourceId) throw new Error("invalid source id");
+    return store.previewSmartSplit(sourceId);
+  });
+
+  ipcMain.handle("knowledge-db:smart-split-materialize", async (event, payload: unknown) => {
+    if (event.sender !== getMainWindow()?.webContents) return [];
+    if (!payload || typeof payload !== "object") throw new Error("invalid smart split request");
+    const sourceId = "sourceId" in payload && typeof payload.sourceId === "string" ? payload.sourceId.trim() : "";
+    const segments = "segments" in payload && Array.isArray(payload.segments)
+      ? payload.segments.flatMap((segment: unknown) => {
+          if (!segment || typeof segment !== "object") return [];
+          const startPage = "startPage" in segment && typeof segment.startPage === "number" ? segment.startPage : 0;
+          const endPage = "endPage" in segment && typeof segment.endPage === "number" ? segment.endPage : 0;
+          const name = "name" in segment && typeof segment.name === "string" ? segment.name : undefined;
+          return Number.isInteger(startPage) && Number.isInteger(endPage) && startPage >= 1 && endPage >= startPage
+            ? [{ startPage, endPage, name }] : [];
+        }) : [];
+    if (!sourceId || segments.length === 0) throw new Error("invalid smart split request");
+    return store.materializeSmartSplit(sourceId, segments);
+  });
+
+  ipcMain.handle("knowledge-db:classification-review", async (event, payload: unknown) => {
+    if (event.sender !== getMainWindow()?.webContents) return null;
+    if (!payload || typeof payload !== "object") throw new Error("invalid classification review");
+    const sourceId = "sourceId" in payload && typeof payload.sourceId === "string" ? payload.sourceId.trim() : "";
+    const pageNumber = "pageNumber" in payload && typeof payload.pageNumber === "number" ? payload.pageNumber : 0;
+    const paths = "paths" in payload && Array.isArray(payload.paths)
+      ? payload.paths.filter((item): item is string[] => Array.isArray(item) && item.every((part) => typeof part === "string")) : [];
+    const confidence = "confidence" in payload && typeof payload.confidence === "number" ? payload.confidence : 0;
+    const reason = "reason" in payload && typeof payload.reason === "string" ? payload.reason : undefined;
+    const evidence = "evidence" in payload && Array.isArray(payload.evidence)
+      ? payload.evidence.filter((item): item is string => typeof item === "string") : undefined;
+    if (!sourceId || !Number.isInteger(pageNumber) || pageNumber < 1 || paths.length === 0) throw new Error("invalid classification review");
+    return store.applyClassificationReview({ sourceId, pageNumber, paths, confidence, reason, evidence });
+  });
+
   ipcMain.handle("knowledge-db:delete-source", async (event, payload: unknown) => {
     if (event.sender !== getMainWindow()?.webContents) return { ok: false };
     const sourceId = payload && typeof payload === "object" && "sourceId" in payload && typeof payload.sourceId === "string" ? payload.sourceId.trim() : "";
