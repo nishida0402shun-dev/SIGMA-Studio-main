@@ -897,6 +897,7 @@ export interface DesktopKnowledgeDbAPI {
   getStructureParserStatus(): Promise<unknown>;
   startIndexing(): Promise<unknown>;
   search(payload: { query: string; limit?: number }): Promise<unknown[]>;
+  recordFeedback(payload: { query: string; sourceId?: string; pageNumber?: number; label: "positive" | "negative" | "correction"; correction?: string }): Promise<unknown>;
   related(payload: { sourceId: string; limit?: number }): Promise<unknown[]>;
   importSources(payload: { paths: string[] }): Promise<unknown[]>;
   previewPdfImport(filePath: string): Promise<unknown>;
