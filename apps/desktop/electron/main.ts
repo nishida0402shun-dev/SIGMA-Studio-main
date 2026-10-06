@@ -198,6 +198,19 @@ ipcMain.handle("web-ai:capture-conversation", async (event, payload: unknown) =>
   return saved;
 });
 
+ipcMain.handle("long-term-memory:recent", async (_event, payload: unknown) => {
+  const input = payload && typeof payload === "object" && !Array.isArray(payload) ? payload as Record<string, unknown> : {};
+  const limit = typeof input.limit === "number" ? input.limit : undefined;
+  return longTermMemoryStore.recent(limit);
+});
+
+ipcMain.handle("long-term-memory:search", async (_event, payload: unknown) => {
+  const input = payload && typeof payload === "object" && !Array.isArray(payload) ? payload as Record<string, unknown> : {};
+  const query = typeof input.query === "string" ? input.query : "";
+  const limit = typeof input.limit === "number" ? input.limit : undefined;
+  return longTermMemoryStore.search(query, limit);
+});
+
 ipcMain.handle("conversation-memory:recent", async (_event, payload: unknown) => {
   const input = payload && typeof payload === "object" && !Array.isArray(payload) ? payload as Record<string, unknown> : {};
   const conversationId = typeof input.conversationId === "string" ? input.conversationId.trim() || undefined : undefined;
