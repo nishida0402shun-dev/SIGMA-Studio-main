@@ -238,6 +238,19 @@ export function registerKnowledgeDbIpc(deps: RegisterKnowledgeDbIpcDeps): void {
     return store.search(query, limit);
   });
 
+  ipcMain.handle("knowledge-db:record-feedback", async (event, payload: unknown) => {
+    if (event.sender !== getMainWindow()?.webContents) return null;
+    if (!payload || typeof payload !== "object" || Array.isArray(payload)) throw new Error("invalid retrieval feedback");
+    const input = payload as Record<string, unknown>;
+    const query = typeof input.query === "string" ? input.query : "";
+    const sourceId = typeof input.sourceId === "string" ? input.sourceId : undefined;
+    const pageNumber = typeof input.pageNumber === "number" ? input.pageNumber : undefined;
+    const label = input.label;
+    const correction = typeof input.correction === "string" ? input.correction : undefined;
+    if (!query.trim() || !["positive", "negative", "correction"].includes(String(label))) throw new Error("invalid retrieval feedback");
+    return store.recordLearningFeedback({ query, sourceId, pageNumber, label: label as "positive" | "negative" | "correction", correction });
+  });
+
   ipcMain.handle("knowledge-db:set-page-type", async (event, payload: unknown) => {
     if (event.sender !== getMainWindow()?.webContents) return null;
     if (!payload || typeof payload !== "object") throw new Error("invalid page metadata");
