@@ -485,6 +485,38 @@ describe("Knowledge DB RAG retrieval quality", () => {
     expect(japanese[0]?.sourceId).toBe(source?.id);
   });
 
+  it("returns no context when the canonical router decides retrieval is unnecessary", async () => {
+    const dataDir = await fs.mkdtemp(path.join(os.tmpdir(), "sigma-knowledge-db-rag-router-"));
+    tempDirs.push(dataDir);
+    const store = new KnowledgeDbStore(dataDir);
+    const filePath = path.join(dataDir, "note.md");
+    await fs.writeFile(filePath, "単なるメモ。", "utf8");
+    await store.addFiles([filePath]);
+    const context = await store.getContext("こんにちは", 4, undefined, 2000);
+    expect(context).toHaveLength(0);
+  });
+
+  it("preserves citation regions for bounded RAG context and honors source filters", async () => {
+    const dataDir = await fs.mkdtemp(path.join(os.tmpdir, "sigma-knowledge-db-rag-citation-"));
+    tempDirs.push(dataDir);
+    const firstPath = path.join(dataDir, "first.md");
+    const secondPath = path.join(dataDir, "second.md");
+    await fs.writeFile(firstPath, "数学Ⅱ 三角関数の定理と公式。", "utf8");
+    await fs.writeFile(secondPath, "数学Ⅱ 三角関数の証明と例題。", "utf8");
+    const store = new KnowledgeDbStore(dataDir);
+    const sources = await store.addFiles([firstPath, secondPath]);
+    expect(sources).toHaveLength(2);
+    const context = await store.getContext("数学Ⅱ 三角関数 定理", 4, [sources[0]!.id], 2000);
+    expect(context.length).toBeGreaterThan(0);
+    expect(new Set(context.map((item) => item.sourceId))).toEqual(new Set([sources[0]!.id]));
+    expect(context[0]?.citationRef).toEqual({
+      sourceId: sources[0]!.id,
+      pageId: sources[0]!.id + "_p1",
+      pageNumber: 1,
+    });
+    expect(context[0]?.citation).toContain(`sigma://knowledge-db/${encodeURIComponent(sources[0]!.id)}/p/1`);
+  });
+
   it("selects compact primary evidence and preserves a cross-source related citation", async () => {
     const dataDir = await fs.mkdtemp(path.join(os.tmpdir(), "sigma-knowledge-db-diverse-context-"));
     tempDirs.push(dataDir);
