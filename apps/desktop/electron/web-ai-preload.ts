@@ -297,6 +297,34 @@ async function registerSigmaWebAiTools(): Promise<void> {
   }, { signal: controller.signal });
 
   await modelContext.registerTool({
+    name: "sigma_knowledge_rag",
+    description: "Use SIGMA's canonical Knowledge DB RAG pipeline for grounded answers. It decides whether retrieval is needed and, when needed, returns citation-aware context with page and region references. Prefer this over manually chaining search and context.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        query: { type: "string" },
+        limit: { type: "number" },
+        maxChars: { type: "number" },
+        sourceIds: { type: "array", items: { type: "string" } },
+      },
+      required: ["query"],
+    },
+    annotations: { readOnlyHint: true, untrustedContentHint: true },
+    execute: async (input) => callApi("/v1/mcp/call", {
+      method: "POST",
+      body: JSON.stringify({
+        name: "knowledge_db_rag_query",
+        arguments: {
+          query: String(input.query),
+          ...(typeof input.limit === "number" ? { limit: input.limit } : {}),
+          ...(typeof input.maxChars === "number" ? { maxChars: input.maxChars } : {}),
+          ...(Array.isArray(input.sourceIds) ? { sourceIds: input.sourceIds.map(String) } : {}),
+        },
+      }),
+    }),
+  }, { signal: controller.signal });
+
+  await modelContext.registerTool({
     name: "sigma_knowledge_search",
     description: "Search SIGMA's global Knowledge DB. Use this when the user asks about documents stored in SIGMA, even when no Workspace is selected. Returns source/page references.",
     inputSchema: {
