@@ -163,7 +163,7 @@ function installConversationCapture(): void {
     const target = event.target;
     if (!(target instanceof Element)) return;
     const label = (target.getAttribute("aria-label") ?? target.textContent ?? "").toLowerCase();
-    if (label.includes("send") || label.includes("送信") || label.includes("submit")) {
+    if (/send|submit|\u9001\u4fe1/i.test(label)) {
       const editor = document.querySelector("textarea, [contenteditable=\"true\"]");
       submitUserText(editor);
       window.setTimeout(() => scanConversationMessages(), 500);
