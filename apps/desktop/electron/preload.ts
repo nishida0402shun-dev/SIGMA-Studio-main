@@ -396,6 +396,9 @@ const desktopAPI = {
     search(payload: { query: string; limit?: number }): Promise<unknown[]> {
       return ipcRenderer.invoke("knowledge-db:search", payload);
     },
+    recordFeedback(payload: { query: string; sourceId?: string; pageNumber?: number; label: "positive" | "negative" | "correction"; correction?: string }): Promise<unknown> {
+      return ipcRenderer.invoke("knowledge-db:record-feedback", payload);
+    },
     related(payload: { sourceId: string; limit?: number }): Promise<unknown[]> {
       return ipcRenderer.invoke("knowledge-db:related", payload);
     },
