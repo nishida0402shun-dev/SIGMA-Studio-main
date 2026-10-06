@@ -194,6 +194,7 @@ export function KnowledgeDbWorkspace({ open, onClose, onOpenAi, t }: Props) {
   const [pendingPdfPaths, setPendingPdfPaths] = useState<string[]>([]);
   const [expandedTaxonomy, setExpandedTaxonomy] = useState<Set<string>>(new Set());
   const [selectedTaxonomyNode, setSelectedTaxonomyNode] = useState<TaxonomyTreeNode | null>(null);
+  const [smartSplit, setSmartSplit] = useState<{ sourceId: string; sourceName: string; pageCount: number; segments: Array<{ id: string; sourceId: string; startPage: number; endPage: number; paths: string[][]; confidence: number; reason: string }>; previewPage: number } | null>(null);
   const desktop = getDesktopBridge();
   const researchApi = desktop?.researchSessions;
   const knowledgeDb = desktop?.knowledgeDb;
@@ -354,7 +355,31 @@ export function KnowledgeDbWorkspace({ open, onClose, onOpenAi, t }: Props) {
     }
   }
 
-  async function addSources(pathsPromise: Promise<{ paths: string[] } | null>): Promise<void> {
+  async function openSmartSplit(sourceId: string): Promise<void> {
+    if (!knowledgeDb) return;
+    const preview = await knowledgeDb.previewSmartSplit({ sourceId });
+    if (!preview || typeof preview !== "object") return;
+    const value = preview as {
+      sourceId: string;
+      sourceName: string;
+      pageCount: number;
+      segments: Array<{ id: string; sourceId: string; startPage: number; endPage: number; paths: string[][]; confidence: number; reason: string }>;
+    };
+    setSmartSplit({ ...value, previewPage: value.segments[0]?.startPage ?? 1 });
+  }
+
+  async function materializeSmartSplit(): Promise<void> {
+    if (!knowledgeDb || !smartSplit) return;
+    const segments = smartSplit.segments.map((segment) => ({
+      startPage: segment.startPage,
+      endPage: segment.endPage,
+      name: segment.paths[0]?.slice(-1)[0],
+    }));
+    const created = await knowledgeDb.materializeSmartSplit({ sourceId: smartSplit.sourceId, segments });
+    setSources((current) => [...(created as KnowledgeSource[]), ...current]);
+    setSmartSplit(null);
+  }
+
     if (!knowledgeDb) return;
     const picked = await pathsPromise;
     if (!picked?.paths?.length) return;
@@ -1077,6 +1102,9 @@ export function KnowledgeDbWorkspace({ open, onClose, onOpenAi, t }: Props) {
               {sources.map((source) => (
                 <div key={source.id} className="knowledge-db-source-row" onContextMenu={(event) => { event.preventDefault(); setSelected({ [source.id]: new Set(source.pages.map((page) => page.pageNumber)) }); setRegion(null); setContextMenu({ x: event.clientX, y: event.clientY }); }}>
                   <span title={source.name}>{source.name} · {source.pageCount}p</span>
+                  {source.mimeType === "application/pdf" && source.pageCount > 1 && (
+                    <button type="button" onClick={() => void openSmartSplit(source.id)}>AI分割</button>
+                  )}
                   <button type="button" onClick={() => void deleteSource(source.id)} aria-label={`「${source.name}」を削除`}>
                     <Trash2 size={14} />
                   </button>
@@ -1094,6 +1122,40 @@ export function KnowledgeDbWorkspace({ open, onClose, onOpenAi, t }: Props) {
           onReject={rejectPdfStaging}
           onClose={() => setPdfStaging(null)}
         />
+      )}
+      {smartSplit && (
+        <div style={{ position: "fixed", inset: 0, zIndex: 250, display: "flex", alignItems: "center", justifyContent: "center", padding: 24, background: "rgb(15 23 42 / 0.42)" }}>
+          <section style={{ width: "min(1200px, 96vw)", height: "min(820px, 92vh)", display: "flex", flexDirection: "column", overflow: "hidden", borderRadius: 14, background: "white", boxShadow: "0 24px 80px rgb(15 23 42 / 0.3)" }}>
+            <header style={{ display: "flex", justifyContent: "space-between", padding: 14, borderBottom: "1px solid rgb(148 163 184 / .24)" }}>
+              <div><strong>AIスマート分割・仕分け確認</strong><div style={{ fontSize: 12 }}>{smartSplit.sourceName} · {smartSplit.pageCount}ページ</div></div>
+              <button type="button" onClick={() => setSmartSplit(null)}><X size={18} /></button>
+            </header>
+            <div style={{ minHeight: 0, flex: 1, display: "grid", gridTemplateColumns: "330px minmax(0,1fr)" }}>
+              <div style={{ overflow: "auto", padding: 10, borderRight: "1px solid rgb(148 163 184 / .24)" }}>
+                {smartSplit.segments.map((segment, index) => (
+                  <button type="button" key={segment.id} style={{ width: "100%", display: "flex", flexDirection: "column", gap: 4, marginBottom: 6, padding: 10, textAlign: "left", border: "1px solid rgb(148 163 184 / .24)", borderRadius: 8, background: smartSplit.previewPage >= segment.startPage && smartSplit.previewPage <= segment.endPage ? "rgb(226 232 240 / .72)" : "white" }} onClick={() => setSmartSplit((current) => current ? { ...current, previewPage: segment.startPage } : current)}>
+                    <strong>{index + 1}. p.{segment.startPage}–{segment.endPage}</strong>
+                    <span>{segment.paths[0]?.join(" → ") || "未分類"}</span>
+                    <small>信頼度 {Math.round(segment.confidence * 100)}% · {segment.reason}</small>
+                  </button>
+                ))}
+              </div>
+              <div style={{ overflow: "auto", display: "flex", flexDirection: "column", alignItems: "center", gap: 10, padding: 16 }}>
+                <KnowledgePdfPageViewer sourceId={smartSplit.sourceId} pageNumber={smartSplit.previewPage} getPagePdf={(payload) => knowledgeDb?.getPagePdf(payload) ?? Promise.resolve(null)} onRegionSelected={() => undefined} />
+                <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
+                  <button type="button" disabled={smartSplit.previewPage <= 1} onClick={() => setSmartSplit((current) => current ? { ...current, previewPage: Math.max(1, current.previewPage - 1) } : current)}>← 前ページ</button>
+                  <span>p.{smartSplit.previewPage} / {smartSplit.pageCount}</span>
+                  <button type="button" disabled={smartSplit.previewPage >= smartSplit.pageCount} onClick={() => setSmartSplit((current) => current ? { ...current, previewPage: Math.min(current.pageCount, current.previewPage + 1) } : current)}>次ページ →</button>
+                </div>
+              </div>
+            </div>
+            <footer style={{ display: "flex", alignItems: "center", gap: 10, padding: 12, borderTop: "1px solid rgb(148 163 184 / .24)" }}>
+              <span style={{ flex: 1, fontSize: 12 }}>分割範囲と仕分け先を確認してから追加します。</span>
+              <button type="button" onClick={() => setSmartSplit(null)}>キャンセル</button>
+              <button type="button" onClick={() => void materializeSmartSplit()}>この内容で分割・追加</button>
+            </footer>
+          </section>
+        </div>
       )}
       {contextMenu && selectedPages.length > 0 && (
         <div className="knowledge-db-context-menu" style={{ left: contextMenu.x, top: contextMenu.y }} onMouseLeave={() => setContextMenu(null)}>
