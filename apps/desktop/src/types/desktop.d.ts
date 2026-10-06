@@ -393,6 +393,12 @@ export interface DesktopWebAiAPI {
   getPreloadUrl(): Promise<string>;
 }
 
+export interface DesktopConversationMemoryAPI {
+  recent(conversationId?: string, limit?: number): Promise<unknown[]>;
+  search(query: string, conversationId?: string, limit?: number): Promise<unknown[]>;
+  save(payload: unknown): Promise<unknown>;
+}
+
 interface DesktopShellAPI {
   openExternal(url: string): Promise<{ ok: boolean; error?: string }>;
 }
