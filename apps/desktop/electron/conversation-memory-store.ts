@@ -42,7 +42,6 @@ export class ConversationMemoryStore {
         id: "mem_" + randomUUID(),
         content,
         createdAt: new Date().toISOString(),
-        metadata: { ...entryInput.metadata, captureKey },
       };
       file.entries.push(entry);
       if (file.entries.length > MAX_ENTRIES) {
