@@ -180,7 +180,7 @@ ipcMain.handle("web-ai:capture-conversation", async (event, payload: unknown) =>
     content,
     ...(provider ? { provider } : {}),
     captureKey,
-    metadata: { source: "web-ai-capture", origin },
+    metadata: { source: "web-ai-capture", origin, captureKey },
   });
 });
 
