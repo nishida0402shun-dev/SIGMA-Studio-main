@@ -184,6 +184,40 @@ ipcMain.handle("web-ai:capture-conversation", async (event, payload: unknown) =>
   });
 });
 
+ipcMain.handle("conversation-memory:recent", async (_event, payload: unknown) => {
+  const input = payload && typeof payload === "object" && !Array.isArray(payload) ? payload as Record<string, unknown> : {};
+  const conversationId = typeof input.conversationId === "string" ? input.conversationId.trim() || undefined : undefined;
+  const limit = typeof input.limit === "number" ? input.limit : undefined;
+  return conversationMemoryStore.recent(conversationId, limit);
+});
+
+ipcMain.handle("conversation-memory:search", async (_event, payload: unknown) => {
+  const input = payload && typeof payload === "object" && !Array.isArray(payload) ? payload as Record<string, unknown> : {};
+  const query = typeof input.query === "string" ? input.query : "";
+  const conversationId = typeof input.conversationId === "string" ? input.conversationId.trim() || undefined : undefined;
+  const limit = typeof input.limit === "number" ? input.limit : undefined;
+  return conversationMemoryStore.search(query, conversationId, limit);
+});
+
+ipcMain.handle("conversation-memory:save", async (_event, payload: unknown) => {
+  if (!payload || typeof payload !== "object" || Array.isArray(payload)) throw new Error("invalid conversation memory payload");
+  const input = payload as Record<string, unknown>;
+  const conversationId = typeof input.conversationId === "string" ? input.conversationId.trim() : "";
+  const role = input.role;
+  const content = typeof input.content === "string" ? input.content : "";
+  const provider = typeof input.provider === "string" ? input.provider.trim() : "";
+  if (!conversationId || !["user","assistant","system","tool"].includes(String(role)) || !content.trim()) {
+    throw new Error("invalid conversation memory payload");
+  }
+  return conversationMemoryStore.append({
+    conversationId,
+    role: role as "user" | "assistant" | "system" | "tool",
+    content,
+    ...(provider ? { provider } : {}),
+    metadata: input.metadata && typeof input.metadata === "object" && !Array.isArray(input.metadata) ? input.metadata as Record<string, unknown> : undefined,
+  });
+});
+
 const externalDocumentOpenQueue = new ExternalDocumentOpenQueue(() => {
   if (mainWindow && !mainWindow.isDestroyed()) {
     mainWindow.webContents.send("file:open-document-available");
