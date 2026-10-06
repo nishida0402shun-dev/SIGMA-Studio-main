@@ -42,6 +42,7 @@ import {
 } from "../electron/ai-edit-run-context";
 import { LocalMaterialStore } from "../electron/local-material-store";
 import { KnowledgeDbStore } from "../electron/knowledge-db-store";
+import { ConversationMemoryStore } from "../electron/conversation-memory-store";
 import { LocalAiResourceStore } from "../electron/ai-resource-store";
 import { isAiWebSearchEnabled, readDesktopSettingsSync, writeDesktopSettings } from "../electron/desktop-settings";
 import {
@@ -3182,6 +3183,65 @@ registerTool(
     const result = await new KnowledgeDbStore(storeContext.dataDir).rejectPdfImport(stagingId);
     return { ok: true, ...result };
   }),
+);
+
+registerTool(
+  "conversation_memory_save",
+  {
+    title: "会話を記憶へ保存",
+    description: "現在の会話から、後でAIが参照すべき発言・要約・重要な判断をSIGMAの永続Conversation Memoryへ保存します。Knowledge DBとは分離され、Workspaceには依存しません。",
+    inputSchema: {
+      conversationId: z.string().min(1).max(256),
+      role: z.enum(["user", "assistant", "system", "tool"]),
+      content: z.string().min(1).max(50000),
+      provider: z.string().min(1).max(64).optional(),
+      metadata: z.record(z.string(), z.unknown()).optional(),
+    },
+  },
+  async ({ conversationId, role, content, provider, metadata }) => withToolErrorHandling(async () => {
+    const entry = await new ConversationMemoryStore(storeContext.dataDir).append({
+      conversationId,
+      role,
+      content,
+      ...(provider ? { provider } : {}),
+      ...(metadata ? { metadata } : {}),
+    });
+    return { ok: true, entry };
+  }),
+);
+
+registerTool(
+  "conversation_memory_search",
+  {
+    title: "過去の会話を検索",
+    description: "保存済みConversation Memoryから現在の質問に関連する過去会話を検索します。AIは過去の発言を事実として扱う前に必要ならKnowledge DBで検証してください。",
+    inputSchema: {
+      query: z.string().min(1).max(2000),
+      conversationId: z.string().min(1).max(256).optional(),
+      limit: z.number().int().min(1).max(20).optional(),
+    },
+  },
+  async ({ query, conversationId, limit }) => withToolErrorHandling(async () => ({
+    ok: true,
+    query,
+    memories: await new ConversationMemoryStore(storeContext.dataDir).search(query, conversationId, limit ?? 8),
+  })),
+);
+
+registerTool(
+  "conversation_memory_recent",
+  {
+    title: "最近の会話記憶を取得",
+    description: "保存済みConversation Memoryから最近の発言を取得します。conversationIdを指定するとその会話だけに限定できます。",
+    inputSchema: {
+      conversationId: z.string().min(1).max(256).optional(),
+      limit: z.number().int().min(1).max(50).optional(),
+    },
+  },
+  async ({ conversationId, limit }) => withToolErrorHandling(async () => ({
+    ok: true,
+    memories: await new ConversationMemoryStore(storeContext.dataDir).recent(conversationId, limit ?? 20),
+  })),
 );
 
 registerTool(
