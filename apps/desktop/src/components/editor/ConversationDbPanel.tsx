@@ -20,11 +20,13 @@ export interface ConversationDbPanelProps {
 
 export function ConversationDbPanel({ open, onClose }: ConversationDbPanelProps) {
   const [entries, setEntries] = useState<Entry[]>([]);
+  const [longTermMemories, setLongTermMemories] = useState<Array<{ id: string; content: string; confidence: number }>>([]);
   const [query, setQuery] = useState("");
   const [loading, setLoading] = useState(false);
 
   const load = async (search = "") => {
-    const api = getDesktopBridge()?.conversationMemory;
+    const desktop = getDesktopBridge();
+    const api = desktop?.conversationMemory;
     if (!api) return;
     setLoading(true);
     try {
@@ -32,6 +34,8 @@ export function ConversationDbPanel({ open, onClose }: ConversationDbPanelProps)
         ? await api.search(search.trim(), undefined, 50)
         : await api.recent(undefined, 50);
       setEntries((Array.isArray(value) ? value : []) as Entry[]);
+      const memories = await desktop?.longTermMemory?.recent(20).catch(() => []) ?? [];
+      setLongTermMemories((Array.isArray(memories) ? memories : []) as Array<{ id: string; content: string; confidence: number }>);
     } finally {
       setLoading(false);
     }
@@ -73,6 +77,17 @@ export function ConversationDbPanel({ open, onClose }: ConversationDbPanelProps)
           />
           <button type="button" onClick={() => void load(query)} aria-label="Search"><Search size={15} /></button>
           {query && <button type="button" onClick={() => { setQuery(""); void load(""); }}>Clear</button>}
+        </div>
+        <div style={{ padding: "10px 12px", borderBottom: "1px solid var(--color-border, #ddd)" }}>
+          <strong style={{ fontSize: 12 }}>Long-term Memory</strong>
+          <div style={{ marginTop: 6, display: "grid", gap: 5 }}>
+            {longTermMemories.length === 0 && <span style={{ fontSize: 11, opacity: .6 }}>No durable memories extracted yet.</span>}
+            {longTermMemories.map((memory) => (
+              <div key={memory.id} style={{ fontSize: 11, lineHeight: 1.4 }}>
+                {memory.content} <span style={{ opacity: .55 }}>({Math.round(memory.confidence * 100)}%)</span>
+              </div>
+            ))}
+          </div>
         </div>
         <div style={{ flex: 1, overflow: "auto", padding: 12 }}>
           {loading && <div style={{ padding: 12, opacity: .65 }}>Loading…</div>}
