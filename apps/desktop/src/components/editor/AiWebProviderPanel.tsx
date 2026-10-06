@@ -5,6 +5,7 @@ import { useEffect, useMemo, useRef, useState, type ElementType } from "react";
 
 import { ClaudeMark, GeminiMark, OpenAiMark } from "@/components/branding/provider-logos";
 import { getDesktopBridge } from "@/lib/desktop-bridge";
+import { ConversationDbPanel } from "./ConversationDbPanel";
 import { useT } from "@/lib/i18n/react";
 
 export type AiWebProvider = "chatgpt" | "claude" | "gemini" | "google-ai-studio";
@@ -51,6 +52,7 @@ export function AiWebProviderPanel({
   const [bridgeAvailable, setBridgeAvailable] = useState<boolean | null>(null);
   const [webMcpAvailable, setWebMcpAvailable] = useState<boolean | null>(null);
   const [webviewReady, setWebviewReady] = useState(false);
+  const [conversationDbOpen, setConversationDbOpen] = useState(false);
   useEffect(() => {
     let cancelled = false;
     const promise = getDesktopBridge()?.webAi?.getPreloadUrl();
@@ -197,6 +199,7 @@ export function AiWebProviderPanel({
           </label>
         )}
         <div className="ai-web-provider-actions">
+          <button type="button" className="ai-web-provider-icon-button" onClick={() => setConversationDbOpen(true)} title="Conversation DB" aria-label="Conversation DB">DB</button>
           <button type="button" className="ai-web-provider-icon-button" onClick={reload} title="Reload" aria-label="Reload">
             <RefreshCw size={13} />
           </button>
@@ -244,6 +247,7 @@ export function AiWebProviderPanel({
           <div className="ai-web-provider-loading">{t("webAi.preparing")}</div>
         )}
       </div>
+      <ConversationDbPanel open={conversationDbOpen} onClose={() => setConversationDbOpen(false)} />
     </section>
   );
 }
