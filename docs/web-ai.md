@@ -67,3 +67,7 @@ Web AI can use the same global Knowledge DB MCP surface as the desktop AI. PDF r
 5. `knowledge_db_pdf_import_reject` discards the pending import without registering the PDF.
 
 The preview, update, approve, and reject operations are consequential Web AI tools and are routed through SIGMA Studio's existing user-approval gate. Workspace selection is not required because the Knowledge DB is global.
+
+## Conversation DB / Long-term Memory
+
+Embedded Web AI conversations can be captured into SIGMA's local Conversation DB. The Web AI panel exposes a REC/OFF toggle; capture is enabled by default and can be disabled at any time. Explicit user preferences such as requests to remember a rule or preference are automatically distilled into the separate long-term memory store. External Chrome/Edge browser capture is intentionally not part of the supported architecture.
