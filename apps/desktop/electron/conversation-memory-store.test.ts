@@ -39,6 +39,34 @@ describe("ConversationMemoryStore", () => {
     }
   });
 
+  it("deduplicates captured entries by captureKey", async () => {
+    const dataDir = await mkdtemp(path.join(os.tmpdir(), "sigma-conversation-memory-"));
+    try {
+      const store = new ConversationMemoryStore(dataDir);
+      const first = await store.appendCaptured({
+        conversationId: "web-1",
+        role: "assistant",
+        content: "同じ回答",
+        provider: "chatgpt",
+        captureKey: "chatgpt:/c/assistant:abc",
+        metadata: { source: "web-ai-capture" },
+      });
+      const duplicate = await store.appendCaptured({
+        conversationId: "web-1",
+        role: "assistant",
+        content: "同じ回答",
+        provider: "chatgpt",
+        captureKey: "chatgpt:/c/assistant:abc",
+        metadata: { source: "web-ai-capture" },
+      });
+      expect(first).not.toBeNull();
+      expect(duplicate).toBeNull();
+      expect(await store.recent("web-1", 10)).toHaveLength(1);
+    } finally {
+      await rm(dataDir, { recursive: true, force: true });
+    }
+  });
+
   it("keeps conversation memory separate from Knowledge DB data", async () => {
     const dataDir = await mkdtemp(path.join(os.tmpdir(), "sigma-conversation-memory-"));
     try {
