@@ -309,13 +309,21 @@ export class KnowledgeDbStore {
     const documentFrequency = buildDocumentFrequency(searchablePages);
     const documentCount = Math.max(1, searchablePages.length);
     const learningStore = new KnowledgeLearningStore(this.dataDir);
-    const ranked = await Promise.all([...bestByPage.values()].map(async (match) => {
+    const learningFeedback = await learningStore.list(500);
+    const ranked = [...bestByPage.values()].map((match) => {
       const lexical = lexicalScore(match.text, queryTokens, documentFrequency, documentCount);
       const exact = exactPhraseScore(match.text, trimmed);
       const page = pages.get(`${match.sourceId}:${match.pageNumber}`);
       const metadata = page ? metadataScore(page, trimmed, queryTokens) : 0;
       const semantic = page ? semanticQueryScore(page, queryTokens) : 0;
-      const learning = await learningStore.getBoost(trimmed, match.sourceId, match.pageNumber);
+      const learning = learningFeedback.reduce((boost, item) => {
+        if (item.sourceId && item.sourceId !== match.sourceId) return boost;
+        if (item.pageNumber !== undefined && item.pageNumber !== match.pageNumber) return boost;
+        const feedbackQuery = item.query.normalize("NFKC").toLocaleLowerCase();
+        const currentQuery = trimmed.normalize("NFKC").toLocaleLowerCase();
+        if (!(currentQuery === feedbackQuery || currentQuery.includes(feedbackQuery) || feedbackQuery.includes(currentQuery))) return boost;
+        return boost + (item.label === "positive" ? 0.06 : item.label === "negative" ? -0.08 : -0.02);
+      }, 0);
       const matchReasons = page ? retrievalMatchReasons(page, trimmed, queryTokens, match.score, lexical, metadata) : [];
       return {
         ...match,
@@ -330,7 +338,7 @@ export class KnowledgeDbStore {
           citationRegions: selectCitationRegions(page, match.text),
         } : {}),
       };
-    }));
+    });
     return ranked
       .sort((a, b) => b.score - a.score)
       .slice(0, safeLimit)
