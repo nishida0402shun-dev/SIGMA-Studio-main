@@ -185,6 +185,7 @@ export function KnowledgeDbWorkspace({ open, onClose, onOpenAi, t }: Props) {
   const [selected, setSelected] = useState<Record<string, Set<number>>>({});
   const [typeFilter, setTypeFilter] = useState<KnowledgeSemanticType | "all">("all");
   const [searchResults, setSearchResults] = useState<KnowledgeSearchResult[]>([]);
+  const [feedbackSent, setFeedbackSent] = useState<Record<string, "positive" | "negative">>({});
   const [region, setRegion] = useState<KnowledgeRegion | null>(null);
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null);
   const [researchSessions, setResearchSessions] = useState<ResearchSession[]>([]);
@@ -955,6 +956,34 @@ export function KnowledgeDbWorkspace({ open, onClose, onOpenAi, t }: Props) {
                   <span className="knowledge-db-item-main">
                     <strong>{source.name}</strong>
                     <span>{t("appMenu.knowledgeDb.page", { page: page.pageNumber })} · {semanticTypeLabel(t, page.semanticType)}{score !== undefined ? ` · ${score.toFixed(2)}` : ""}{page.classificationReviewStatus === "confirmed" ? " · AI確認済み" : page.classificationReviewStatus === "needs-review" ? " · AI要確認" : ""}</span>
+                    {score !== undefined && query.trim() && (
+                      <span className="knowledge-db-search-feedback" onClick={(event) => event.preventDefault()}>
+                        <button
+                          type="button"
+                          title="この検索結果は役に立った"
+                          aria-label="検索結果は役に立った"
+                          className={feedbackSent[page.id] === "positive" ? "active" : ""}
+                          onClick={(event) => {
+                            event.preventDefault();
+                            event.stopPropagation();
+                            void knowledgeDb?.recordFeedback({ query: query.trim(), sourceId: source.id, pageNumber: page.pageNumber, label: "positive" });
+                            setFeedbackSent((current) => ({ ...current, [page.id]: "positive" }));
+                          }}
+                        >👍</button>
+                        <button
+                          type="button"
+                          title="この検索結果は役に立たなかった"
+                          aria-label="検索結果は役に立たなかった"
+                          className={feedbackSent[page.id] === "negative" ? "active" : ""}
+                          onClick={(event) => {
+                            event.preventDefault();
+                            event.stopPropagation();
+                            void knowledgeDb?.recordFeedback({ query: query.trim(), sourceId: source.id, pageNumber: page.pageNumber, label: "negative" });
+                            setFeedbackSent((current) => ({ ...current, [page.id]: "negative" }));
+                          }}
+                        >👎</button>
+                      </span>
+                    )}
                   </span>
                 </label>
               );
