@@ -9,6 +9,7 @@ const KNOWLEDGE_DB_TOOLS = new Set([
   "knowledge_db_get_classification_review_context","knowledge_db_list_classification_reviews","knowledge_db_submit_classification_review",
   "knowledge_db_pdf_import_preview","knowledge_db_pdf_import_staging_list","knowledge_db_pdf_import_staging_get",
   "conversation_memory_search","conversation_memory_recent",
+  "conversation_memory_search","conversation_memory_recent",
   "knowledge_db_pdf_import_staging_update","knowledge_db_pdf_import_approve","knowledge_db_pdf_import_reject",
   "conversation_memory_save","conversation_memory_search","conversation_memory_recent",
 ]);
