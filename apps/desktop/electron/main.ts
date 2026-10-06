@@ -130,6 +130,15 @@ ipcMain.handle("web-ai:get-preload-url", (event) => {
   return pathToFileURL(path.join(__dirname, "web-ai-preload.cjs")).toString();
 });
 
+ipcMain.handle("web-ai:get-conversation-capture-setting", (event) => {
+  const frameUrl = event.senderFrame?.url ?? "";
+  let hostname = "";
+  try { hostname = new URL(frameUrl).hostname; } catch { throw new Error("invalid Web AI frame origin"); }
+  const allowed = [...WEB_AI_ALLOWED_HOSTS].some((host) => hostname === host || hostname.endsWith("." + host));
+  if (!allowed) throw new Error("conversation capture setting is not available for this origin");
+  return readDesktopSettingsSync(SIGMA_STUDIO_DATA_PATH).webAiConversationCaptureEnabled !== false;
+});
+
 ipcMain.handle("web-ai:get-bridge-info", (event) => {
   const url = event.senderFrame?.url ?? "";
   let hostname = "";
