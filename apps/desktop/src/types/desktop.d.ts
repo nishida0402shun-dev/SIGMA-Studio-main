@@ -912,6 +912,9 @@ export interface DesktopKnowledgeDbAPI {
     selections?: Array<{ sourceId: string; pageNumbers: number[] }>;
   }): Promise<{ filePath: string; pageCount: number } | null>;
   setPageType(payload: { sourceId: string; pageNumber: number; semanticType: string; title?: string }): Promise<unknown>;
+  previewSmartSplit(payload: { sourceId: string }): Promise<unknown>;
+  materializeSmartSplit(payload: { sourceId: string; segments: Array<{ startPage: number; endPage: number; name?: string }> }): Promise<unknown[]>;
+  applyClassificationReview(payload: { sourceId: string; pageNumber: number; paths: string[][]; confidence: number; reason?: string; evidence?: string[] }): Promise<unknown>;
   deleteSource(payload: { sourceId: string }): Promise<{ ok: boolean }>;
   openPage(payload: { sourceId: string; pageNumber: number }): Promise<{ ok: boolean; error?: string; filePath?: string }>;
   getPagePdf(payload: { sourceId: string; pageNumber: number }): Promise<{ dataBase64: string; width: number; height: number } | null>;
