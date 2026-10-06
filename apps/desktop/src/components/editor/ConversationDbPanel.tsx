@@ -42,7 +42,9 @@ export function ConversationDbPanel({ open, onClose }: ConversationDbPanelProps)
   }, []);
 
   useEffect(() => {
-    if (open) void load();
+    if (!open) return;
+    const timer = window.setTimeout(() => void load(), 0);
+    return () => window.clearTimeout(timer);
   }, [load, open]);
 
   if (!open) return null;
