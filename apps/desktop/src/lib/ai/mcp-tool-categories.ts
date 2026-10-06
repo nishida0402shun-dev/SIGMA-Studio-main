@@ -58,6 +58,8 @@ export const MCP_TOOL_CATEGORY_MAP = {
     "knowledge_db_pdf_import_staging_update",
     "knowledge_db_pdf_import_approve",
     "knowledge_db_pdf_import_reject",
+    "conversation_memory_search",
+    "conversation_memory_recent",
   ],
   "教材管理": [
     "create_local_document",
@@ -121,6 +123,7 @@ export const MCP_TOOL_CATEGORY_MAP = {
     "list_materials",
   ],
   "AI設定・アプリ文脈": [
+    "conversation_memory_save",
     "delete_ai_resource",
     "get_edit_proposal",
     "get_local_app_status",
