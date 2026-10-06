@@ -136,6 +136,11 @@ export class KnowledgeDbStore {
     this.dataDir = dataDir;
   }
 
+  async recordLearningFeedback(input: { query: string; sourceId?: string; pageNumber?: number; label: "positive" | "negative" | "correction"; correction?: string }): Promise<unknown> {
+    const store = new KnowledgeLearningStore(this.dataDir);
+    return store.record(input);
+  }
+
   async listSources(): Promise<KnowledgeSource[]> {
     const library = await this.readLibrary();
     return library.sources;
