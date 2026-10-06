@@ -62,6 +62,7 @@ import { registerAiResourcesIpc } from "./ipc/ai-resources";
 import { registerFileIpc } from "./ipc/file";
 import { KnowledgeDbStore } from "./knowledge-db-store";
 import { ConversationMemoryStore } from "./conversation-memory-store";
+import { LongTermMemoryStore } from "./long-term-memory-store";
 import { registerKnowledgeDbIpc } from "./ipc/knowledge-db";
 import { ResearchSessionStore } from "./research-session-store";
 import { registerResearchSessionIpc } from "./ipc/research-session";
@@ -174,7 +175,7 @@ ipcMain.handle("web-ai:capture-conversation", async (event, payload: unknown) =>
   if (!conversationId || !captureKey || !content || !["user", "assistant", "system", "tool"].includes(String(role))) {
     throw new Error("invalid conversation capture entry");
   }
-  return conversationMemoryStore.appendCaptured({
+  const saved = await conversationMemoryStore.appendCaptured({
     conversationId,
     role: role as "user" | "assistant" | "system" | "tool",
     content,
@@ -182,6 +183,19 @@ ipcMain.handle("web-ai:capture-conversation", async (event, payload: unknown) =>
     captureKey,
     metadata: { source: "web-ai-capture", origin, captureKey },
   });
+  if (saved && role === "user") {
+    const durable = extractLongTermMemory(content);
+    if (durable) {
+      void longTermMemoryStore.remember({
+        content: durable.text,
+        conversationId,
+        sourceEntryId: saved.id,
+        ...(provider ? { provider } : {}),
+        confidence: durable.confidence,
+      });
+    }
+  }
+  return saved;
 });
 
 ipcMain.handle("conversation-memory:recent", async (_event, payload: unknown) => {
@@ -217,6 +231,16 @@ ipcMain.handle("conversation-memory:save", async (_event, payload: unknown) => {
     metadata: input.metadata && typeof input.metadata === "object" && !Array.isArray(input.metadata) ? input.metadata as Record<string, unknown> : undefined,
   });
 });
+
+function extractLongTermMemory(content: string): { text: string; confidence: number } | null {
+  const normalized = content.normalize("NFKC").trim().replace(/\s+/gu, " ");
+  if (normalized.length < 8) return null;
+  const explicit = normalized.match(/(?:覚えて(?:おいて|て)|記憶して|今後(?:も|は)|これから(?:も|は)|必ず|常に|デフォルトで|好みは|設定は|方針は|ルールは)[:：]?\\s*(.+)$/u);
+  if (explicit?.[1]) return { text: explicit[1].slice(0, 4000), confidence: 0.95 };
+  const preference = normalized.match(/(?:私は|自分は|私の|自分の).{0,80}(?:好き|嫌い|好み|使う|使わない|したい|したくない|でいてほしい|にしてほしい|方がいい).{0,160}/u);
+  if (preference?.[0]) return { text: preference[0].slice(0, 4000), confidence: 0.82 };
+  return null;
+}
 
 const externalDocumentOpenQueue = new ExternalDocumentOpenQueue(() => {
   if (mainWindow && !mainWindow.isDestroyed()) {
@@ -263,6 +287,7 @@ const localAiResourceStore = new LocalAiResourceStore(USER_DATA_PATH);
 const SIGMA_STUDIO_DATA_PATH = path.join(USER_DATA_PATH, "data");
 const knowledgeDbStore = new KnowledgeDbStore(SIGMA_STUDIO_DATA_PATH);
 const conversationMemoryStore = new ConversationMemoryStore(SIGMA_STUDIO_DATA_PATH);
+const longTermMemoryStore = new LongTermMemoryStore(SIGMA_STUDIO_DATA_PATH);
 const researchSessionStore = new ResearchSessionStore(SIGMA_STUDIO_DATA_PATH);
 const appUpdateController = new AppUpdateController({ releaseUrl: RELEASE_PAGE_URL });
 const desktopSettings = readDesktopSettingsSync(SIGMA_STUDIO_DATA_PATH);
