@@ -365,8 +365,8 @@ function reportWebAiStatus(webMcp: boolean, bridge: boolean): void {
 async function registerSigmaWebAiTools(): Promise<void> {
   if (!ORIGIN_ALLOWLIST.has(window.location.origin)) return;
   try {
-    const settings = await ipcRenderer.invoke("settings:get") as { webAiConversationCaptureEnabled?: unknown };
-    conversationCaptureEnabled = settings?.webAiConversationCaptureEnabled !== false;
+    const enabled = await ipcRenderer.invoke("web-ai:get-conversation-capture-setting") as unknown;
+    conversationCaptureEnabled = enabled !== false;
   } catch {
     conversationCaptureEnabled = true;
   }
