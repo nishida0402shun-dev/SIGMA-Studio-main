@@ -1,7 +1,6 @@
 import fs from "node:fs/promises";
 import path from "node:path";
 import os from "node:os";
-import { createRequire } from "node:module";
 
 export interface VectorRecord {
   id: string;
@@ -42,8 +41,10 @@ type Embedder = {
 
 type WasmEmbeddingModule = {
   default?: () => Promise<unknown>;
-  WasmEmbedder: new (modelBytes: Uint8Array, tokenizerJson: string) => {
-    embedOne(text: string): Float32Array;
+  WasmEmbedder: {
+    withConfig(modelBytes: Uint8Array, tokenizerJson: string, config: unknown): {
+      embedOne(text: string): Float32Array;
+    };
   };
   WasmEmbedderConfig: new () => {
     setMaxLength(length: number): unknown;
@@ -88,15 +89,11 @@ async function getEmbedder(): Promise<Embedder> {
       if (runtime.default) await runtime.default();
       const modelBytes = await fs.readFile(modelPath);
       const tokenizerJson = await fs.readFile(tokenizerPath, "utf8");
-      const config = new runtime.WasmEmbedderConfig()
-        .setMaxLength(8192) as {
-          setNormalize(normalize: boolean): unknown;
-          setPooling(strategy: number): unknown;
-        };
-      config.setNormalize(true);
-      config.setPooling(0);
-      const base = runtime.WasmEmbedder;
-      const rawEmbedder = new base(modelBytes, tokenizerJson);
+      let config: unknown = new runtime.WasmEmbedderConfig();
+      config = (config as { setMaxLength(length: number): unknown }).setMaxLength(8192);
+      config = (config as { setNormalize(normalize: boolean): unknown }).setNormalize(true);
+      config = (config as { setPooling(strategy: number): unknown }).setPooling(0);
+      const rawEmbedder = runtime.WasmEmbedder.withConfig(modelBytes, tokenizerJson, config);
       return {
         embedOne: (text: string) => rawEmbedder.embedOne(text),
       };
