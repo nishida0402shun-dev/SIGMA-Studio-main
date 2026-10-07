@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import { spawn } from "node:child_process";
-import { cpSync, mkdirSync, readFileSync } from "node:fs";
+import { cpSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -32,6 +32,12 @@ await build({
     "mathlive": path.join(root, "electron/mathlive-main-stub.ts"),
   },
 });
+
+cpSync(
+  path.join(root, "electron", "official-skills"),
+  path.join(root, "dist-mcp", "official-skills"),
+  { recursive: true },
+);
 
 const child = spawn(process.execPath, [outfile], {
   cwd: root,
