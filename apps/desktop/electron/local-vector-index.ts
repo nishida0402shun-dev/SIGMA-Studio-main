@@ -36,11 +36,17 @@ async function getEmbedder(): Promise<Embedder> {
     embedderPromise = (async () => {
       const runtime = globalThis as typeof globalThis & Record<string, unknown>;
       const previousModule = runtime["module"];
+      const previousExports = runtime["exports"];
       const previousRequire = runtime["require"];
       Object.defineProperty(runtime, "module", {
         configurable: true,
         writable: true,
         value: { exports: {} },
+      });
+      Object.defineProperty(runtime, "exports", {
+        configurable: true,
+        writable: true,
+        value: (runtime["module"] as { exports: Record<string, unknown> }).exports,
       });
       Object.defineProperty(runtime, "require", {
         configurable: true,
@@ -53,6 +59,8 @@ async function getEmbedder(): Promise<Embedder> {
       } finally {
         if (previousModule === undefined) Reflect.deleteProperty(runtime, "module");
         else Object.defineProperty(runtime, "module", { configurable: true, writable: true, value: previousModule });
+        if (previousExports === undefined) Reflect.deleteProperty(runtime, "exports");
+        else Object.defineProperty(runtime, "exports", { configurable: true, writable: true, value: previousExports });
         if (previousRequire === undefined) Reflect.deleteProperty(runtime, "require");
         else Object.defineProperty(runtime, "require", { configurable: true, writable: true, value: previousRequire });
       }
