@@ -3,12 +3,16 @@ import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js"
 import type { CallToolResult, Tool } from "@modelcontextprotocol/sdk/types.js";
 import { createAiPermissionGate, type AiPermissionRequester } from "./ai-permission-gate";
 
+const GLOBAL_MCP_TOOLS = new Set([
+  "list_ai_resources","get_ai_resource","save_ai_resource","delete_ai_resource",
+]);
+
 const KNOWLEDGE_DB_TOOLS = new Set([
   "knowledge_db_list_sources","knowledge_db_search","knowledge_db_route_query","knowledge_db_rag_query","knowledge_db_record_feedback","knowledge_db_get_context",
   "knowledge_db_get_page","knowledge_db_get_region","knowledge_db_get_related_sources","knowledge_db_get_analysis_status",
   "knowledge_db_get_classification_review_context","knowledge_db_list_classification_reviews","knowledge_db_submit_classification_review",
   "knowledge_db_pdf_import_preview","knowledge_db_pdf_import_staging_list","knowledge_db_pdf_import_staging_get",
-  "conversation_memory_search","conversation_memory_recent",
+  "conversation_memory_search","conversation_memory_recent","list_ai_resources","get_ai_resource",
   "knowledge_db_pdf_import_staging_update","knowledge_db_pdf_import_approve","knowledge_db_pdf_import_reject",
   "conversation_memory_save","conversation_memory_search","conversation_memory_recent",
 ]);
@@ -90,14 +94,14 @@ export function createWebAiMcpGateway(options: WebAiMcpGatewayOptions): WebAiMcp
     async listTools(workspaceId) {
       const currentClient = await ensureStarted();
       const result = await currentClient.listTools();
-      return result.tools.filter((tool) => Boolean(workspaceId) || KNOWLEDGE_DB_TOOLS.has(tool.name)).map((tool) =>
+      return result.tools.filter((tool) => Boolean(workspaceId) || KNOWLEDGE_DB_TOOLS.has(tool.name) || GLOBAL_MCP_TOOLS.has(tool.name)).map((tool) =>
         tool.name === "list_local_documents" && isRecord(tool.inputSchema) && workspaceId
           ? { ...tool, description: `${tool.description ?? ""} Current SIGMA Workspace: ${workspaceId}.` }
           : tool,
       );
     },
     async callTool(name, args, workspaceId) {
-      if (!workspaceId && !KNOWLEDGE_DB_TOOLS.has(name)) {
+      if (!workspaceId && !KNOWLEDGE_DB_TOOLS.has(name) && !GLOBAL_MCP_TOOLS.has(name)) {
         throw new Error("Select a SIGMA Workspace before using this Tool.");
       }
       const currentClient = await ensureStarted();
@@ -105,9 +109,13 @@ export function createWebAiMcpGateway(options: WebAiMcpGatewayOptions): WebAiMcp
       const tool = availableTools.tools.find((candidate) => candidate.name === name);
       if (!tool) throw new Error(`Web AI cannot use this Tool: ${name}`);
       const input = { ...args };
-      if (KNOWLEDGE_DB_TOOLS.has(name)) {
+      if (KNOWLEDGE_DB_TOOLS.has(name) || GLOBAL_MCP_TOOLS.has(name)) {
         if (!await permissionGate.check(tool, input, READ_ONLY_TOOLS)) throw new Error("Web AI Tool request was denied.");
-        delete input.workspaceId;
+        if (GLOBAL_MCP_TOOLS.has(name) && (name === "list_ai_resources" || name === "get_ai_resource")
+          && workspaceId && input.workspaceId === undefined) {
+          input.workspaceId = workspaceId;
+        }
+        if (KNOWLEDGE_DB_TOOLS.has(name)) delete input.workspaceId;
         return (await currentClient.callTool({ name, arguments: input })) as CallToolResult;
       }
       if (typeof input.workspaceId === "string" && input.workspaceId !== workspaceId) {
