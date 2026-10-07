@@ -111,6 +111,21 @@ describe("Web AI bridge", () => {
     });
     expect(globalCall.status).toBe(200);
     expect(calls).toEqual([{ name: "knowledge_db_pdf_import_staging_list", workspaceId: null }]);
+
+    const skillsCall = await fetch(`${base}/v1/mcp/call`, {
+      method: "POST",
+      headers: {
+        Authorization: "Bearer test-token",
+        Origin: "https://chatgpt.com",
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        name: "list_ai_resources",
+        arguments: { kind: "skill" },
+      }),
+    });
+    expect(skillsCall.status).toBe(200);
+    expect(calls.at(-1)).toEqual({ name: "list_ai_resources", workspaceId: null });
   });
 
   it("allows all supported Web AI origins to call the canonical global RAG tool", async () => {
