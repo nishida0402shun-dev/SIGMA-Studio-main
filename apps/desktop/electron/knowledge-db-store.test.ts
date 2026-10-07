@@ -303,6 +303,51 @@ it("imports non-PDF files into the global Knowledge DB and indexes their text", 
   expect((await store.search("正弦定理", 5)).some((item) => item.sourceId === source?.id)).toBe(true);
 });
 
+describe("Knowledge DB large-library resilience", () => {
+  it("searches a multi-thousand-page library without unbounded result growth", async () => {
+    const dataDir = await fs.mkdtemp(path.join(os.tmpdir(), "sigma-knowledge-db-large-"));
+    tempDirs.push(dataDir);
+    const sourceCount = 25;
+    const pagesPerSource = 100;
+    const now = new Date().toISOString();
+    const sources = Array.from({ length: sourceCount }, (_, sourceIndex) => ({
+      id: `src_large_${sourceIndex}`,
+      name: `large-${sourceIndex}.md`,
+      originalPath: "",
+      storedPath: "",
+      mimeType: "text/markdown",
+      sizeBytes: 0,
+      pageCount: pagesPerSource,
+      importedAt: now,
+      updatedAt: now,
+      extractionStatus: "complete",
+      pages: Array.from({ length: pagesPerSource }, (_, pageIndex) => ({
+        id: `src_large_${sourceIndex}_p${pageIndex + 1}`,
+        sourceId: `src_large_${sourceIndex}`,
+        pageNumber: pageIndex + 1,
+        semanticType: "unknown",
+        text: pageIndex === 73 && sourceIndex === 12
+          ? "数学II 三角関数 加法定理 正弦定理"
+          : `一般教材本文 source ${sourceIndex} page ${pageIndex + 1}`,
+        extractionStatus: "text",
+        analysisStatus: "analyzed",
+        analysisVersion: KNOWLEDGE_ANALYSIS_VERSION,
+        taxonomyVersion: KNOWLEDGE_TAXONOMY_VERSION,
+      })),
+    }));
+    const libraryPath = path.join(dataDir, "knowledge-db", "library.json");
+    await fs.mkdir(path.dirname(libraryPath), { recursive: true });
+    await fs.writeFile(libraryPath, JSON.stringify({ version: 3, sources }), "utf8");
+
+    const store = new KnowledgeDbStore(dataDir);
+    const results = await store.search("三角関数 加法定理", 12);
+
+    expect(results.length).toBeLessThanOrEqual(12);
+    expect(results.some((result) => result.sourceId === "src_large_12" && result.pageNumber === 74)).toBe(true);
+    expect((await store.listSources()).flatMap((source) => source.pages)).toHaveLength(sourceCount * pagesPerSource);
+  });
+});
+
 describe("global library", () => {
   it("shares sources across all app contexts", async () => {
     const dataDir = await fs.mkdtemp(path.join(os.tmpdir(), "sigma-knowledge-db-global-"));
