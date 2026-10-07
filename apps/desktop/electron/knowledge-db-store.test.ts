@@ -505,6 +505,41 @@ describe("Knowledge DB RAG retrieval quality", () => {
   });
 });
 
+describe("Knowledge DB smart split", () => {
+  it("previews taxonomy boundaries and materializes child PDFs", async () => {
+    const dataDir = await fs.mkdtemp(path.join(os.tmpdir(), "sigma-knowledge-smart-split-"));
+    tempDirs.push(dataDir);
+    const sourcePath = await createPdf("mixed.pdf", 4);
+    const store = new KnowledgeDbStore(dataDir);
+    const [source] = await store.addFiles([sourcePath]);
+    expect(source).toBeTruthy();
+    const libraryPath = path.join(dataDir, "knowledge-db", "library.json");
+    const library = JSON.parse(await fs.readFile(libraryPath, "utf8")) as { sources: Array<{ pages: KnowledgePage[] }> };
+    library.sources[0]!.pages.forEach((page, index) => {
+      page.text = index < 2 ? "数学Ⅱ 三角関数" : "物理 力学";
+      page.taxonomyPaths = index < 2 ? [["数学", "数学II", "三角関数"]] : [["理科", "物理", "力学"]];
+      page.taxonomyConfidence = 0.92;
+    });
+    await fs.writeFile(libraryPath, JSON.stringify(library), "utf8");
+
+    const preview = await store.previewSmartSplit(source!.id);
+    expect(preview.segments).toHaveLength(2);
+    expect(preview.segments[0]?.startPage).toBe(1);
+    expect(preview.segments[0]?.endPage).toBe(2);
+    expect(preview.segments[1]?.startPage).toBe(3);
+    expect(preview.segments[1]?.endPage).toBe(4);
+
+    const children = await store.materializeSmartSplit(source!.id, preview.segments.map((segment) => ({
+      startPage: segment.startPage,
+      endPage: segment.endPage,
+      name: segment.paths[0]?.at(-1),
+    })));
+    expect(children).toHaveLength(2);
+    expect(children.map((item) => item.pageCount)).toEqual([2, 2]);
+    expect((await store.listSources()).filter((item) => item.id !== source!.id)).toHaveLength(2);
+  });
+});
+
 describe("Knowledge DB classification review", () => {
   it("confirms matching AI classification and preserves the local taxonomy on conflict", async () => {
     const dataDir = await fs.mkdtemp(path.join(os.tmpdir(), "sigma-knowledge-db-review-"));
