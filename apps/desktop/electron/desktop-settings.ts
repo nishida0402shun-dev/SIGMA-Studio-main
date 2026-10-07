@@ -24,6 +24,8 @@ export interface DesktopSettings {
   // 未設定 (キー欠落) も true として扱う (isAiWebSearchEnabled 参照)。false のときだけ
   // キーを書き込む (設定ファイルを簡潔に保つため、他の bool 設定と極性が逆な点に注意)。
   aiWebSearchEnabled?: boolean;
+  // Knowledge DB のローカルJev/Tev1判定を使う。既定は有効。
+  knowledgeDecisionEnabled?: boolean;
   // UIの表示言語。mainプロセスとMCPサーバーも読むので、localStorageではなくここが正本。
   // 他の既定値と違いキーの「不在」が「まだ選んでいない」を意味する (= OSロケール検出に
   // 委ねる) ので、既定の ja を選んだ場合もキーを消さずに書く。
@@ -136,6 +138,10 @@ async function writeDesktopSettingsNow(dataDir: string, settings: DesktopSetting
       // 既定値 (true) はキーごと削除して設定ファイルを簡潔に保つ。
       delete next.aiWebSearchEnabled;
     }
+  }
+  if ("knowledgeDecisionEnabled" in settings) {
+    if (settings.knowledgeDecisionEnabled === false) next.knowledgeDecisionEnabled = false;
+    else delete next.knowledgeDecisionEnabled;
   }
   if ("webAiConversationCaptureEnabled" in settings) {
     if (settings.webAiConversationCaptureEnabled === false) next.webAiConversationCaptureEnabled = false;
@@ -279,6 +285,7 @@ function normalizeDesktopSettings(value: unknown): DesktopSettings {
   const aiWebSearchEnabled = parsed.aiWebSearchEnabled !== false;
   const uiLocale = normalizeUiLocale(parsed.uiLocale);
   const webAiConversationCaptureEnabled = parsed.webAiConversationCaptureEnabled !== false;
+  const knowledgeDecisionEnabled = parsed.knowledgeDecisionEnabled !== false;
 
   if (codexBin) {
     next.codexBin = codexBin;
@@ -306,6 +313,9 @@ function normalizeDesktopSettings(value: unknown): DesktopSettings {
   }
   if (!aiWebSearchEnabled) {
     next.aiWebSearchEnabled = false;
+  }
+  if (!knowledgeDecisionEnabled) {
+    next.knowledgeDecisionEnabled = false;
   }
   if (!webAiConversationCaptureEnabled) {
     next.webAiConversationCaptureEnabled = false;
