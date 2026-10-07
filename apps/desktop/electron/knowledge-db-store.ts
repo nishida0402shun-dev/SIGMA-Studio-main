@@ -5,6 +5,7 @@ import { createHash, randomUUID } from "node:crypto";
 import { PDFDocument } from "pdf-lib";
 import JSZip from "jszip";
 import { LocalVectorIndex, type VectorSearchResult } from "./local-vector-index";
+import { rerankKnowledgeCandidates } from "./knowledge-decision-reranker";
 import { KnowledgeStructureParser, type KnowledgeStructureBlock, type KnowledgeStructureBlockType, type StructureParserStatus } from "./knowledge-db-structure-parser";
 import { analyzeKnowledgePage, KNOWLEDGE_ANALYSIS_VERSION } from "./knowledge-analysis-engine";
 import { classifyKnowledgeTaxonomy, KNOWLEDGE_TAXONOMY_VERSION } from "./knowledge-taxonomy";
@@ -363,8 +364,25 @@ export class KnowledgeDbStore {
         } : {}),
       };
     });
-    return ranked
-      .sort((a, b) => b.score - a.score)
+    const baseRanked = ranked.sort((a, b) => b.score - a.score);
+    const decisionRanked = await rerankKnowledgeCandidates(trimmed, baseRanked.slice(0, Math.min(12, Math.max(safeLimit * 2, 6))));
+    const decisionScores = new Map(decisionRanked.map((match) => [
+      `${match.sourceId}:${match.pageNumber}:${match.chunkIndex}`,
+      match.decisionScore,
+    ]));
+    const reranked = baseRanked
+      .map((match) => {
+        const decision = decisionScores.get(`${match.sourceId}:${match.pageNumber}:${match.chunkIndex}`);
+        if (decision === undefined || decision <= 0) return match;
+        return {
+          ...match,
+          score: match.score * 0.72 + decision * 0.28,
+          matchReasons: [...match.matchReasons, `ローカル判定 ${Math.round(decision * 100)}%`].slice(0, 5),
+        };
+      })
+      .sort((a, b) => b.score - a.score);
+
+    return reranked
       .slice(0, safeLimit)
       .map((match) => ({ ...match, sourceName: sourceNames.get(match.sourceId) ?? match.sourceId }));
   }
