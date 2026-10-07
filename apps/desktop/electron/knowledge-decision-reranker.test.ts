@@ -1,9 +1,15 @@
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi, afterEach } from "vitest";
 import { rerankKnowledgeCandidates } from "./knowledge-decision-reranker";
 
 describe("knowledge decision reranker", () => {
+  afterEach(() => {
+    delete process.env.SIGMA_KNOWLEDGE_DECISION_MODEL;
+    delete process.env.SIGMA_KNOWLEDGE_DECISION_ENABLED;
+    vi.unstubAllGlobals();
+  });
   it("uses Tev1 probabilities to rerank candidates", async () => {
     process.env.SIGMA_KNOWLEDGE_DECISION_ENABLED = "true";
+    process.env.SIGMA_KNOWLEDGE_DECISION_MODEL = "tev1:0.8b";
     const fetchMock = vi.fn()
       .mockResolvedValueOnce(new Response(JSON.stringify({ answers: { ready: { noul: true } } }), { status: 200 }))
       .mockResolvedValueOnce(new Response(JSON.stringify({
