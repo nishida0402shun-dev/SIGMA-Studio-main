@@ -365,7 +365,7 @@ export class KnowledgeDbStore {
       };
     });
     const baseRanked = ranked.sort((a, b) => b.score - a.score);
-    const decisionRanked = await rerankKnowledgeCandidates(trimmed, baseRanked.slice(0, Math.min(12, Math.max(safeLimit * 2, 6))));
+    const decisionRanked = await rerankKnowledgeCandidates(trimmed, baseRanked.slice(0, Math.min(12, Math.max(safeLimit * 2, 6))), this.dataDir);
     const decisionScores = new Map(decisionRanked.map((match) => [
       `${match.sourceId}:${match.pageNumber}:${match.chunkIndex}`,
       match.decisionScore,
