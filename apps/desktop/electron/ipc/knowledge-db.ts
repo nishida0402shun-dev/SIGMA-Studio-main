@@ -41,6 +41,32 @@ export function registerKnowledgeDbIpc(deps: RegisterKnowledgeDbIpcDeps): void {
     return { paths: await collectSourceFiles(result.filePaths) };
   }
 
+  ipcMain.handle("knowledge-db:backup", async (event) => {
+    if (event.sender !== getMainWindow()?.webContents) return null;
+    const mainWindow = getMainWindow();
+    if (!mainWindow) return null;
+    const result = await dialog.showSaveDialog(mainWindow, {
+      title: "Knowledge DBをバックアップ",
+      defaultPath: "sigma-knowledge-db-backup.zip",
+      filters: [{ name: "Knowledge DB Backup", extensions: ["zip"] }],
+    });
+    if (result.canceled || !result.filePath) return null;
+    return store.createBackup(result.filePath);
+  });
+
+  ipcMain.handle("knowledge-db:restore", async (event) => {
+    if (event.sender !== getMainWindow()?.webContents) return null;
+    const mainWindow = getMainWindow();
+    if (!mainWindow) return null;
+    const result = await dialog.showOpenDialog(mainWindow, {
+      title: "Knowledge DBバックアップを復元",
+      properties: ["openFile"],
+      filters: [{ name: "Knowledge DB Backup", extensions: ["zip"] }],
+    });
+    if (result.canceled || !result.filePaths[0]) return null;
+    return store.restoreBackup(result.filePaths[0]);
+  });
+
   ipcMain.handle("knowledge-db:choose-files", (event) =>
     chooseSourcePaths(event, ["openFile", "multiSelections"], "Knowledge DBにファイルを追加"),
   );
