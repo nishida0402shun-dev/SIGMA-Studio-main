@@ -118,6 +118,9 @@ const desktopAPI = {
     setAiWebSearchEnabled(value: boolean): Promise<{ ok: boolean; error?: string }> {
       return ipcRenderer.invoke("settings:set-ai-web-search-enabled", value);
     },
+    setKnowledgeDecisionEnabled(value: boolean): Promise<{ ok: boolean; error?: string }> {
+      return ipcRenderer.invoke("settings:set-knowledge-decision-enabled", value);
+    },
     setWebAiConversationCaptureEnabled(value: boolean): Promise<{ ok: boolean; error?: string }> {
       return ipcRenderer.invoke("settings:set-web-ai-conversation-capture-enabled", value);
     },
