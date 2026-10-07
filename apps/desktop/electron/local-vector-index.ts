@@ -34,22 +34,17 @@ let embedderPromise: Promise<Embedder> | null = null;
 async function getEmbedder(): Promise<Embedder> {
   if (!embedderPromise) {
     embedderPromise = (async () => {
-      const runtime = globalThis as typeof globalThis & {
-        module?: { exports: Record<string, unknown> };
-        require?: NodeRequire;
-      };
-      const previousModule = runtime.module;
-      const previousRequire = runtime.require;
-      runtime.module = { exports: {} };
-      runtime.require = createRequire(import.meta.url);
+      const runtime = globalThis as typeof globalThis & Record<string, unknown>;
+      const previousModule = runtime["module"];
+      const previousRequire = runtime["require"];
+      runtime["module"] = { exports: {} };
+      runtime["require"] = createRequire(import.meta.url);
       try {
         const { createEmbedder } = await import("ruvector-onnx-embeddings-wasm/loader.js");
         return (await createEmbedder(MODEL)) as Embedder;
       } finally {
-        if (previousModule === undefined) delete runtime.module;
-        else runtime.module = previousModule;
-        if (previousRequire === undefined) delete runtime.require;
-        else runtime.require = previousRequire;
+        runtime["module"] = previousModule;
+        runtime["require"] = previousRequire;
       }
     })().catch((error) => {
       embedderPromise = null;
