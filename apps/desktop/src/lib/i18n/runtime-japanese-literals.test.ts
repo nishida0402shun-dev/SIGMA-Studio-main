@@ -49,8 +49,8 @@ export const INTENTIONAL_RUNTIME_JAPANESE: readonly IntentionalJapaneseRule[] = 
   {
     path: /^electron\/local-vector-index\.ts$/,
     value: /^(?:検索クエリ:|検索文書:)/,
-    classification: "Ruri retrieval protocol",
-    reason: "Ruri v3 requires these Japanese instruction prefixes on both query and document sides; they are model protocol strings, not user-facing UI copy.",
+    classification: "multilingual GTE retrieval protocol",
+    reason: "The retrieval pipeline uses these stable Japanese instruction prefixes on both query and document sides; they are model protocol strings, not user-facing UI copy.",
   },
   {
     path: /^electron\/ipc\/knowledge-db\.ts$/,
