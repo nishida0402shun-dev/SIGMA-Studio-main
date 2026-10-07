@@ -759,6 +759,88 @@ export class KnowledgeDbStore {
     return { status, page };
   }
 
+  async createBackup(outputPath: string): Promise<{ filePath: string; fileCount: number; bytes: number }> {
+    const paths = this.paths();
+    await fs.mkdir(paths.root, { recursive: true });
+    const zip = new JSZip();
+    const files = await collectFiles(paths.root);
+    for (const filePath of files) {
+      const relative = path.relative(paths.root, filePath).split(path.sep).join("/");
+      if (!relative || relative.endsWith(".tmp")) continue;
+      zip.file(relative, await fs.readFile(filePath));
+    }
+    zip.file("backup-manifest.json", JSON.stringify({
+      format: "sigma-knowledge-db-backup",
+      version: 1,
+      createdAt: new Date().toISOString(),
+      fileCount: files.length,
+    }, null, 2));
+    const bytes = await zip.generateAsync({ type: "nodebuffer", compression: "DEFLATE", compressionOptions: { level: 6 } });
+    const destination = path.resolve(outputPath);
+    await fs.mkdir(path.dirname(destination), { recursive: true });
+    await fs.writeFile(destination, bytes);
+    return { filePath: destination, fileCount: files.length, bytes: bytes.byteLength };
+  }
+
+  async restoreBackup(backupPath: string): Promise<{ filePath: string; fileCount: number }> {
+    const destination = path.resolve(backupPath);
+    const bytes = await fs.readFile(destination);
+    const zip = await JSZip.loadAsync(bytes);
+    const manifestEntry = zip.file("backup-manifest.json");
+    if (!manifestEntry) throw new Error("Invalid Knowledge DB backup: manifest missing");
+    let manifest: { format?: string; version?: number };
+    try {
+      manifest = JSON.parse(await manifestEntry.async("text")) as { format?: string; version?: number };
+    } catch {
+      throw new Error("Invalid Knowledge DB backup: manifest unreadable");
+    }
+    if (manifest.format !== "sigma-knowledge-db-backup" || manifest.version !== 1) {
+      throw new Error("Unsupported Knowledge DB backup format");
+    }
+
+    const paths = this.paths();
+    const parent = path.dirname(paths.root);
+    const tempRoot = path.join(parent, `.knowledge-db-restore-${randomUUID()}`);
+    await fs.mkdir(tempRoot, { recursive: true });
+    try {
+      let fileCount = 0;
+      for (const entry of Object.values(zip.files)) {
+        if (entry.dir || entry.name === "backup-manifest.json") continue;
+        const normalized = path.posix.normalize(entry.name);
+        if (normalized.startsWith("../") || normalized === ".." || path.posix.isAbsolute(normalized)) {
+          throw new Error("Invalid Knowledge DB backup entry");
+        }
+        const target = path.join(tempRoot, ...normalized.split("/"));
+        const relativeTarget = path.relative(tempRoot, target);
+        if (relativeTarget.startsWith("..") || path.isAbsolute(relativeTarget)) {
+          throw new Error("Invalid Knowledge DB backup path");
+        }
+        await fs.mkdir(path.dirname(target), { recursive: true });
+        await fs.writeFile(target, await entry.async("nodebuffer"));
+        fileCount += 1;
+      }
+      const restoredLibrary = path.join(tempRoot, "library.json");
+      await fs.access(restoredLibrary);
+      const currentBackup = `${paths.root}.before-restore-${Date.now()}`;
+      try {
+        await fs.rename(paths.root, currentBackup);
+      } catch (error) {
+        if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
+      }
+      try {
+        await fs.rename(tempRoot, paths.root);
+      } catch (error) {
+        try { await fs.rename(currentBackup, paths.root); } catch {}
+        throw error;
+      }
+      await fs.rm(currentBackup, { recursive: true, force: true });
+      return { filePath: destination, fileCount };
+    } catch (error) {
+      await fs.rm(tempRoot, { recursive: true, force: true });
+      throw error;
+    }
+  }
+
   async deleteSource(sourceId: string): Promise<boolean> {
     const paths = this.paths();
     const library = await this.readLibrary();
@@ -1080,6 +1162,17 @@ export class KnowledgeDbStore {
   private vectorIndex(): LocalVectorIndex {
     return new LocalVectorIndex(path.join(this.paths().root, "vector-index"));
   }
+}
+
+async function collectFiles(root: string): Promise<string[]> {
+  const entries = await fs.readdir(root, { withFileTypes: true });
+  const files: string[] = [];
+  for (const entry of entries) {
+    const fullPath = path.join(root, entry.name);
+    if (entry.isDirectory()) files.push(...await collectFiles(fullPath));
+    else if (entry.isFile()) files.push(fullPath);
+  }
+  return files;
 }
 
 async function extractPdfPageTexts(bytes: Uint8Array, pageCount: number): Promise<string[]> {
