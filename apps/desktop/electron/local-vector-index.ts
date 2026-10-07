@@ -1,6 +1,7 @@
 import fs from "node:fs/promises";
 import path from "node:path";
 import { createRequire } from "node:module";
+import { fileURLToPath } from "node:url";
 
 export interface VectorRecord {
   id: string;
@@ -38,6 +39,8 @@ async function getEmbedder(): Promise<Embedder> {
       const previousModule = runtime["module"];
       const previousExports = runtime["exports"];
       const previousRequire = runtime["require"];
+      const previousFilename = runtime["__filename"];
+      const previousDirname = runtime["__dirname"];
       Object.defineProperty(runtime, "module", {
         configurable: true,
         writable: true,
@@ -47,6 +50,16 @@ async function getEmbedder(): Promise<Embedder> {
         configurable: true,
         writable: true,
         value: (runtime["module"] as { exports: Record<string, unknown> }).exports,
+      });
+      Object.defineProperty(runtime, "__filename", {
+        configurable: true,
+        writable: true,
+        value: fileURLToPath(import.meta.url),
+      });
+      Object.defineProperty(runtime, "__dirname", {
+        configurable: true,
+        writable: true,
+        value: path.dirname(fileURLToPath(import.meta.url)),
       });
       Object.defineProperty(runtime, "require", {
         configurable: true,
@@ -63,6 +76,10 @@ async function getEmbedder(): Promise<Embedder> {
         else Object.defineProperty(runtime, "exports", { configurable: true, writable: true, value: previousExports });
         if (previousRequire === undefined) Reflect.deleteProperty(runtime, "require");
         else Object.defineProperty(runtime, "require", { configurable: true, writable: true, value: previousRequire });
+        if (previousFilename === undefined) Reflect.deleteProperty(runtime, "__filename");
+        else Object.defineProperty(runtime, "__filename", { configurable: true, writable: true, value: previousFilename });
+        if (previousDirname === undefined) Reflect.deleteProperty(runtime, "__dirname");
+        else Object.defineProperty(runtime, "__dirname", { configurable: true, writable: true, value: previousDirname });
       }
     })().catch((error) => {
       embedderPromise = null;
