@@ -478,6 +478,10 @@ export const settings = {
       label: "Allow the AI to search the web",
       description: "Lets the AI search the web when it needs to, and cite its sources.",
     },
+    knowledgeDecision: {
+      label: "Local Jev decision for Knowledge DB",
+      description: "Re-ranks search candidates with local Tev1. When OFF, Ruri + RRF results are used directly.",
+    },
     hint: {
       codexPathWindows: "codex or C:\\Users\\...\\AppData\\Roaming\\npm\\codex.cmd",
       codexPathPosix: "codex or /Users/.../codex",
