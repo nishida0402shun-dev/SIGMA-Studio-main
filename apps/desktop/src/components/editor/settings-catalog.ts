@@ -96,6 +96,14 @@ export const SETTINGS_ENTRIES: readonly SettingsEntryDefinition[] = [
     descriptionKey: "provider.webSearch.description",
     keywordsKey: "catalog.keywords.webSearch",
   },
+  {
+    id: "settings.ai.knowledgeDecision",
+    surface: "desktopAi",
+    anchorId: "desktop-settings-knowledge-decision",
+    labelKey: "provider.knowledgeDecision.label",
+    descriptionKey: "provider.knowledgeDecision.description",
+    keywordsKey: "catalog.keywords.knowledgeDecision",
+  },
   // --- ページ設定 (PageSettingsDialog) ---
   {
     id: "settings.page.paper",
