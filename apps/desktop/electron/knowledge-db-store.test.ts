@@ -3,7 +3,7 @@ import os from "node:os";
 import path from "node:path";
 import { PDFDocument } from "pdf-lib";
 import { afterEach, describe, expect, it } from "vitest";
-import { KnowledgeDbStore, type KnowledgePage } from "./knowledge-db-store";
+import { KnowledgeDbStore, type KnowledgePage, type KnowledgeSource } from "./knowledge-db-store";
 import { LocalVectorIndex } from "./local-vector-index";
 import { KNOWLEDGE_ANALYSIS_VERSION } from "./knowledge-analysis-engine";
 import { KNOWLEDGE_TAXONOMY_VERSION } from "./knowledge-taxonomy";
