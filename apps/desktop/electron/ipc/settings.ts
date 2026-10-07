@@ -32,6 +32,7 @@ export function registerSettingsIpc(deps: RegisterSettingsIpcDeps): void {
       hasCustomCommands: "customCommands" in settings,
       aiAutoApplyVerifiedProposals: settings.aiAutoApplyVerifiedProposals ?? false,
       aiWebSearchEnabled: isAiWebSearchEnabled(settings),
+      knowledgeDecisionEnabled: settings.knowledgeDecisionEnabled !== false,
       webAiConversationCaptureEnabled: settings.webAiConversationCaptureEnabled !== false,
       // 既定 (ja) はキーごと削除される保存形式なので、未設定は null で返す。
       // ここで既定値に解決してしまうと、初回起動でOSロケール検出が効かなくなる。
@@ -57,6 +58,11 @@ export function registerSettingsIpc(deps: RegisterSettingsIpcDeps): void {
     await writeDesktopSettings(dataDir, { aiAutoApplyVerifiedProposals: value === true });
     // 設定をONにした直後、既存の検証済みpending提案がすでにあれば即座に自動承認する。
     scheduleAutoApplyCheck();
+    return { ok: true };
+  });
+
+  ipcMain.handle("settings:set-knowledge-decision-enabled", async (_event, value: unknown) => {
+    await writeDesktopSettings(dataDir, { knowledgeDecisionEnabled: value === true });
     return { ok: true };
   });
 
