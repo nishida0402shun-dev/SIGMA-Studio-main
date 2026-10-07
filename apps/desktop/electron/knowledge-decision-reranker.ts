@@ -1,5 +1,6 @@
 import os from "node:os";
 import type { VectorSearchResult } from "./local-vector-index";
+import { readDesktopSettingsSync } from "./desktop-settings";
 
 const DEFAULT_ENDPOINT = "http://127.0.0.1:11434/v1/systemone";
 const SAFE_MODEL = "tev1:0.8b";
@@ -49,9 +50,11 @@ function model(): string {
     : SAFE_MODEL;
 }
 
-function enabled(): boolean {
+function enabled(dataDir?: string): boolean {
   const value = process.env.SIGMA_KNOWLEDGE_DECISION_ENABLED?.trim().toLowerCase();
-  return value !== "0" && value !== "false" && value !== "off";
+  if (value === "0" || value === "false" || value === "off") return false;
+  if (dataDir) return readDesktopSettingsSync(dataDir).knowledgeDecisionEnabled !== false;
+  return true;
 }
 
 async function request(payload: unknown, timeoutMs = REQUEST_TIMEOUT_MS): Promise<DecisionResponse> {
@@ -97,8 +100,9 @@ async function isAvailable(): Promise<boolean> {
 export async function rerankKnowledgeCandidates(
   query: string,
   candidates: VectorSearchResult[],
+  dataDir?: string,
 ): Promise<DecisionRerankResult[]> {
-  if (!query.trim() || candidates.length < 2 || !(await isAvailable())) {
+  if (!query.trim() || candidates.length < 2 || !enabled(dataDir) || !(await isAvailable())) {
     return candidates.map((candidate) => ({ ...candidate, decisionScore: 0 }));
   }
 
