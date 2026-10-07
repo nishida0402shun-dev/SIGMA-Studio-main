@@ -1,5 +1,6 @@
 import fs from "node:fs/promises";
 import path from "node:path";
+import os from "node:os";
 import { createRequire } from "node:module";
 
 export interface VectorRecord {
@@ -24,81 +25,97 @@ export interface VectorSearchResult extends Omit<VectorRecord, "vector"> {
 }
 
 const DIMENSIONS = 384;
-const MODEL = "gte-small";
+const MODEL = "ruri-v3-70m";
+const MODEL_REPOSITORY = "sirasagi62/ruri-v3-70m-ONNX";
+const MODEL_REVISION = "5e9cd15";
+const MODEL_CACHE_DIR = path.join(
+  process.env.SIGMA_STUDIO_MODEL_CACHE?.trim() || path.join(os.homedir(), ".sigma-studio", "models"),
+  MODEL_REPOSITORY.replace(/[^a-zA-Z0-9._-]+/gu, "_"),
+  MODEL_REVISION,
+);
+const MODEL_URL = `https://huggingface.co/${MODEL_REPOSITORY}/resolve/${MODEL_REVISION}/onnx/model_int8.onnx?download=true`;
+const TOKENIZER_URL = `https://huggingface.co/${MODEL_REPOSITORY}/resolve/${MODEL_REVISION}/tokenizer.json?download=true`;
+
 type Embedder = {
   embedOne(text: string): Float32Array | number[];
 };
 
+type WasmEmbeddingModule = {
+  default?: () => Promise<unknown>;
+  WasmEmbedder: new (modelBytes: Uint8Array, tokenizerJson: string) => {
+    embedOne(text: string): Float32Array;
+  };
+  WasmEmbedderConfig: new () => {
+    setMaxLength(length: number): unknown;
+    setNormalize(normalize: boolean): unknown;
+    setPooling(strategy: number): unknown;
+  };
+};
+
 let embedderPromise: Promise<Embedder> | null = null;
+
+async function downloadModelFile(url: string, outputPath: string): Promise<void> {
+  try {
+    await fs.access(outputPath);
+    return;
+  } catch {
+    // First use or an interrupted previous download.
+  }
+
+  await fs.mkdir(path.dirname(outputPath), { recursive: true });
+  const response = await fetch(url);
+  if (!response.ok) {
+    throw new Error(`Knowledge DB Japanese embedding model download failed (${response.status}): ${url}`);
+  }
+  const bytes = new Uint8Array(await response.arrayBuffer());
+  if (bytes.byteLength < 1024) {
+    throw new Error(`Knowledge DB Japanese embedding model download was unexpectedly small: ${url}`);
+  }
+  const tempPath = outputPath + ".tmp";
+  await fs.writeFile(tempPath, bytes);
+  await fs.rename(tempPath, outputPath);
+}
 
 async function getEmbedder(): Promise<Embedder> {
   if (!embedderPromise) {
     embedderPromise = (async () => {
-      const runtime = globalThis as typeof globalThis & Record<string, unknown>;
-      const previousModule = runtime["module"];
-      const previousExports = runtime["exports"];
-      const previousRequire = runtime["require"];
-      const previousFilename = runtime["__filename"];
-      const previousDirname = runtime["__dirname"];
-      const requireFromSigma = createRequire(import.meta.url);
-      const loaderPath = requireFromSigma.resolve("ruvector-onnx-embeddings-wasm/loader.js");
-      const wasmPackageDir = path.join(path.dirname(loaderPath), "pkg");
-      const wasmGluePath = path.join(wasmPackageDir, "ruvector_onnx_embeddings_wasm.js");
-      Object.defineProperty(runtime, "module", {
-        configurable: true,
-        writable: true,
-        value: { exports: {} },
-      });
-      Object.defineProperty(runtime, "exports", {
-        configurable: true,
-        writable: true,
-        value: (runtime["module"] as { exports: Record<string, unknown> }).exports,
-      });
-      Object.defineProperty(runtime, "__filename", {
-        configurable: true,
-        writable: true,
-        value: wasmGluePath,
-      });
-      Object.defineProperty(runtime, "__dirname", {
-        configurable: true,
-        writable: true,
-        value: wasmPackageDir,
-      });
-      Object.defineProperty(runtime, "require", {
-        configurable: true,
-        writable: true,
-        value: requireFromSigma,
-      });
-      try {
-        const { createEmbedder } = await import("ruvector-onnx-embeddings-wasm/loader.js");
-        return (await createEmbedder(MODEL)) as Embedder;
-      } finally {
-        if (previousModule === undefined) Reflect.deleteProperty(runtime, "module");
-        else Object.defineProperty(runtime, "module", { configurable: true, writable: true, value: previousModule });
-        if (previousExports === undefined) Reflect.deleteProperty(runtime, "exports");
-        else Object.defineProperty(runtime, "exports", { configurable: true, writable: true, value: previousExports });
-        if (previousRequire === undefined) Reflect.deleteProperty(runtime, "require");
-        else Object.defineProperty(runtime, "require", { configurable: true, writable: true, value: previousRequire });
-        if (previousFilename === undefined) Reflect.deleteProperty(runtime, "__filename");
-        else Object.defineProperty(runtime, "__filename", { configurable: true, writable: true, value: previousFilename });
-        if (previousDirname === undefined) Reflect.deleteProperty(runtime, "__dirname");
-        else Object.defineProperty(runtime, "__dirname", { configurable: true, writable: true, value: previousDirname });
-      }
+      const modelPath = path.join(MODEL_CACHE_DIR, "model_int8.onnx");
+      const tokenizerPath = path.join(MODEL_CACHE_DIR, "tokenizer.json");
+      await downloadModelFile(MODEL_URL, modelPath);
+      await downloadModelFile(TOKENIZER_URL, tokenizerPath);
+
+      const runtime = await import("ruvector-onnx-embeddings-wasm") as unknown as WasmEmbeddingModule;
+      if (runtime.default) await runtime.default();
+      const modelBytes = await fs.readFile(modelPath);
+      const tokenizerJson = await fs.readFile(tokenizerPath, "utf8");
+      const config = new runtime.WasmEmbedderConfig()
+        .setMaxLength(8192) as {
+          setNormalize(normalize: boolean): unknown;
+          setPooling(strategy: number): unknown;
+        };
+      config.setNormalize(true);
+      config.setPooling(0);
+      const base = runtime.WasmEmbedder;
+      const rawEmbedder = new base(modelBytes, tokenizerJson);
+      return {
+        embedOne: (text: string) => rawEmbedder.embedOne(text),
+      };
     })().catch((error) => {
       embedderPromise = null;
       throw new Error(
-        `Knowledge DB semantic embedding model could not be initialized: ${error instanceof Error ? error.message : String(error)}`,
+        `Knowledge DB Japanese semantic embedding model could not be initialized: ${error instanceof Error ? error.message : String(error)}`,
       );
     });
   }
   return embedderPromise;
 }
 
-async function embedText(text: string): Promise<number[]> {
+async function embedText(text: string, role: "query" | "document" | "generic" = "generic"): Promise<number[]> {
   const embedder = await getEmbedder();
-  const vector = Array.from(embedder.embedOne(text));
+  const prefix = role === "query" ? "検索クエリ: " : role === "document" ? "検索文書: " : "";
+  const vector = Array.from(embedder.embedOne(prefix + text));
   if (vector.length !== DIMENSIONS) {
-    throw new Error(`Unexpected embedding dimension: ${vector.length}; expected ${DIMENSIONS}`);
+    throw new Error(`Unexpected Japanese embedding dimension: ${vector.length}; expected ${DIMENSIONS}`);
   }
   return vector;
 }
@@ -141,7 +158,7 @@ export class LocalVectorIndex {
       const batchSize = 32;
       for (let start = 0; start < records.length; start += batchSize) {
         const batch = records.slice(start, start + batchSize);
-        const embedded = await Promise.all(batch.map((record) => embedText(record.text)));
+        const embedded = await Promise.all(batch.map((record) => embedText(record.text, "document")));
         vectors.push(...embedded);
       }
       next.push(...records.map((record, index) => ({ ...record, vector: vectors[index] })));
@@ -167,7 +184,7 @@ export class LocalVectorIndex {
   async search(query: string, limit = 12): Promise<VectorSearchResult[]> {
     const normalized = query.trim();
     if (!normalized) return [];
-    const queryVector = await embedText(normalized);
+    const queryVector = await embedText(normalized, "query");
     const index = await this.read();
     return index.records
       .map(({ vector, ...record }) => ({ ...record, score: cosine(queryVector, vector) }))
@@ -217,7 +234,7 @@ export class LocalVectorIndex {
       const batchSize = 32;
       for (let start = 0; start < oldRecords.length; start += batchSize) {
         const batch = oldRecords.slice(start, start + batchSize);
-        migratedVectors.push(...await Promise.all(batch.map((record) => embedText(record.text))));
+        migratedVectors.push(...await Promise.all(batch.map((record) => embedText(record.text, "document"))));
       }
       const migrated: VectorIndexFile = {
         version: 3,
