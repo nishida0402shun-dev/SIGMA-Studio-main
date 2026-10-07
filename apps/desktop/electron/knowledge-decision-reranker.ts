@@ -1,7 +1,10 @@
 import type { VectorSearchResult } from "./local-vector-index";
 
 const DEFAULT_ENDPOINT = "http://127.0.0.1:11434/v1/systemone";
-const DEFAULT_MODEL = "tev1:4b";
+const SAFE_MODEL = "tev1:0.8b";
+const HIGH_QUALITY_MODEL = "tev1:4b";
+const DEFAULT_MEMORY_BUDGET_GB = 8;
+const HIGH_QUALITY_MIN_AVAILABLE_GB = 6.5;
 const MAX_CANDIDATES = 12;
 const MAX_TEXT_CHARS = 2200;
 const HEALTH_CACHE_MS = 5_000;
@@ -27,8 +30,24 @@ function endpoint(): string {
   return process.env.SIGMA_KNOWLEDGE_DECISION_URL?.trim() || DEFAULT_ENDPOINT;
 }
 
+function configuredModel(): string {
+  return process.env.SIGMA_KNOWLEDGE_DECISION_MODEL?.trim() || "auto";
+}
+
+function availableMemoryGb(): number {
+  // Electron's Node runtime exposes os.freemem(); avoid importing os solely for this
+  // small policy check by using the process-level value injected by desktop startup.
+  const raw = process.env.SIGMA_AVAILABLE_MEMORY_GB?.trim();
+  const parsed = raw ? Number(raw) : Number.NaN;
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : DEFAULT_MEMORY_BUDGET_GB;
+}
+
 function model(): string {
-  return process.env.SIGMA_KNOWLEDGE_DECISION_MODEL?.trim() || DEFAULT_MODEL;
+  const configured = configuredModel();
+  if (configured && configured !== "auto") return configured;
+  return availableMemoryGb() >= HIGH_QUALITY_MIN_AVAILABLE_GB
+    ? HIGH_QUALITY_MODEL
+    : SAFE_MODEL;
 }
 
 function enabled(): boolean {
@@ -110,7 +129,8 @@ export async function rerankKnowledgeCandidates(
       model: model(),
       state,
       questions,
-      keep_alive: "5m",
+      // Keep the lightweight model warm briefly, but do not pin it indefinitely.
+      keep_alive: model() === SAFE_MODEL ? "60s" : "2m",
     }, 4_000);
     const answers = response.answers ?? {};
     return selected.map((candidate, index) => {
