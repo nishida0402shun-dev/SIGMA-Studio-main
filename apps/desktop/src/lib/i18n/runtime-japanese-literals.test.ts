@@ -47,6 +47,12 @@ export const INTENTIONAL_RUNTIME_JAPANESE: readonly IntentionalJapaneseRule[] = 
     reason: "Knowledge DB workspace labels are intentionally authored in Japanese until the dedicated dictionary entries are wired; this rule documents the current contract.",
   },
   {
+    path: /^electron\/local-vector-index\.ts$/,
+    value: /^(?:検索クエリ:|検索文書:)/,
+    classification: "Ruri retrieval protocol",
+    reason: "Ruri v3 requires these Japanese instruction prefixes on both query and document sides; they are model protocol strings, not user-facing UI copy.",
+  },
+  {
     path: /^electron\/ipc\/knowledge-db\.ts$/,
     value: /^(?:Knowledge DBにファイルを追加|Knowledge DBにフォルダを追加|Knowledge DBをバックアップ|Knowledge DBバックアップを復元)$/,
     classification: "native dialog title",
