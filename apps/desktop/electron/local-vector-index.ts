@@ -103,6 +103,22 @@ async function embedText(text: string): Promise<number[]> {
   return vector;
 }
 
+const indexLocks = new Map<string, Promise<void>>();
+
+async function withIndexLock<T>(indexPath: string, task: () => Promise<T>): Promise<T> {
+  const previous = indexLocks.get(indexPath) ?? Promise.resolve();
+  let release!: () => void;
+  const current = new Promise<void>((resolve) => { release = resolve; });
+  indexLocks.set(indexPath, previous.then(() => current));
+  await previous;
+  try {
+    return await task();
+  } finally {
+    release();
+    if (indexLocks.get(indexPath) === current) indexLocks.delete(indexPath);
+  }
+}
+
 export class LocalVectorIndex {
   private readonly indexPath: string;
 
@@ -116,12 +132,20 @@ export class LocalVectorIndex {
 
   async upsertMany(records: Array<Omit<VectorRecord, "vector">>): Promise<void> {
     if (records.length === 0) return;
-    const index = await this.read();
+    await withIndexLock(this.indexPath, async () => {
+      const index = await this.read();
     const keys = new Set(records.map((record) => record.sourceId + ":" + record.pageNumber + ":" + record.chunkIndex));
     const next = index.records.filter((item) => !keys.has(item.sourceId + ":" + item.pageNumber + ":" + item.chunkIndex));
-    const vectors = await Promise.all(records.map((record) => embedText(record.text)));
+    const vectors: number[][] = [];
+    const batchSize = 32;
+    for (let start = 0; start < records.length; start += batchSize) {
+      const batch = records.slice(start, start + batchSize);
+      const embedded = await Promise.all(batch.map((record) => embedText(record.text)));
+      vectors.push(...embedded);
+    }
     next.push(...records.map((record, index) => ({ ...record, vector: vectors[index] })));
-    await this.write({ version: 3, dimensions: DIMENSIONS, model: MODEL, records: next });
+      await this.write({ version: 3, dimensions: DIMENSIONS, model: MODEL, records: next });
+    });
   }
 
   async hasSource(sourceId: string): Promise<boolean> {
@@ -130,11 +154,13 @@ export class LocalVectorIndex {
   }
 
   async removeSource(sourceId: string): Promise<void> {
-    const index = await this.read();
-    const next = index.records.filter((item) => item.sourceId !== sourceId);
-    if (next.length !== index.records.length) {
-      await this.write({ ...index, records: next });
-    }
+    await withIndexLock(this.indexPath, async () => {
+      const index = await this.read();
+      const next = index.records.filter((item) => item.sourceId !== sourceId);
+      if (next.length !== index.records.length) {
+        await this.write({ ...index, records: next });
+      }
+    });
   }
 
   async search(query: string, limit = 12): Promise<VectorSearchResult[]> {
@@ -186,7 +212,12 @@ export class LocalVectorIndex {
     // Migration errors intentionally propagate so the old index is never replaced by an empty one.
     if (parsed.version === 2 && parsed.dimensions === DIMENSIONS && Array.isArray(parsed.records)) {
       const oldRecords = parsed.records as VectorRecord[];
-      const migratedVectors = await Promise.all(oldRecords.map((record) => embedText(record.text)));
+      const migratedVectors: number[][] = [];
+      const batchSize = 32;
+      for (let start = 0; start < oldRecords.length; start += batchSize) {
+        const batch = oldRecords.slice(start, start + batchSize);
+        migratedVectors.push(...await Promise.all(batch.map((record) => embedText(record.text))));
+      }
       const migrated: VectorIndexFile = {
         version: 3,
         dimensions: DIMENSIONS,
