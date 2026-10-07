@@ -1,5 +1,6 @@
 import fs from "node:fs/promises";
 import path from "node:path";
+import { createRequire } from "node:module";
 
 export interface VectorRecord {
   id: string;
@@ -24,8 +25,6 @@ export interface VectorSearchResult extends Omit<VectorRecord, "vector"> {
 
 const DIMENSIONS = 384;
 const MODEL = "gte-small";
-const MODEL_PACKAGE = "ruvector-onnx-embeddings-wasm/loader.js";
-
 type Embedder = {
   embedOne(text: string): Float32Array | number[];
 };
@@ -34,9 +33,25 @@ let embedderPromise: Promise<Embedder> | null = null;
 
 async function getEmbedder(): Promise<Embedder> {
   if (!embedderPromise) {
-    embedderPromise = import(MODEL_PACKAGE).then(async ({ createEmbedder }) => {
-      return (await createEmbedder(MODEL)) as Embedder;
-    }).catch((error) => {
+    embedderPromise = (async () => {
+      const runtime = globalThis as typeof globalThis & {
+        module?: { exports: Record<string, unknown> };
+        require?: NodeRequire;
+      };
+      const previousModule = runtime.module;
+      const previousRequire = runtime.require;
+      runtime.module = { exports: {} };
+      runtime.require = createRequire(import.meta.url);
+      try {
+        const { createEmbedder } = await import("ruvector-onnx-embeddings-wasm/loader.js");
+        return (await createEmbedder(MODEL)) as Embedder;
+      } finally {
+        if (previousModule === undefined) delete runtime.module;
+        else runtime.module = previousModule;
+        if (previousRequire === undefined) delete runtime.require;
+        else runtime.require = previousRequire;
+      }
+    })().catch((error) => {
       embedderPromise = null;
       throw new Error(
         `Knowledge DB semantic embedding model could not be initialized: ${error instanceof Error ? error.message : String(error)}`,
