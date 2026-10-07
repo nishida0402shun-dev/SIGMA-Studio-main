@@ -887,6 +887,8 @@ export interface DesktopResearchSessionsAPI {
 }
 
 export interface DesktopKnowledgeDbAPI {
+  backup(): Promise<{ filePath: string; fileCount: number; bytes: number } | null>;
+  restore(): Promise<{ filePath: string; fileCount: number } | null>;
   chooseFiles(): Promise<{ paths: string[] } | null>;
   chooseFolder(): Promise<{ paths: string[] } | null>;
   chooseSources(): Promise<{ paths: string[] } | null>;
