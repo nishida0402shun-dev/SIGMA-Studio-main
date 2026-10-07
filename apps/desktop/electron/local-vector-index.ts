@@ -24,83 +24,28 @@ export interface VectorSearchResult extends Omit<VectorRecord, "vector"> {
 }
 
 const DIMENSIONS = 384;
-const MODEL = "ruri-v3-70m";
-const MODEL_REPOSITORY = "sirasagi62/ruri-v3-70m-ONNX";
-const MODEL_REVISION = "5e9cd15";
-const MODEL_CACHE_DIR = path.join(
-  process.env.SIGMA_STUDIO_MODEL_CACHE?.trim() || path.join(os.homedir(), ".sigma-studio", "models"),
-  MODEL_REPOSITORY.replace(/[^a-zA-Z0-9._-]+/gu, "_"),
-  MODEL_REVISION,
-);
-const MODEL_URL = `https://huggingface.co/${MODEL_REPOSITORY}/resolve/${MODEL_REVISION}/onnx/model_int8.onnx?download=true`;
-const TOKENIZER_URL = `https://huggingface.co/${MODEL_REPOSITORY}/resolve/${MODEL_REVISION}/tokenizer.json?download=true`;
+const MODEL = "gte-small";
 
-type Embedder = {
+interface Embedder {
   embedOne(text: string): Float32Array | number[];
-};
-
-type WasmEmbeddingModule = {
-  default?: () => Promise<unknown>;
-  WasmEmbedder: {
-    withConfig(modelBytes: Uint8Array, tokenizerJson: string, config: unknown): {
-      embedOne(text: string): Float32Array;
-    };
-  };
-  WasmEmbedderConfig: new () => {
-    setMaxLength(length: number): unknown;
-    setNormalize(normalize: boolean): unknown;
-    setPooling(strategy: number): unknown;
-  };
-};
+}
 
 let embedderPromise: Promise<Embedder> | null = null;
-
-async function downloadModelFile(url: string, outputPath: string): Promise<void> {
-  try {
-    await fs.access(outputPath);
-    return;
-  } catch {
-    // First use or an interrupted previous download.
-  }
-
-  await fs.mkdir(path.dirname(outputPath), { recursive: true });
-  const response = await fetch(url);
-  if (!response.ok) {
-    throw new Error(`Knowledge DB Japanese embedding model download failed (${response.status}): ${url}`);
-  }
-  const bytes = new Uint8Array(await response.arrayBuffer());
-  if (bytes.byteLength < 1024) {
-    throw new Error(`Knowledge DB Japanese embedding model download was unexpectedly small: ${url}`);
-  }
-  const tempPath = outputPath + ".tmp";
-  await fs.writeFile(tempPath, bytes);
-  await fs.rename(tempPath, outputPath);
-}
 
 async function getEmbedder(): Promise<Embedder> {
   if (!embedderPromise) {
     embedderPromise = (async () => {
-      const modelPath = path.join(MODEL_CACHE_DIR, "model_int8.onnx");
-      const tokenizerPath = path.join(MODEL_CACHE_DIR, "tokenizer.json");
-      await downloadModelFile(MODEL_URL, modelPath);
-      await downloadModelFile(TOKENIZER_URL, tokenizerPath);
-
-      const runtime = await import("ruvector-onnx-embeddings-wasm") as unknown as WasmEmbeddingModule;
-      if (runtime.default) await runtime.default();
-      const modelBytes = await fs.readFile(modelPath);
-      const tokenizerJson = await fs.readFile(tokenizerPath, "utf8");
-      let config: unknown = new runtime.WasmEmbedderConfig();
-      config = (config as { setMaxLength(length: number): unknown }).setMaxLength(8192);
-      config = (config as { setNormalize(normalize: boolean): unknown }).setNormalize(true);
-      config = (config as { setPooling(strategy: number): unknown }).setPooling(0);
-      const rawEmbedder = runtime.WasmEmbedder.withConfig(modelBytes, tokenizerJson, config);
+      const runtime = await import("ruvector-onnx-embeddings-wasm/loader.js") as {
+        createEmbedder(model: string): Promise<Embedder>;
+      };
+      const embedder = await runtime.createEmbedder(MODEL);
       return {
-        embedOne: (text: string) => rawEmbedder.embedOne(text),
+        embedOne: (text: string) => embedder.embedOne(text),
       };
     })().catch((error) => {
       embedderPromise = null;
       throw new Error(
-        `Knowledge DB Japanese semantic embedding model could not be initialized: ${error instanceof Error ? error.message : String(error)}`,
+        `Knowledge DB multilingual semantic embedding model could not be initialized: ${error instanceof Error ? error.message : String(error)}`,
       );
     });
   }
