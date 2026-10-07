@@ -217,6 +217,44 @@ describe("Web AI bridge", () => {
     expect(proposal.status).toBe(409);
   });
 
+  it("rejects malformed JSON and oversized request bodies with client errors", async () => {
+    const server = createWebAiBridgeServer({
+      token: "test-token",
+      getDocument: async () => null,
+      listDocuments: async () => [],
+      listProposals: async () => [],
+      getProposal: async () => null,
+      approveProposal: async () => null,
+      rejectProposal: async () => null,
+      startRun: async () => ({ ok: true }),
+      cancelRun: () => false,
+      mcpGateway,
+    });
+    servers.push(server);
+    const base = await listen(server);
+    const headers = {
+      Authorization: "Bearer test-token",
+      Origin: "https://chatgpt.com",
+      "Content-Type": "application/json",
+    };
+
+    const malformed = await fetch(`${base}/v1/mcp/call`, {
+      method: "POST",
+      headers,
+      body: "{not-json",
+    });
+    expect(malformed.status).toBe(400);
+    await expect(malformed.json()).resolves.toMatchObject({ ok: false, error: "invalid JSON request body" });
+
+    const oversized = await fetch(`${base}/v1/mcp/call`, {
+      method: "POST",
+      headers,
+      body: JSON.stringify({ name: "knowledge_db_search", arguments: { query: "x".repeat(2 * 1024 * 1024) } }),
+    });
+    expect(oversized.status).toBe(413);
+    await expect(oversized.json()).resolves.toMatchObject({ ok: false, error: "request body too large" });
+  });
+
   it("starts runs and exposes completion state", async () => {
     const server = createWebAiBridgeServer({
       token: "test-token",
