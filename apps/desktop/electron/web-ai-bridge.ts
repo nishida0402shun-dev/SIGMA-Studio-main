@@ -17,6 +17,10 @@ const BRIDGE_DIR_NAME = "ai-run-context";
 const BRIDGE_FILE_NAME = "web-ai-bridge.json";
 const API_VERSION = "1";
 
+const GLOBAL_MCP_TOOLS = new Set([
+  "list_ai_resources","get_ai_resource","save_ai_resource","delete_ai_resource",
+]);
+
 const KNOWLEDGE_DB_MCP_TOOLS = new Set([
   "knowledge_db_list_sources","knowledge_db_search","knowledge_db_route_query","knowledge_db_rag_query","knowledge_db_record_feedback","knowledge_db_get_context","knowledge_db_get_page","knowledge_db_get_region",
   "knowledge_db_get_related_sources","knowledge_db_get_analysis_status","knowledge_db_list_classification_reviews",
@@ -322,7 +326,7 @@ export function createWebAiBridgeServer(deps: CreateWebAiBridgeServerDeps): http
           sendJson(res, 400, { ok: false, error: "name and object arguments are required" }, origin);
           return;
         }
-        if (!workspaceId && !KNOWLEDGE_DB_MCP_TOOLS.has(name)) {
+        if (!workspaceId && !KNOWLEDGE_DB_MCP_TOOLS.has(name) && !GLOBAL_MCP_TOOLS.has(name)) {
           sendJson(res, 409, { ok: false, error: "Select a SIGMA Workspace before using this Tool." }, origin);
           return;
         }
