@@ -483,6 +483,11 @@ export const settings = {
       label: "AIのWeb検索を許可",
       description: "AIが必要に応じてWeb検索を行い、出典を提示します。",
     },
+    knowledgeDecision: {
+      label: "Knowledge DBのローカルJev判定",
+      description: "検索候補をローカルのTev1で再判定します。OFFにするとRuri＋RRFの検索結果をそのまま使います。",
+    },
+
     hint: {
       codexPathWindows: "codex または C:\\Users\\...\\AppData\\Roaming\\npm\\codex.cmd",
       codexPathPosix: "codex または /Users/.../codex",
