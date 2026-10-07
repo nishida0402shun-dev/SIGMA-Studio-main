@@ -10,6 +10,7 @@ const MAX_CANDIDATES = 12;
 const MAX_TEXT_CHARS = 2200;
 const HEALTH_CACHE_MS = 5_000;
 const REQUEST_TIMEOUT_MS = 2_500;
+const MIN_FREE_MEMORY_GB = 1.5;
 
 interface DecisionAnswer {
   noul?: boolean;
@@ -69,6 +70,9 @@ async function request(payload: unknown, timeoutMs = REQUEST_TIMEOUT_MS): Promis
 
 async function isAvailable(): Promise<boolean> {
   if (!enabled()) return false;
+  // Electron + multiple WebViews can consume substantial RAM. Do not start a
+  // local decision model when the OS is already under memory pressure.
+  if (os.freemem() / (1024 ** 3) < MIN_FREE_MEMORY_GB) return false;
   if (Date.now() < healthUntil) return healthy;
   try {
     await request({
