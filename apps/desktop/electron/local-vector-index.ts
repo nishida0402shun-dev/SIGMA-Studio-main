@@ -12,8 +12,9 @@ export interface VectorRecord {
 }
 
 interface VectorIndexFile {
-  version: 2;
+  version: 3;
   dimensions: number;
+  model: string;
   records: VectorRecord[];
 }
 
@@ -22,7 +23,37 @@ export interface VectorSearchResult extends Omit<VectorRecord, "vector"> {
 }
 
 const DIMENSIONS = 384;
-const TOKEN_RE = /[\p{L}\p{N}][\p{P}\p{L}\p{N}_-]*/gu;
+const MODEL = "gte-small";
+const MODEL_PACKAGE = "ruvector-onnx-embeddings-wasm/loader.js";
+
+type Embedder = {
+  embedOne(text: string): Float32Array | number[];
+};
+
+let embedderPromise: Promise<Embedder> | null = null;
+
+async function getEmbedder(): Promise<Embedder> {
+  if (!embedderPromise) {
+    embedderPromise = import(MODEL_PACKAGE).then(async ({ createEmbedder }) => {
+      return (await createEmbedder(MODEL)) as Embedder;
+    }).catch((error) => {
+      embedderPromise = null;
+      throw new Error(
+        `Knowledge DB semantic embedding model could not be initialized: ${error instanceof Error ? error.message : String(error)}`,
+      );
+    });
+  }
+  return embedderPromise;
+}
+
+async function embedText(text: string): Promise<number[]> {
+  const embedder = await getEmbedder();
+  const vector = Array.from(embedder.embedOne(text));
+  if (vector.length !== DIMENSIONS) {
+    throw new Error(`Unexpected embedding dimension: ${vector.length}; expected ${DIMENSIONS}`);
+  }
+  return vector;
+}
 
 export class LocalVectorIndex {
   private readonly indexPath: string;
@@ -40,8 +71,9 @@ export class LocalVectorIndex {
     const index = await this.read();
     const keys = new Set(records.map((record) => record.sourceId + ":" + record.pageNumber + ":" + record.chunkIndex));
     const next = index.records.filter((item) => !keys.has(item.sourceId + ":" + item.pageNumber + ":" + item.chunkIndex));
-    next.push(...records.map((record) => ({ ...record, vector: embed(record.text) })));
-    await this.write({ version: 2, dimensions: DIMENSIONS, records: next });
+    const vectors = await Promise.all(records.map((record) => embedText(record.text)));
+    next.push(...records.map((record, index) => ({ ...record, vector: vectors[index] })));
+    await this.write({ version: 3, dimensions: DIMENSIONS, model: MODEL, records: next });
   }
 
   async hasSource(sourceId: string): Promise<boolean> {
@@ -52,13 +84,15 @@ export class LocalVectorIndex {
   async removeSource(sourceId: string): Promise<void> {
     const index = await this.read();
     const next = index.records.filter((item) => item.sourceId !== sourceId);
-    if (next.length !== index.records.length) await this.write({ ...index, records: next });
+    if (next.length !== index.records.length) {
+      await this.write({ ...index, records: next });
+    }
   }
 
   async search(query: string, limit = 12): Promise<VectorSearchResult[]> {
     const normalized = query.trim();
     if (!normalized) return [];
-    const queryVector = embed(normalized);
+    const queryVector = await embedText(normalized);
     const index = await this.read();
     return index.records
       .map(({ vector, ...record }) => ({ ...record, score: cosine(queryVector, vector) }))
@@ -71,13 +105,33 @@ export class LocalVectorIndex {
     try {
       const raw = await fs.readFile(this.indexPath, "utf8");
       const parsed = JSON.parse(raw) as Partial<VectorIndexFile>;
-      if (parsed.version === 2 && parsed.dimensions === DIMENSIONS && Array.isArray(parsed.records)) {
+      if (
+        parsed.version === 3 &&
+        parsed.dimensions === DIMENSIONS &&
+        parsed.model === MODEL &&
+        Array.isArray(parsed.records)
+      ) {
         return parsed as VectorIndexFile;
       }
+
+      // v2 contained deterministic hash vectors, not semantic embeddings.
+      // Rebuild those records in-place so existing Knowledge DB content survives.
+      if (parsed.version === 2 && parsed.dimensions === DIMENSIONS && Array.isArray(parsed.records)) {
+        const oldRecords = parsed.records as VectorRecord[];
+        const migratedVectors = await Promise.all(oldRecords.map((record) => embedText(record.text)));
+        const migrated: VectorIndexFile = {
+          version: 3,
+          dimensions: DIMENSIONS,
+          model: MODEL,
+          records: oldRecords.map((record, index) => ({ ...record, vector: migratedVectors[index] })),
+        };
+        await this.write(migrated);
+        return migrated;
+      }
     } catch {
-      // First launch or an incomplete index.
+      // First launch, an incomplete index, or a stale legacy index.
     }
-    return { version: 2, dimensions: DIMENSIONS, records: [] };
+    return { version: 3, dimensions: DIMENSIONS, model: MODEL, records: [] };
   }
 
   private async write(index: VectorIndexFile): Promise<void> {
@@ -88,35 +142,8 @@ export class LocalVectorIndex {
   }
 }
 
-export function embed(text: string): number[] {
-  const vector = new Array<number>(DIMENSIONS).fill(0);
-  const tokens = tokenize(text);
-  for (const token of tokens) {
-    const hash = fnv1a(token);
-    const index = hash % DIMENSIONS;
-    const sign = (hash & 1) === 0 ? 1 : -1;
-    vector[index] += sign;
-    const second = (hash >>> 8) % DIMENSIONS;
-    vector[second] += sign * 0.5;
-  }
-  const norm = Math.sqrt(vector.reduce((sum, value) => sum + value * value, 0));
-  return norm === 0 ? vector : vector.map((value) => value / norm);
-}
-
-function tokenize(text: string): string[] {
-  const normalized = text.normalize("NFKC").toLocaleLowerCase();
-  const baseTokens = normalized.match(TOKEN_RE) ?? [];
-  const characterTokens = Array.from(normalized).filter((char) => /[\u3040-\u30ff\u3400-\u9fff]/u.test(char));
-  return [...baseTokens, ...characterTokens];
-}
-
-function fnv1a(value: string): number {
-  let hash = 2166136261;
-  for (let index = 0; index < value.length; index += 1) {
-    hash ^= value.charCodeAt(index);
-    hash = Math.imul(hash, 16777619);
-  }
-  return hash >>> 0;
+export async function embed(text: string): Promise<number[]> {
+  return embedText(text);
 }
 
 function cosine(a: number[], b: number[]): number {
