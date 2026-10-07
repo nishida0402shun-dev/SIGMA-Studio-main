@@ -107,6 +107,7 @@ export interface DesktopSettingsAPI {
     hasCustomCommands?: boolean;
     aiAutoApplyVerifiedProposals?: boolean;
     aiWebSearchEnabled?: boolean;
+    knowledgeDecisionEnabled?: boolean;
     webAiConversationCaptureEnabled?: boolean;
     /** UIの表示言語。settings.jsonが正本。未設定はnullで、レンダラ側のOSロケール検出に委ねる。 */
     uiLocale?: "ja" | "en" | null;
@@ -121,6 +122,7 @@ export interface DesktopSettingsAPI {
   setAiAutoApplyVerifiedProposals?(value: boolean): Promise<DesktopStorageResult>;
   /** AIエージェント (Codex/Claude/Antigravity) にWeb検索を許可する。既定true (未設定は有効扱い)。 */
   setAiWebSearchEnabled?(value: boolean): Promise<DesktopStorageResult>;
+  setKnowledgeDecisionEnabled?(value: boolean): Promise<DesktopStorageResult>;
   setWebAiConversationCaptureEnabled?(value: boolean): Promise<DesktopStorageResult>;
   /** UIの表示言語。既定(ja)を渡すとキーごと削除される。 */
   setUiLocale?(value: "ja" | "en"): Promise<DesktopStorageResult>;
