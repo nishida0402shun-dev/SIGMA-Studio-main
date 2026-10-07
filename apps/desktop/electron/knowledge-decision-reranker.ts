@@ -1,10 +1,11 @@
+import os from "node:os";
 import type { VectorSearchResult } from "./local-vector-index";
 
 const DEFAULT_ENDPOINT = "http://127.0.0.1:11434/v1/systemone";
 const SAFE_MODEL = "tev1:0.8b";
 const HIGH_QUALITY_MODEL = "tev1:4b";
 const DEFAULT_MEMORY_BUDGET_GB = 8;
-const HIGH_QUALITY_MIN_AVAILABLE_GB = 6.5;
+const HIGH_QUALITY_MIN_TOTAL_GB = 16;
 const MAX_CANDIDATES = 12;
 const MAX_TEXT_CHARS = 2200;
 const HEALTH_CACHE_MS = 5_000;
@@ -35,17 +36,15 @@ function configuredModel(): string {
 }
 
 function availableMemoryGb(): number {
-  // Electron's Node runtime exposes os.freemem(); avoid importing os solely for this
-  // small policy check by using the process-level value injected by desktop startup.
-  const raw = process.env.SIGMA_AVAILABLE_MEMORY_GB?.trim();
-  const parsed = raw ? Number(raw) : Number.NaN;
-  return Number.isFinite(parsed) && parsed > 0 ? parsed : DEFAULT_MEMORY_BUDGET_GB;
+  const totalGb = os.totalmem() / (1024 ** 3);
+  const freeGb = os.freemem() / (1024 ** 3);
+  return Math.max(0, Math.min(totalGb, freeGb));
 }
 
 function model(): string {
   const configured = configuredModel();
   if (configured && configured !== "auto") return configured;
-  return availableMemoryGb() >= HIGH_QUALITY_MIN_AVAILABLE_GB
+  return os.totalmem() / (1024 ** 3) >= HIGH_QUALITY_MIN_TOTAL_GB
     ? HIGH_QUALITY_MODEL
     : SAFE_MODEL;
 }
