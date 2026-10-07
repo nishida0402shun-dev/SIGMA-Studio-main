@@ -505,6 +505,25 @@ describe("Knowledge DB RAG retrieval quality", () => {
   });
 });
 
+describe("Knowledge DB write safety", () => {
+  it("rejects a stale read-modify-write instead of losing a concurrent update", async () => {
+    const dataDir = await fs.mkdtemp(path.join(os.tmpdir(), "sigma-knowledge-db-conflict-"));
+    tempDirs.push(dataDir);
+    const firstPath = path.join(dataDir, "first.md");
+    const secondPath = path.join(dataDir, "second.md");
+    await fs.writeFile(firstPath, "最初の資料", "utf8");
+    await fs.writeFile(secondPath, "追加の資料", "utf8");
+    const first = new KnowledgeDbStore(dataDir);
+    const second = new KnowledgeDbStore(dataDir);
+    await first.addFiles([firstPath]);
+    const stale = await second.listSources();
+    expect(stale).toHaveLength(1);
+    await first.addFiles([secondPath]);
+    await expect(second.updatePageSemanticType(stale[0]!.id, 1, "definition")).rejects.toThrow("changed concurrently");
+    expect((await first.listSources()).map((source) => source.name)).toEqual(expect.arrayContaining(["first.md", "second.md"]));
+  });
+});
+
 describe("Knowledge DB smart split", () => {
   it("previews taxonomy boundaries and materializes child PDFs", async () => {
     const dataDir = await fs.mkdtemp(path.join(os.tmpdir(), "sigma-knowledge-smart-split-"));
