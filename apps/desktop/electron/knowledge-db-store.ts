@@ -70,6 +70,8 @@ export interface KnowledgeSource {
 interface KnowledgeLibrary {
   version: 3;
   sources: KnowledgeSource[];
+  /** Process-local snapshot fingerprint used to detect stale read-modify-write cycles. */
+  __fingerprint?: string;
 }
 
 export interface KnowledgeRegion {
@@ -781,22 +783,24 @@ export class KnowledgeDbStore {
     await fs.mkdir(paths.root, { recursive: true });
     const zip = new JSZip();
     const files = await collectFiles(paths.root);
+    let includedFileCount = 0;
     for (const filePath of files) {
       const relative = path.relative(paths.root, filePath).split(path.sep).join("/");
       if (!relative || relative.endsWith(".tmp")) continue;
       zip.file(relative, await fs.readFile(filePath));
+      includedFileCount += 1;
     }
     zip.file("backup-manifest.json", JSON.stringify({
       format: "sigma-knowledge-db-backup",
       version: 1,
       createdAt: new Date().toISOString(),
-      fileCount: files.length,
+      fileCount: includedFileCount,
     }, null, 2));
     const bytes = await zip.generateAsync({ type: "nodebuffer", compression: "DEFLATE", compressionOptions: { level: 6 } });
     const destination = path.resolve(outputPath);
     await fs.mkdir(path.dirname(destination), { recursive: true });
     await fs.writeFile(destination, bytes);
-    return { filePath: destination, fileCount: files.length, bytes: bytes.byteLength };
+    return { filePath: destination, fileCount: includedFileCount, bytes: bytes.byteLength };
   }
 
   async restoreBackup(backupPath: string): Promise<{ filePath: string; fileCount: number }> {
@@ -1095,14 +1099,17 @@ export class KnowledgeDbStore {
     const paths = this.paths();
     await fs.mkdir(paths.root, { recursive: true });
     try {
-      const parsed = JSON.parse(await fs.readFile(paths.libraryPath, "utf8")) as Partial<KnowledgeLibrary>;
+      const raw = await fs.readFile(paths.libraryPath, "utf8");
+      const parsed = JSON.parse(raw) as Partial<KnowledgeLibrary>;
       if (parsed.version === 3 && Array.isArray(parsed.sources)) {
         const sources = parsed.sources.map((source) => {
           const globalSource = { ...(source as KnowledgeSource & { workspaceId?: unknown }) };
           delete globalSource.workspaceId;
           return globalSource as KnowledgeSource;
         });
-        return { version: 3, sources };
+        const library: KnowledgeLibrary = { version: 3, sources };
+        Object.defineProperty(library, "__fingerprint", { value: createHash("sha256").update(raw).digest("hex"), enumerable: false, writable: true });
+        return library;
       }
     } catch {}
     const library: KnowledgeLibrary = { version: 3, sources: [] };
@@ -1162,9 +1169,21 @@ export class KnowledgeDbStore {
   private async writeLibrary(library: KnowledgeLibrary): Promise<void> {
     const paths = this.paths();
     await fs.mkdir(paths.root, { recursive: true });
+    let currentFingerprint: string | null = null;
+    try {
+      const currentRaw = await fs.readFile(paths.libraryPath, "utf8");
+      currentFingerprint = createHash("sha256").update(currentRaw).digest("hex");
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
+    }
+    if (library.__fingerprint !== undefined && library.__fingerprint !== currentFingerprint) {
+      throw new Error("Knowledge DB changed concurrently; the operation was not written. Please retry.");
+    }
+    const serialized = JSON.stringify(library, null, 2);
     const tmp = `${paths.libraryPath}.tmp`;
-    await fs.writeFile(tmp, JSON.stringify(library, null, 2), "utf8");
+    await fs.writeFile(tmp, serialized, "utf8");
     await fs.rename(tmp, paths.libraryPath);
+    library.__fingerprint = createHash("sha256").update(serialized).digest("hex");
   }
 
   private stagingPaths() {
