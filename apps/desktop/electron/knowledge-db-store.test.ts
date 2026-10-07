@@ -516,10 +516,14 @@ describe("Knowledge DB write safety", () => {
     const first = new KnowledgeDbStore(dataDir);
     const second = new KnowledgeDbStore(dataDir);
     await first.addFiles([firstPath]);
-    const stale = await second.listSources();
-    expect(stale).toHaveLength(1);
+    const secondInternal = second as unknown as {
+      readLibrary: () => Promise<{ sources: KnowledgeSource[]; __fingerprint?: string }>;
+      writeLibrary: (library: { version: 3; sources: KnowledgeSource[]; __fingerprint?: string }) => Promise<void>;
+    };
+    const stale = await secondInternal.readLibrary();
+    expect(stale.sources).toHaveLength(1);
     await first.addFiles([secondPath]);
-    await expect(second.updatePageSemanticType(stale[0]!.id, 1, "definition")).rejects.toThrow("changed concurrently");
+    await expect(secondInternal.writeLibrary(stale)).rejects.toThrow("changed concurrently");
     expect((await first.listSources()).map((source) => source.name)).toEqual(expect.arrayContaining(["first.md", "second.md"]));
   });
 });
