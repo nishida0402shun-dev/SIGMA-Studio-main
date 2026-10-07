@@ -41,6 +41,10 @@ async function getEmbedder(): Promise<Embedder> {
       const previousRequire = runtime["require"];
       const previousFilename = runtime["__filename"];
       const previousDirname = runtime["__dirname"];
+      const requireFromSigma = createRequire(import.meta.url);
+      const loaderPath = requireFromSigma.resolve("ruvector-onnx-embeddings-wasm/loader.js");
+      const wasmPackageDir = path.join(path.dirname(loaderPath), "pkg");
+      const wasmGluePath = path.join(wasmPackageDir, "ruvector_onnx_embeddings_wasm.js");
       Object.defineProperty(runtime, "module", {
         configurable: true,
         writable: true,
@@ -54,17 +58,17 @@ async function getEmbedder(): Promise<Embedder> {
       Object.defineProperty(runtime, "__filename", {
         configurable: true,
         writable: true,
-        value: fileURLToPath(import.meta.url),
+        value: wasmGluePath,
       });
       Object.defineProperty(runtime, "__dirname", {
         configurable: true,
         writable: true,
-        value: path.dirname(fileURLToPath(import.meta.url)),
+        value: wasmPackageDir,
       });
       Object.defineProperty(runtime, "require", {
         configurable: true,
         writable: true,
-        value: createRequire(import.meta.url),
+        value: requireFromSigma,
       });
       try {
         const { createEmbedder } = await import("ruvector-onnx-embeddings-wasm/loader.js");
