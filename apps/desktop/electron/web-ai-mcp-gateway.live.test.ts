@@ -86,6 +86,10 @@ describe("Web AI MCP gateway live server path", () => {
     expect(reviewTool?.annotations?.readOnlyHint).toBe(false);
     expect(reviewTool?.annotations?.destructiveHint).toBe(false);
     expect(names.has("create_local_document")).toBe(true);
+    expect(names.has("list_ai_resources")).toBe(true);
+    expect(names.has("get_ai_resource")).toBe(true);
+    expect(names.has("save_ai_resource")).toBe(true);
+    expect(names.has("delete_ai_resource")).toBe(true);
     expect(names.size).toBeGreaterThan(5);
 
     const globalTools = await gateway.listTools(null);
@@ -99,6 +103,14 @@ describe("Web AI MCP gateway live server path", () => {
     expect(globalNames.has("knowledge_db_pdf_import_staging_list")).toBe(true);
     expect(globalNames.has("knowledge_db_pdf_import_staging_get")).toBe(true);
     expect(globalNames.has("list_local_documents")).toBe(false);
+    expect(globalNames.has("list_ai_resources")).toBe(true);
+    expect(globalNames.has("get_ai_resource")).toBe(true);
+    expect(globalNames.has("save_ai_resource")).toBe(true);
+    expect(globalNames.has("delete_ai_resource")).toBe(true);
+
+    const skillList = await gateway.callTool("list_ai_resources", { kind: "skill" }, null);
+    expect(skillList.isError).not.toBe(true);
+    expect(skillList.content).toBeTruthy();
   });
 
   it("allows the classification review workflow without a selected Workspace", async () => {
