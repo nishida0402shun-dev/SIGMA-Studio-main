@@ -366,6 +366,12 @@ const desktopAPI = {
   },
 
   knowledgeDb: {
+    backup(): Promise<{ filePath: string; fileCount: number; bytes: number } | null> {
+      return ipcRenderer.invoke("knowledge-db:backup");
+    },
+    restore(): Promise<{ filePath: string; fileCount: number } | null> {
+      return ipcRenderer.invoke("knowledge-db:restore");
+    },
     chooseFiles(): Promise<{ paths: string[] } | null> {
       return ipcRenderer.invoke("knowledge-db:choose-files");
     },
