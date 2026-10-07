@@ -13,6 +13,22 @@ describe("LocalVectorIndex", () => {
     expect(Math.sqrt(first.reduce((sum, value) => sum + value * value, 0))).toBeCloseTo(1);
   });
 
+  it("serializes concurrent upserts from independent index instances", async () => {
+    const root = await mkdtemp(path.join(os.tmpdir(), "sigma-vector-concurrent-"));
+    try {
+      const first = new LocalVectorIndex(root);
+      const second = new LocalVectorIndex(root);
+      await Promise.all([
+        first.upsert({ id: "page-a", sourceId: "source-a", pageNumber: 1, chunkIndex: 0, text: "二次関数の頂点" }),
+        second.upsert({ id: "page-b", sourceId: "source-b", pageNumber: 1, chunkIndex: 0, text: "英語の長文読解" }),
+      ]);
+      const persisted = JSON.parse(await readFile(path.join(root, "vectors.json"), "utf8")) as { records: unknown[] };
+      expect(persisted.records).toHaveLength(2);
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
   it("persists semantic vectors and returns the closest matching page", async () => {
     const root = await mkdtemp(path.join(os.tmpdir(), "sigma-vector-"));
     try {
