@@ -15,13 +15,13 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/Atsu-Taiyo/SIGMA-Studio/releases/latest"><img src="docs/images/download.svg" alt="macOS / Windows版をダウンロード" height="48" /></a>
+  <a href="https://github.com/nishida0402shun-dev/SIGMA-Studio-main/releases/latest"><img src="docs/images/download.svg" alt="macOS / Windows版をダウンロード" height="48" /></a>
   <a href="https://chocoschools.com/sigma-studio/#try"><img src="docs/images/demo.svg" alt="公式サイトでデモを試す" height="48" /></a>
 </p>
 
 <p align="center">
   <a href="#features">機能を見る</a> ·
-  <a href="https://github.com/Atsu-Taiyo/SIGMA-Studio/issues/new/choose">不具合報告・やりたいこと</a> ·
+  <a href="https://github.com/nishida0402shun-dev/SIGMA-Studio-main/issues/new/choose">不具合報告・やりたいこと</a> ·
   <a href="CONTRIBUTING.md">開発に参加する</a> ·
   <a href="LICENSE">MIT License</a>
 </p>
@@ -46,7 +46,7 @@ AI機能は、利用するプロバイダの接続設定が必要です。
 
 ## はじめる
 
-**アプリを使う** — [最新リリース](https://github.com/Atsu-Taiyo/SIGMA-Studio/releases/latest)から、お使いのmacOS / Windowsに対応するアプリをダウンロードしてください。
+**アプリを使う** — [最新リリース](https://github.com/nishida0402shun-dev/SIGMA-Studio-main/releases/latest)から、お使いのmacOS / Windowsに対応するアプリをダウンロードしてください。
 
 **まず触ってみる** — [公式サイトのデモ](https://chocoschools.com/sigma-studio/#try)で、編集画面を試せます。
 
@@ -87,14 +87,14 @@ Electronアプリの開発起動は `npm run electron:dev` です。
 
 ## 一緒に育てていく
 
-「ここがうまく動かない」「こんなことができたらうれしい」。どちらも[Issue作成画面](https://github.com/Atsu-Taiyo/SIGMA-Studio/issues/new/choose)からお寄せください。「不具合報告」または「機能リクエスト」を選ぶと、フォームに沿って記入できます。GitHubアカウントが必要です。
+「ここがうまく動かない」「こんなことができたらうれしい」。どちらも[Issue作成画面](https://github.com/nishida0402shun-dev/SIGMA-Studio-main/issues/new/choose)からお寄せください。「不具合報告」または「機能リクエスト」を選ぶと、フォームに沿って記入できます。GitHubアカウントが必要です。
 
 投稿内容と添付ファイルは公開されます。教材や画像を添付する際は、生徒名などの個人情報を取り除いてください。コードの変更を提案する際は、再現手順と実行した検証を添えてください。
 
 <p align="center">
   <strong>Sigma Studioが役に立ったら、GitHubのStarで応援してください。</strong><br />
   日々のフィードバックと応援が、開発を続ける励みになります。<br /><br />
-  <a href="https://github.com/Atsu-Taiyo/SIGMA-Studio">☆ GitHubでStarを付ける</a>
+  <a href="https://github.com/nishida0402shun-dev/SIGMA-Studio-main">☆ GitHubでStarを付ける</a>
 </p>
 
 ## Supported by
