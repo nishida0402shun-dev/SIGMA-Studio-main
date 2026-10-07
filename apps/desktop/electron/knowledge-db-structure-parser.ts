@@ -40,7 +40,7 @@ pipeline = PPStructureV3(
     use_doc_unwarping=False,
     use_textline_orientation=True,
 )
-results = pipeline.predict(input_path)
+results = pipeline.predict(pdf_path)
 pages = []
 for index, result in enumerate(results, 1):
     data = result.json if hasattr(result, "json") else {}
