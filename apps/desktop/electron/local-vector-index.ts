@@ -102,35 +102,53 @@ export class LocalVectorIndex {
   }
 
   private async read(): Promise<VectorIndexFile> {
+    let raw: string;
     try {
-      const raw = await fs.readFile(this.indexPath, "utf8");
-      const parsed = JSON.parse(raw) as Partial<VectorIndexFile>;
-      if (
-        parsed.version === 3 &&
-        parsed.dimensions === DIMENSIONS &&
-        parsed.model === MODEL &&
-        Array.isArray(parsed.records)
-      ) {
-        return parsed as VectorIndexFile;
+      raw = await fs.readFile(this.indexPath, "utf8");
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code === "ENOENT") {
+        return { version: 3, dimensions: DIMENSIONS, model: MODEL, records: [] };
       }
-
-      // v2 contained deterministic hash vectors, not semantic embeddings.
-      // Rebuild those records in-place so existing Knowledge DB content survives.
-      if (parsed.version === 2 && parsed.dimensions === DIMENSIONS && Array.isArray(parsed.records)) {
-        const oldRecords = parsed.records as VectorRecord[];
-        const migratedVectors = await Promise.all(oldRecords.map((record) => embedText(record.text)));
-        const migrated: VectorIndexFile = {
-          version: 3,
-          dimensions: DIMENSIONS,
-          model: MODEL,
-          records: oldRecords.map((record, index) => ({ ...record, vector: migratedVectors[index] })),
-        };
-        await this.write(migrated);
-        return migrated;
-      }
-    } catch {
-      // First launch, an incomplete index, or a stale legacy index.
+      throw error;
     }
+
+    let parsed: {
+      version?: number;
+      dimensions?: number;
+      model?: string;
+      records?: unknown;
+    };
+    try {
+      parsed = JSON.parse(raw) as typeof parsed;
+    } catch {
+      return { version: 3, dimensions: DIMENSIONS, model: MODEL, records: [] };
+    }
+
+    if (
+      parsed.version === 3 &&
+      parsed.dimensions === DIMENSIONS &&
+      parsed.model === MODEL &&
+      Array.isArray(parsed.records)
+    ) {
+      return parsed as VectorIndexFile;
+    }
+
+    // v2 contained deterministic hash vectors, not semantic embeddings.
+    // Rebuild those records in-place so existing Knowledge DB content survives.
+    // Migration errors intentionally propagate so the old index is never replaced by an empty one.
+    if (parsed.version === 2 && parsed.dimensions === DIMENSIONS && Array.isArray(parsed.records)) {
+      const oldRecords = parsed.records as VectorRecord[];
+      const migratedVectors = await Promise.all(oldRecords.map((record) => embedText(record.text)));
+      const migrated: VectorIndexFile = {
+        version: 3,
+        dimensions: DIMENSIONS,
+        model: MODEL,
+        records: oldRecords.map((record, index) => ({ ...record, vector: migratedVectors[index] })),
+      };
+      await this.write(migrated);
+      return migrated;
+    }
+
     return { version: 3, dimensions: DIMENSIONS, model: MODEL, records: [] };
   }
 
