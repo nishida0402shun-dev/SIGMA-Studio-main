@@ -5,7 +5,6 @@ import { readDesktopSettingsSync } from "./desktop-settings";
 const DEFAULT_ENDPOINT = "http://127.0.0.1:11434/v1/systemone";
 const SAFE_MODEL = "tev1:0.8b";
 const HIGH_QUALITY_MODEL = "tev1:4b";
-const DEFAULT_MEMORY_BUDGET_GB = 8;
 const HIGH_QUALITY_MIN_TOTAL_GB = 16;
 const MAX_CANDIDATES = 12;
 const MAX_TEXT_CHARS = 2200;
@@ -34,12 +33,6 @@ function endpoint(): string {
 
 function configuredModel(): string {
   return process.env.SIGMA_KNOWLEDGE_DECISION_MODEL?.trim() || "auto";
-}
-
-function availableMemoryGb(): number {
-  const totalGb = os.totalmem() / (1024 ** 3);
-  const freeGb = os.freemem() / (1024 ** 3);
-  return Math.max(0, Math.min(totalGb, freeGb));
 }
 
 function model(): string {
