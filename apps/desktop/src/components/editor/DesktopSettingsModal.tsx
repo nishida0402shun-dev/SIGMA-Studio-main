@@ -215,6 +215,8 @@ function DesktopSettingsBody({
   // aiWebSearchEnabled は未設定 (キー欠落) が有効扱いのため、既定値は true。
   const [webSearchEnabled, setWebSearchEnabled] = useState(true);
   const [webSearchBusy, setWebSearchBusy] = useState(false);
+  const [knowledgeDecisionEnabled, setKnowledgeDecisionEnabled] = useState(true);
+  const [knowledgeDecisionBusy, setKnowledgeDecisionBusy] = useState(false);
   const t = useT("settings");
   const tCommon = useT("common");
   useSettingsEntryFocus(focusEntryId);
@@ -249,6 +251,7 @@ function DesktopSettingsBody({
       if (!cancelled) {
         setAutoApplyVerified(r.aiAutoApplyVerifiedProposals ?? false);
         setWebSearchEnabled(r.aiWebSearchEnabled ?? true);
+        setKnowledgeDecisionEnabled(r.knowledgeDecisionEnabled ?? true);
       }
     });
     bridge.fonts?.list().then((r) => {
@@ -263,6 +266,7 @@ function DesktopSettingsBody({
         if (!cancelled) {
           setAutoApplyVerified(r.aiAutoApplyVerifiedProposals ?? false);
           setWebSearchEnabled(r.aiWebSearchEnabled ?? true);
+          setKnowledgeDecisionEnabled(r.knowledgeDecisionEnabled ?? true);
         }
       });
     }) ?? (() => {});
@@ -888,6 +892,19 @@ function DesktopSettingsBody({
     }
   };
 
+
+  const setKnowledgeDecisionEnabledSetting = async (next: boolean) => {
+    setKnowledgeDecisionEnabled(next);
+    setKnowledgeDecisionBusy(true);
+    try {
+      const result = await bridge.settings?.setKnowledgeDecisionEnabled?.(next);
+      if (result && !result.ok) setKnowledgeDecisionEnabled(!next);
+    } catch {
+      setKnowledgeDecisionEnabled(!next);
+    } finally {
+      setKnowledgeDecisionBusy(false);
+    }
+  };
   return (
     <ModalFrame
       open
@@ -1058,6 +1075,19 @@ function DesktopSettingsBody({
                 checked={autoApplyVerified}
                 disabled={autoApplyBusy || !bridge.settings?.setAiAutoApplyVerifiedProposals}
                 onCheckedChange={(next) => void setAutoApplyVerifiedSetting(next)}
+              />
+            )}
+          />
+          <SettingsRow
+            id="desktop-settings-knowledge-decision"
+            label={t("provider.knowledgeDecision.label")}
+            description={t("provider.knowledgeDecision.description")}
+            control={(
+              <Switch
+                label={t("provider.knowledgeDecision.label")}
+                checked={knowledgeDecisionEnabled}
+                disabled={knowledgeDecisionBusy || !bridge.settings?.setKnowledgeDecisionEnabled}
+                onCheckedChange={(next) => void setKnowledgeDecisionEnabledSetting(next)}
               />
             )}
           />
