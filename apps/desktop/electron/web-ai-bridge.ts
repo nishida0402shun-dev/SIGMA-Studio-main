@@ -178,17 +178,33 @@ function sendJson(res: http.ServerResponse, status: number, payload: unknown, or
   res.end(body);
 }
 
+class WebAiRequestError extends Error {
+  readonly status: 400 | 413;
+
+  constructor(message: string, status: 400 | 413) {
+    super(message);
+    this.name = "WebAiRequestError";
+    this.status = status;
+  }
+}
+
 async function readBody(req: http.IncomingMessage): Promise<unknown> {
   const chunks: Buffer[] = [];
   let total = 0;
   for await (const chunk of req) {
     const buffer = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
     total += buffer.length;
-    if (total > MAX_REQUEST_BODY_BYTES) throw new Error("request body too large");
+    if (total > MAX_REQUEST_BODY_BYTES) {
+      throw new WebAiRequestError("request body too large", 413);
+    }
     chunks.push(buffer);
   }
   if (chunks.length === 0) return {};
-  return JSON.parse(Buffer.concat(chunks).toString("utf8"));
+  try {
+    return JSON.parse(Buffer.concat(chunks).toString("utf8"));
+  } catch {
+    throw new WebAiRequestError("invalid JSON request body", 400);
+  }
 }
 
 function sendSseEvent(res: http.ServerResponse, event: unknown): void {
@@ -522,10 +538,11 @@ export function createWebAiBridgeServer(deps: CreateWebAiBridgeServerDeps): http
       sendJson(res, 404, { ok: false, error: "not found" }, origin);
     })().catch((error) => {
       const zodError = error instanceof z.ZodError ? error : null;
-      const status = zodError ? 400 : 500;
+      const requestError = error instanceof WebAiRequestError ? error : null;
+      const status = requestError?.status ?? (zodError ? 400 : 500);
       sendJson(res, status, {
         ok: false,
-        error: error instanceof Error ? error.message : "request failed",
+        error: requestError?.message ?? (error instanceof Error ? error.message : "request failed"),
         ...(zodError ? { details: zodError.issues } : {}),
       }, typeof req.headers.origin === "string" ? req.headers.origin : undefined);
     });
