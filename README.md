@@ -111,3 +111,22 @@ Electronアプリの開発起動は `npm run electron:dev` です。
 ## ライセンス
 
 [MIT License](LICENSE)。同梱する第三者コンポーネントのライセンスも適用されます。掲載素材については[画像の出典](docs/images/README.md)を参照してください。
+
+
+## Knowledge DB local decision reranking
+
+Knowledge DB uses Japanese Ruri v3 embeddings for the primary semantic retrieval path. When Ollama is available locally, SIGMA additionally uses **Tev1 4B** as a Jev-style evidence judge to rerank the top candidates. The decision layer is local-only and automatically falls back to the normal hybrid RAG path when Ollama is unavailable.
+
+Install Ollama and pull the default decision model:
+
+```bash
+ollama pull tev1:4b
+```
+
+The default endpoint is `http://127.0.0.1:11434/v1/systemone`. Optional environment variables:
+
+- `SIGMA_KNOWLEDGE_DECISION_ENABLED=false` — disable the local decision layer.
+- `SIGMA_KNOWLEDGE_DECISION_MODEL=tev1:4b` — select another Ollama decision model.
+- `SIGMA_KNOWLEDGE_DECISION_URL=http://127.0.0.1:11434/v1/systemone` — override the local endpoint.
+
+The decision model never replaces Ruri retrieval; it only judges the relevance of the highest-ranked local candidates.
