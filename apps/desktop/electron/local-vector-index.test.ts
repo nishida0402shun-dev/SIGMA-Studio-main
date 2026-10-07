@@ -5,14 +5,15 @@ import { describe, expect, it } from "vitest";
 import { LocalVectorIndex, embed } from "./local-vector-index";
 
 describe("LocalVectorIndex", () => {
-  it("creates normalized deterministic vectors", () => {
-    const first = embed("二次関数の頂点");
-    const second = embed("二次関数の頂点");
+  it("creates normalized deterministic semantic vectors", async () => {
+    const first = await embed("二次関数の頂点");
+    const second = await embed("二次関数の頂点");
     expect(first).toEqual(second);
+    expect(first).toHaveLength(384);
     expect(Math.sqrt(first.reduce((sum, value) => sum + value * value, 0))).toBeCloseTo(1);
   });
 
-  it("persists records and returns the closest matching page", async () => {
+  it("persists semantic vectors and returns the closest matching page", async () => {
     const root = await mkdtemp(path.join(os.tmpdir(), "sigma-vector-"));
     try {
       const index = new LocalVectorIndex(root);
@@ -35,7 +36,15 @@ describe("LocalVectorIndex", () => {
       expect(results[0]?.id).toBe("page-a");
       expect(results[0]?.chunkIndex).toBe(0);
 
-      const persisted = JSON.parse(await readFile(path.join(root, "vectors.json"), "utf8")) as { records: unknown[] };
+      const persisted = JSON.parse(await readFile(path.join(root, "vectors.json"), "utf8")) as {
+        version: number;
+        dimensions: number;
+        model: string;
+        records: unknown[];
+      };
+      expect(persisted.version).toBe(3);
+      expect(persisted.dimensions).toBe(384);
+      expect(persisted.model).toBe("gte-small");
       expect(persisted.records).toHaveLength(2);
     } finally {
       await rm(root, { recursive: true, force: true });
