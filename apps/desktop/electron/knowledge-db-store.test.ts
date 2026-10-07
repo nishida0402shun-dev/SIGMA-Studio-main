@@ -523,7 +523,7 @@ describe("Knowledge DB write safety", () => {
     const stale = await secondInternal.readLibrary();
     expect(stale.sources).toHaveLength(1);
     await first.addFiles([secondPath]);
-    await expect(secondInternal.writeLibrary(stale)).rejects.toThrow("changed concurrently");
+    await expect(secondInternal.writeLibrary({ version: 3, sources: stale.sources, __fingerprint: stale.__fingerprint })).rejects.toThrow("changed concurrently");
     expect((await first.listSources()).map((source) => source.name)).toEqual(expect.arrayContaining(["first.md", "second.md"]));
   });
 });
