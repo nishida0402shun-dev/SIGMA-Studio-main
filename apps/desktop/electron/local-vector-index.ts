@@ -109,6 +109,8 @@ async function getEmbedder(): Promise<Embedder> {
 
 async function embedText(text: string, role: "query" | "document" | "generic" = "generic"): Promise<number[]> {
   const embedder = await getEmbedder();
+  // Ruri retrieval prefixes are model protocol strings, not user-facing UI copy.
+  // eslint-disable-next-line no-restricted-syntax
   const prefix = role === "query" ? "検索クエリ: " : role === "document" ? "検索文書: " : "";
   const vector = Array.from(embedder.embedOne(prefix + text));
   if (vector.length !== DIMENSIONS) {
