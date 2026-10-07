@@ -296,7 +296,15 @@ export class KnowledgeDbStore {
         text: page.text ?? "",
         score: 0.18,
       })));
+    // Hybrid retrieval: keep independent semantic/vector and lexical/metadata candidate lists,
+    // then fuse their ranks so a strong match from either retrieval channel cannot disappear
+    // merely because the other channel scored it lower.
     const matches = [...vectorMatches, ...metadataMatches];
+    const vectorRank = new Map<string, number>();
+    vectorMatches.forEach((match, index) => vectorRank.set(`${match.sourceId}:${match.pageNumber}`, index + 1));
+    const lexicalRanked = [...metadataMatches].sort((a, b) => b.score - a.score);
+    const lexicalRank = new Map<string, number>();
+    lexicalRanked.forEach((match, index) => lexicalRank.set(`${match.sourceId}:${match.pageNumber}`, index + 1));
     const bestByPage = new Map<string, (typeof matches)[number]>();
     for (const match of matches) {
       const current = bestByPage.get(`${match.sourceId}:${match.pageNumber}`);
@@ -332,7 +340,16 @@ export class KnowledgeDbStore {
       const matchReasons = page ? retrievalMatchReasons(page, trimmed, queryTokens, match.score, lexical, metadata) : [];
       return {
         ...match,
-        score: match.score * 0.48 + lexical * 0.22 + metadata * 0.15 + exact * 0.10 + semantic * 0.05 + learning,
+        // Reciprocal-rank fusion is the backbone of the hybrid score; the remaining
+        // signals refine ties and preserve exact/metadata intent.
+        score: (
+          (1 / (60 + (vectorRank.get(`${match.sourceId}:${match.pageNumber}`) ?? 1000))) * 0.52 +
+          (1 / (60 + (lexicalRank.get(`${match.sourceId}:${match.pageNumber}`) ?? 1000))) * 0.28 +
+          exact * 0.10 +
+          metadata * 0.06 +
+          semantic * 0.04 +
+          learning
+        ),
         matchReasons,
         ...(page ? {
           semanticType: page.semanticType,
