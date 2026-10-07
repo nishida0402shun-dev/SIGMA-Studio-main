@@ -3599,6 +3599,60 @@ registerTool(
 );
 
 registerTool(
+  "list_ai_resources",
+  {
+    title: "SIGMA Skills一覧",
+    description: "SIGMA Studioが管理するAI Skill/Instructionの一覧を取得します。Workspace未選択時はグローバルリソースのみ、Workspace選択時はグローバルとそのWorkspace専用リソースを返します。本文は返さず、必要なSkillだけget_ai_resourceで取得できます。",
+    inputSchema: {
+      workspaceId: z.string().min(1).max(256).optional(),
+      kind: z.enum(["skill", "instruction"]).optional(),
+      includeDisabled: z.boolean().optional(),
+    },
+  },
+  async ({ workspaceId, kind, includeDisabled }) => withToolErrorHandling(async () => {
+    const tree = await createAiResourceStore().getTree();
+    const resources = tree.resources
+      .filter((resource) => resource.workspaceId == null || resource.workspaceId === workspaceId)
+      .filter((resource) => kind === undefined || resource.kind === kind)
+      .filter((resource) => includeDisabled === true || resource.enabled)
+      .map(({ id, kind: resourceKind, title, description, tags, loadMode, enabled, workspaceId: scope }) => ({
+        id,
+        kind: resourceKind,
+        title,
+        description,
+        tags,
+        loadMode,
+        enabled,
+        workspaceId: scope ?? null,
+      }));
+    return { ok: true, workspaceId: workspaceId ?? null, resources };
+  }),
+);
+
+registerTool(
+  "get_ai_resource",
+  {
+    title: "SIGMA Skillを取得",
+    description: "指定したSIGMA Skill/Instructionの本文を取得します。Workspace専用リソースは、そのWorkspaceが選択されている場合だけ取得できます。",
+    inputSchema: {
+      resourceId: z.string().min(1).max(256),
+      workspaceId: z.string().min(1).max(256).optional(),
+    },
+  },
+  async ({ resourceId, workspaceId }) => withToolErrorHandling(async () => {
+    const result = await createAiResourceStore().readFile(resourceId);
+    if (result.resource.workspaceId != null && result.resource.workspaceId !== workspaceId) {
+      throw new Error("The requested AI resource does not belong to the selected Workspace.");
+    }
+    return {
+      ok: true,
+      resource: result.resource,
+      content: result.content,
+    };
+  }),
+);
+
+registerTool(
   "save_ai_resource",
   {
     title: "AIリソースを保存",
