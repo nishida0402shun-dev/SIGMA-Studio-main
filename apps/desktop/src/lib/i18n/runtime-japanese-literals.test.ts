@@ -48,9 +48,9 @@ export const INTENTIONAL_RUNTIME_JAPANESE: readonly IntentionalJapaneseRule[] = 
   },
   {
     path: /^electron\/ipc\/knowledge-db\.ts$/,
-    value: /^(?:Knowledge DBにファイルを追加|Knowledge DBにフォルダを追加)$/,
+    value: /^(?:Knowledge DBにファイルを追加|Knowledge DBにフォルダを追加|Knowledge DBをバックアップ|Knowledge DBバックアップを復元)$/,
     classification: "native dialog title",
-    reason: "Native Electron file/folder picker titles are intentionally localized at the process boundary.",
+    reason: "Native Electron Knowledge DB picker and backup/restore dialog titles are intentionally localized at the process boundary.",
   },
   {
     path: /^src\/components\/editor\/AiEditPanel\.tsx$/,
