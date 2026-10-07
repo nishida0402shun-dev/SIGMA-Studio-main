@@ -195,6 +195,7 @@ export function KnowledgeDbWorkspace({ open, onClose, onOpenAi, t }: Props) {
   const [expandedTaxonomy, setExpandedTaxonomy] = useState<Set<string>>(new Set());
   const [selectedTaxonomyNode, setSelectedTaxonomyNode] = useState<TaxonomyTreeNode | null>(null);
   const [smartSplit, setSmartSplit] = useState<{ sourceId: string; sourceName: string; pageCount: number; segments: Array<{ id: string; sourceId: string; startPage: number; endPage: number; paths: string[][]; confidence: number; reason: string }>; previewPage: number } | null>(null);
+  const [knowledgeBusy, setKnowledgeBusy] = useState(false);
   const desktop = getDesktopBridge();
   const researchApi = desktop?.researchSessions;
   const knowledgeDb = desktop?.knowledgeDb;
@@ -386,6 +387,31 @@ export function KnowledgeDbWorkspace({ open, onClose, onOpenAi, t }: Props) {
     if (!picked?.paths?.length) return;
     const added = await knowledgeDb.importSources({ paths: picked.paths });
     setSources((current) => [...(added as KnowledgeSource[]), ...current]);
+  }
+
+  async function backupKnowledgeDb(): Promise<void> {
+    if (!knowledgeDb || knowledgeBusy) return;
+    setKnowledgeBusy(true);
+    try {
+      const result = await knowledgeDb.backup();
+      if (result) window.alert(`Knowledge DBをバックアップしました。\\n${result.filePath}`);
+    } finally { setKnowledgeBusy(false); }
+  }
+
+  async function restoreKnowledgeDb(): Promise<void> {
+    if (!knowledgeDb || knowledgeBusy) return;
+    if (!window.confirm("Knowledge DB全体をバックアップから復元します。現在のDBは復元前に退避されます。続行しますか？")) return;
+    setKnowledgeBusy(true);
+    try {
+      const result = await knowledgeDb.restore();
+      if (result) {
+        const refreshed = await knowledgeDb.list();
+        setSources((Array.isArray(refreshed) ? refreshed : []) as KnowledgeSource[]);
+        setSelected({});
+        setQuery("");
+        window.alert(`Knowledge DBを復元しました。\\n${result.filePath}`);
+      }
+    } finally { setKnowledgeBusy(false); }
   }
 
   async function addFiles(): Promise<void> {
@@ -912,6 +938,8 @@ export function KnowledgeDbWorkspace({ open, onClose, onOpenAi, t }: Props) {
           <button type="button" className="knowledge-db-add-button" onClick={() => void addFiles()}><FilePlus2 size={16} />ファイル追加</button>
           <button type="button" className="knowledge-db-add-button" onClick={() => void choosePdfForPreview()}><FileText size={16} />AI分割プレビュー</button>
           <button type="button" className="knowledge-db-add-button" onClick={addFolder}><FolderPlus size={16} />フォルダ追加</button>
+          <button type="button" className="knowledge-db-add-button" onClick={() => void backupKnowledgeDb()} disabled={knowledgeBusy}>DBバックアップ</button>
+          <button type="button" className="knowledge-db-add-button" onClick={() => void restoreKnowledgeDb()} disabled={knowledgeBusy}>DB復元</button>
           <label className="knowledge-db-search"><Search size={16} /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder={t("appMenu.knowledgeDb.searchPlaceholder")} /></label>
           <select value={typeFilter} onChange={(event) => setTypeFilter(event.target.value as KnowledgeSemanticType | "all")}>
             <option value="all">{t("appMenu.knowledgeDb.allTypes")}</option>
