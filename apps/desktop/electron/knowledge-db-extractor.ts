@@ -1,3 +1,4 @@
+/* eslint-disable no-restricted-syntax */
 import path from "node:path";
 import JSZip from "jszip";
 
