@@ -27,10 +27,7 @@ jobs:
           node-version: "24"
           cache: npm
       - run: npm ci
-      - name: Audit dependency vulnerabilities
-        run: npm audit --json > audit-report.json || true
-      - name: Print audit advisories
-        run: node -e "const r=require('./audit-report.json'); for(const [name,v] of Object.entries(r.vulnerabilities||{})){console.log(name, v.severity, v.isDirect, v.fixAvailable, (v.via||[]).map(x=>typeof x==='object'?x.title:x).join(' | '));}"
+      - run: npm run audit:production
       - run: npm run version:check
       - run: npm run test:scripts
       - run: npm exec --workspace @sigma-studio/desktop -- next typegen
