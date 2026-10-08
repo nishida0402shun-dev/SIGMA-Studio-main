@@ -47,6 +47,12 @@ export const INTENTIONAL_RUNTIME_JAPANESE: readonly IntentionalJapaneseRule[] = 
     reason: "Knowledge DB workspace labels are intentionally authored in Japanese until the dedicated dictionary entries are wired; this rule documents the current contract.",
   },
   {
+    path: /^electron\/knowledge-page-indexer\.ts$/,
+    value: /^その他$/,
+    classification: "Knowledge DB taxonomy fallback",
+    reason: "The taxonomy fallback label is persisted classification data, not locale-dependent renderer copy.",
+  },
+  {
     path: /^electron\/local-vector-index\.ts$/,
     value: /^(?:検索クエリ:|検索文書:)/,
     classification: "multilingual GTE retrieval protocol",
