@@ -1,5 +1,7 @@
 name: Regenerate dependency lockfile
 
+# Keep the root lockfile synchronized with desktop dependencies.
+
 on:
   push:
     branches: [main]
