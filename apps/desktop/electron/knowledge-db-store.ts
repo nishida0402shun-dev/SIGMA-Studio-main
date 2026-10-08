@@ -13,7 +13,7 @@ import { buildKnowledgeIndexedPage } from "./knowledge-page-indexer";
 import { analyzeKnowledgeVisualPage } from "./knowledge-multimodal";
 import { acquireFileLock } from "./file-lock";
 import { extractKnowledgeFilePageTexts, extractPdfPageTexts } from "./knowledge-db-extractor";
-import { buildDocumentFrequency, exactPhraseScore, lexicalScore, metadataScore, retrievalMatchReasons, searchTokenVariants, selectCitationRegions, selectDiverseContextResults, semanticQueryScore, semanticTypeFromQuery, tokenizeForSearch } from "./knowledge-db-search-utils";
+import { buildDocumentFrequency, exactPhraseScore, lexicalScore, metadataScore, retrievalMatchReasons, searchTokenVariants, selectCitationRegions, selectDiverseContextResults, semanticQueryScore, tokenizeForSearch } from "./knowledge-db-search-utils";
 
 export type KnowledgeSemanticType =
   | "problem" | "example" | "explanation" | "column" | "definition"
