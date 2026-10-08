@@ -11,6 +11,7 @@ import { analyzeKnowledgePage, KNOWLEDGE_ANALYSIS_VERSION } from "./knowledge-an
 import { classifyKnowledgeTaxonomy, KNOWLEDGE_TAXONOMY_VERSION } from "./knowledge-taxonomy";
 import { buildKnowledgeIndexedPage } from "./knowledge-page-indexer";
 import { analyzeKnowledgeVisualPage } from "./knowledge-multimodal";
+import { acquireFileLock } from "./file-lock";
 
 export type KnowledgeSemanticType =
   | "problem" | "example" | "explanation" | "column" | "definition"
@@ -338,8 +339,11 @@ export class KnowledgeDbStore {
     const library = await this.readLibrary();
     const allowedSources = sourceIds?.length ? new Set(sourceIds) : null;
     const safeLimit = Math.max(1, Math.min(limit, 50));
-    const vectorMatches = (await this.vectorIndex().search(trimmed, Math.min(50, safeLimit * 5)))
-      .filter((match) => !allowedSources || allowedSources.has(match.sourceId));
+    const vectorIndex = this.vectorIndex();
+    const vectorMatches = (await vectorIndex.hasRecords()
+      ? vectorIndex.search(trimmed, Math.min(50, safeLimit * 5))
+      : Promise.resolve([]))
+      .then((matches) => matches.filter((match) => !allowedSources || allowedSources.has(match.sourceId)));
     const metadataQueryTokens = tokenizeForSearch(trimmed);
     const metadataMatches = library.sources.flatMap((source) => source.pages
       .filter(() => !allowedSources || allowedSources.has(source.id))
@@ -362,9 +366,10 @@ export class KnowledgeDbStore {
     // Hybrid retrieval: keep independent semantic/vector and lexical/metadata candidate lists,
     // then fuse their ranks so a strong match from either retrieval channel cannot disappear
     // merely because the other channel scored it lower.
-    const matches = [...vectorMatches, ...metadataMatches];
+    const resolvedVectorMatches = await vectorMatches;
+    const matches = [...resolvedVectorMatches, ...metadataMatches];
     const vectorRank = new Map<string, number>();
-    vectorMatches.forEach((match, index) => vectorRank.set(`${match.sourceId}:${match.pageNumber}`, index + 1));
+    resolvedVectorMatches.forEach((match, index) => vectorRank.set(`${match.sourceId}:${match.pageNumber}`, index + 1));
     const lexicalRanked = [...metadataMatches].sort((a, b) => b.score - a.score);
     const lexicalRank = new Map<string, number>();
     lexicalRanked.forEach((match, index) => lexicalRank.set(`${match.sourceId}:${match.pageNumber}`, index + 1));
@@ -1256,10 +1261,25 @@ export class KnowledgeDbStore {
       throw new Error("Knowledge DB changed concurrently; the operation was not written. Please retry.");
     }
     const serialized = JSON.stringify(library, null, 2);
-    const tmp = `${paths.libraryPath}.tmp`;
-    await fs.writeFile(tmp, serialized, "utf8");
-    await fs.rename(tmp, paths.libraryPath);
-    library.__fingerprint = createHash("sha256").update(serialized).digest("hex");
+    const lock = await acquireFileLock(`${paths.libraryPath}.lock`, { op: "knowledge-library-write" });
+    try {
+      let lockedCurrentFingerprint: string | null = null;
+      try {
+        const lockedRaw = await fs.readFile(paths.libraryPath, "utf8");
+        lockedCurrentFingerprint = createHash("sha256").update(lockedRaw).digest("hex");
+      } catch (error) {
+        if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
+      }
+      if (library.__fingerprint !== undefined && library.__fingerprint !== lockedCurrentFingerprint) {
+        throw new Error("Knowledge DB changed concurrently; the operation was not written. Please retry.");
+      }
+      const tmp = `${paths.libraryPath}.${randomUUID()}.tmp`;
+      await fs.writeFile(tmp, serialized, "utf8");
+      await fs.rename(tmp, paths.libraryPath);
+      library.__fingerprint = createHash("sha256").update(serialized).digest("hex");
+    } finally {
+      await lock.release();
+    }
   }
 
   private stagingPaths() {
