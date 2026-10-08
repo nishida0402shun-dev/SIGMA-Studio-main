@@ -134,10 +134,6 @@ export interface KnowledgeIndexStatus {
   finishedAt?: string;
 }
 
-function pageHasVisualBlocks(blocks: KnowledgeStructureBlock[] | undefined): boolean {
-  return Boolean(blocks?.some((block) => block.type === "figure" || block.type === "table"));
-}
-
 export class KnowledgeDbStore {
   private readonly dataDir: string;
   private indexPromise: Promise<void> | null = null;
