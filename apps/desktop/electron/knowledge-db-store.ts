@@ -9,7 +9,7 @@ import { rerankKnowledgeCandidates } from "./knowledge-decision-reranker";
 import { KnowledgeStructureParser, type KnowledgeStructureBlock, type KnowledgeStructureBlockType, type StructureParserStatus } from "./knowledge-db-structure-parser";
 import { analyzeKnowledgePage, KNOWLEDGE_ANALYSIS_VERSION } from "./knowledge-analysis-engine";
 import { classifyKnowledgeTaxonomy, KNOWLEDGE_TAXONOMY_VERSION } from "./knowledge-taxonomy";
-import { analyzeKnowledgeVisualPage, KNOWLEDGE_VISUAL_ANALYSIS_VERSION, KNOWLEDGE_VISUAL_MODEL, shouldRunKnowledgeVisualAnalysis } from "./knowledge-multimodal";
+import { KNOWLEDGE_VISUAL_ANALYSIS_VERSION, shouldRunKnowledgeVisualAnalysis } from "./knowledge-multimodal";
 
 export type KnowledgeSemanticType =
   | "problem" | "example" | "explanation" | "column" | "definition"
@@ -1177,6 +1177,9 @@ export class KnowledgeDbStore {
               classificationReviewEvidence: undefined,
               extractionStatus: text ? "text" : "ocr-needed",
               wordCount: text ? countWords(text) : 0,
+              ...(visualPreviewPath ? { visualPreviewPath } : {}),
+              ...(visualAnalysis ? { visualAnalysis } : {}),
+              ...(visualAnalysisError ? { visualAnalysisError } : {}),
               ...(blocks.length ? { structureBlocks: blocks } : {}),
             };
           }));
