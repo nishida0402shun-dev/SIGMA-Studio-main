@@ -988,12 +988,20 @@ export class KnowledgeDbStore {
 
   async getPagePdfBase64(sourceId: string, pageNumber: number): Promise<{ dataBase64: string; width: number; height: number }> {
     const { source } = await this.getPage(sourceId, pageNumber);
+    if (source.mimeType !== "application/pdf") {
+      throw new Error("knowledge page preview requires a PDF source");
+    }
     const bytes = await fs.readFile(source.storedPath);
     const input = await PDFDocument.load(bytes);
-    const page = input.getPage(pageNumber - 1);
+    const sourcePage = input.getPage(pageNumber - 1);
+    if (!sourcePage) throw new Error("knowledge page not found");
+    const { width, height } = sourcePage.getSize();
+    const output = await PDFDocument.create();
+    const [page] = await output.copyPages(input, [pageNumber - 1]);
     if (!page) throw new Error("knowledge page not found");
-    const { width, height } = page.getSize();
-    return { dataBase64: Buffer.from(bytes).toString("base64"), width, height };
+    output.addPage(page);
+    const pageBytes = await output.save();
+    return { dataBase64: Buffer.from(pageBytes).toString("base64"), width, height };
   }
 
   async extractRegion(sourceId: string, pageNumber: number, rect: KnowledgeRegion): Promise<string> {
