@@ -13,7 +13,7 @@ export interface VectorRecord {
 }
 
 interface VectorIndexFile {
-  version: 4;
+  version: 5;
   dimensions: number;
   model: string;
   records: VectorRecord[];
@@ -24,7 +24,7 @@ export interface VectorSearchResult extends Omit<VectorRecord, "vector"> {
 }
 
 const DIMENSIONS = 256;
-const MODEL = "embeddinggemma-2";
+const MODEL = "embeddinggemma-2-text";
 const MODEL_REPOSITORY = "onnx-community/embeddinggemma-2-ONNX";
 const MODEL_CACHE_DIR = path.join(
   process.env.SIGMA_STUDIO_MODEL_CACHE?.trim() || path.join(os.homedir(), ".sigma-studio", "models"),
@@ -40,11 +40,17 @@ let embedderPromise: Promise<Embedder> | null = null;
 async function getEmbedder(): Promise<Embedder> {
   if (!embedderPromise) {
     embedderPromise = (async () => {
-      const { env, pipeline } = await import("@huggingface/transformers");
+      const { env, AutoConfig, AutoModel, AutoTokenizer } = await import("@huggingface/transformers");
       env.cacheDir = MODEL_CACHE_DIR;
       env.allowRemoteModels = true;
 
-      const extractor = await pipeline("feature-extraction", MODEL_REPOSITORY, {
+      const config = await AutoConfig.from_pretrained(MODEL_REPOSITORY);
+      config.vision_config = null;
+      config.audio_config = null;
+
+      const tokenizer = await AutoTokenizer.from_pretrained(MODEL_REPOSITORY);
+      const model = await AutoModel.from_pretrained(MODEL_REPOSITORY, {
+        config,
         device: "cpu",
         dtype: "q4",
       });
@@ -52,8 +58,9 @@ async function getEmbedder(): Promise<Embedder> {
       return {
         embed: async (texts: string[]) => {
           if (texts.length === 0) return [];
-          const output = await extractor(texts, { pooling: "mean", normalize: true });
-          const rows = output.tolist() as number[][];
+          const inputs = await tokenizer(texts, { padding: true });
+          const output = await model(inputs);
+          const rows = output.sentence_embedding.tolist() as number[][];
           return rows.map((row) => {
             if (row.length < DIMENSIONS) {
               throw new Error(`EmbeddingGemma 2 returned ${row.length} dimensions; expected at least ${DIMENSIONS}`);
@@ -192,7 +199,7 @@ export class LocalVectorIndex {
       raw = await fs.readFile(this.indexPath, "utf8");
     } catch (error) {
       if ((error as NodeJS.ErrnoException).code === "ENOENT") {
-        return { version: 4, dimensions: DIMENSIONS, model: MODEL, records: [] };
+        return { version: 5, dimensions: DIMENSIONS, model: MODEL, records: [] };
       }
       throw error;
     }
@@ -206,7 +213,7 @@ export class LocalVectorIndex {
     try {
       parsed = JSON.parse(raw) as typeof parsed;
     } catch {
-      return { version: 4, dimensions: DIMENSIONS, model: MODEL, records: [] };
+      return { version: 5, dimensions: DIMENSIONS, model: MODEL, records: [] };
     }
 
     if (
@@ -223,7 +230,7 @@ export class LocalVectorIndex {
     if (
       Array.isArray(parsed.records) &&
       ((parsed.version === 3 && parsed.dimensions === 384) ||
-        (parsed.version === 4 && parsed.model !== MODEL))
+        ((parsed.version === 4 || parsed.version === 5) && parsed.model !== MODEL))
     ) {
       const oldRecords = parsed.records as VectorRecord[];
       const migratedVectors: number[][] = [];
@@ -233,7 +240,7 @@ export class LocalVectorIndex {
         migratedVectors.push(...(await embedDocuments(batch.map((record) => record.text))));
       }
       const migrated: VectorIndexFile = {
-        version: 4,
+        version: 5,
         dimensions: DIMENSIONS,
         model: MODEL,
         records: oldRecords.map((record, index) => ({ ...record, vector: migratedVectors[index] })),
