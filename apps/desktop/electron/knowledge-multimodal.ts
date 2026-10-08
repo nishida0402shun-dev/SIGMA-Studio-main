@@ -68,12 +68,6 @@ async function renderPdfPage(filePath: string, pageNumber: number, outputDir: st
 
 let parserPromise: Promise<KnowledgeStructureParser> | null = null;
 
-function getParser(): KnowledgeStructureParser {
-  parserPromise ??= Promise.resolve(new KnowledgeStructureParser());
-  // The parser itself is stateless; keeping one instance avoids repeated runtime discovery.
-  return undefined as never;
-}
-
 async function parseVisualPage(imagePath: string): Promise<string> {
   if (!parserPromise) {
     parserPromise = Promise.resolve(new KnowledgeStructureParser());
