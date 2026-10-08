@@ -157,21 +157,21 @@ export class LocalVectorIndex {
       const fileLock = await acquireFileLock(this.indexPath + ".lock", { op: "knowledge-vector-upsert" });
       try {
         const index = await this.read();
-      const keys = new Set(
+        const keys = new Set(
         records.map((record) => record.sourceId + ":" + record.pageNumber + ":" + record.chunkIndex),
       );
-      const next = index.records.filter(
-        (item) => !keys.has(item.sourceId + ":" + item.pageNumber + ":" + item.chunkIndex),
-      );
+        const next = index.records.filter(
+          (item) => !keys.has(item.sourceId + ":" + item.pageNumber + ":" + item.chunkIndex),
+        );
 
-      const vectors: number[][] = [];
-      const batchSize = 32;
-      for (let start = 0; start < records.length; start += batchSize) {
-        const batch = records.slice(start, start + batchSize);
-        vectors.push(...(await embedDocuments(batch.map((record) => record.text))));
-      }
+        const vectors: number[][] = [];
+        const batchSize = 32;
+        for (let start = 0; start < records.length; start += batchSize) {
+          const batch = records.slice(start, start + batchSize);
+          vectors.push(...(await embedDocuments(batch.map((record) => record.text))));
+        }
 
-      next.push(...records.map((record, index) => ({ ...record, vector: vectors[index] })));
+        next.push(...records.map((record, index) => ({ ...record, vector: vectors[index] })));
         await this.write({ version: 5, dimensions: DIMENSIONS, model: MODEL, records: next });
       } finally {
         await fileLock.release();
