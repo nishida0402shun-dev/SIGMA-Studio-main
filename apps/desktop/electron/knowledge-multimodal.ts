@@ -42,10 +42,12 @@ async function renderPdfPage(filePath: string, pageNumber: number, outputDir: st
     const originalViewport = page.getViewport({ scale: 1 });
     const scale = Math.min(2, 2200 / Math.max(originalViewport.width, originalViewport.height));
     const viewport = page.getViewport({ scale });
-    const canvasAndContext = document.canvasFactory.create(Math.max(1, Math.ceil(viewport.width)), Math.max(1, Math.ceil(viewport.height)));
+    const canvasFactory = document.canvasFactory as unknown as { create: (width: number, height: number) => { canvas: { toBuffer: (format: string) => Buffer; }; context: CanvasRenderingContext2D }; destroy: (canvasAndContext: unknown) => void };
+    const canvasAndContext = canvasFactory.create(Math.max(1, Math.ceil(viewport.width)), Math.max(1, Math.ceil(viewport.height)));
 
     try {
       await page.render({
+        canvas: canvasAndContext.canvas as unknown as HTMLCanvasElement,
         canvasContext: canvasAndContext.context,
         viewport,
       }).promise;
