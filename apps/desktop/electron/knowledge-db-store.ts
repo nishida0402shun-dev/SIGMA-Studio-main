@@ -216,7 +216,7 @@ export class KnowledgeDbStore {
         page.semanticType = page.semanticType === "unknown" ? analysis.semanticType : page.semanticType;
         page.title ??= analysis.title;
         page.keywords = analysis.keywords;
-        page.analysisSignals = [...new Set([...(page.analysisSignals ?? []), ...analysis.signals, "gemma-3-visual"])].slice(0, 20);
+        page.analysisSignals = [...new Set([...(page.analysisSignals ?? []), ...analysis.signals, "paddleocr-structure"])].slice(0, 20);
         page.analysisStatus = "analyzed";
         page.analysisVersion = KNOWLEDGE_ANALYSIS_VERSION;
         const taxonomy = classifyKnowledgeTaxonomy(merged, analysis.keywords);
