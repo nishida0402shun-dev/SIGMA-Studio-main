@@ -56,9 +56,11 @@ export async function renderAttachedPdfPages(
       const originalViewport = page.getViewport({ scale: 1 });
       const scale = Math.min(2, 2000 / Math.max(originalViewport.width, originalViewport.height));
       const viewport = page.getViewport({ scale });
-      const canvasAndContext = pdf.canvasFactory.create(Math.max(1, Math.ceil(viewport.width)), Math.max(1, Math.ceil(viewport.height)));
+      const canvasFactory = pdf.canvasFactory as unknown as { create: (width: number, height: number) => { canvas: { toBuffer: (format: string) => Buffer; }; context: CanvasRenderingContext2D }; destroy: (canvasAndContext: unknown) => void };
+    const canvasAndContext = canvasFactory.create(Math.max(1, Math.ceil(viewport.width)), Math.max(1, Math.ceil(viewport.height)));
       try {
         await page.render({
+          canvas: canvasAndContext.canvas as unknown as HTMLCanvasElement,
           canvasContext: canvasAndContext.context,
           viewport,
         }).promise;
@@ -70,7 +72,7 @@ export async function renderAttachedPdfPages(
         options.onPageImage?.(pageNumber, png);
       } finally {
         page.cleanup();
-        pdf.canvasFactory.destroy(canvasAndContext);
+        canvasFactory.destroy(canvasAndContext);
       }
     }
     return { pageCount: pdf.numPages, pages, nextPageStart: end < pdf.numPages ? end + 1 : null };
