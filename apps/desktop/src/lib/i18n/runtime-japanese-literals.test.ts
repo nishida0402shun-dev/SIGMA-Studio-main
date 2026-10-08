@@ -230,6 +230,16 @@ export const INTENTIONAL_RUNTIME_JAPANESE: readonly IntentionalJapaneseRule[] = 
     reason: "The fallback reason is recorded in the ledger log only; the renderer resolves its own localized document-open error.",
   },
   {
+    path: /^electron\/knowledge-db-extractor\.ts$/,
+    classification: "Knowledge DB extraction contract",
+    reason: "Japanese file metadata and fallback extraction text are persisted Knowledge DB data, not locale-dependent renderer copy.",
+  },
+  {
+    path: /^electron\/knowledge-db-search-utils\.ts$/,
+    classification: "Knowledge DB retrieval contract",
+    reason: "Japanese search labels, matching vocabulary, and relation reasons are machine-facing retrieval data, not renderer interface copy.",
+  },
+  {
     path: /^electron\/shared-workspace-doc-store\.ts$/,
     value: /^(?:共有Workspace|個人Workspaceと共有Workspaceの間では、フォルダ移動だけでは移動できません。|教材の読み込みに失敗しました。|元の教材を削除できなかったため移動を取り消しました。)$/,
     classification: "workspace storage contract",
