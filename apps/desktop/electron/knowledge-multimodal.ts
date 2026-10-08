@@ -121,7 +121,8 @@ export async function analyzeKnowledgeVisualPage(input: {
     : input.filePath;
 
   const pipeline = await getPipeline();
-  const image = await pipeline.load_image(previewPath);
+  const { RawImage } = await import("@huggingface/transformers");
+  const image = await RawImage.read(previewPath);
   const context = input.pageText?.trim()
     ? `The page's extracted text is below. Use it as supporting context, but inspect the image for information that extraction may have missed.\n\n${input.pageText.slice(0, 12000)}`
     : "There is little or no reliable extracted text. Read the page image directly.";
