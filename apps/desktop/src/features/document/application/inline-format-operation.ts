@@ -229,7 +229,7 @@ function findInlineNodeAtOffset(children: readonly InlineNode[], targetOffset: n
     }
     offset += nodeLength;
   }
-  return children.at(-1);
+  return children.length > 0 ? children[children.length - 1] : undefined;
 }
 
 function inheritInlinePresentation(source: InlineNode | undefined, replacement: InlineNode): InlineNode {
@@ -326,7 +326,7 @@ function applyInlineFormatPatch<T extends InlineNode>(child: T, patch: InlineFor
 function mergeAdjacentTextNodes(children: readonly InlineNode[]): InlineNode[] {
   const merged: InlineNode[] = [];
   for (const child of children) {
-    const previous = merged.at(-1);
+    const previous = merged.length > 0 ? merged[merged.length - 1] : undefined;
     if (previous?.type === "text" && child.type === "text" && haveSameTextStyle(previous, child)) {
       previous.text += child.text;
     } else {
