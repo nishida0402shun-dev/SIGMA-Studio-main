@@ -1,6 +1,7 @@
 import fs from "node:fs/promises";
-import path from "node:path";
 import os from "node:os";
+import path from "node:path";
+
 export interface VectorRecord {
   id: string;
   sourceId: string;
@@ -12,7 +13,7 @@ export interface VectorRecord {
 }
 
 interface VectorIndexFile {
-  version: 3;
+  version: 4;
   dimensions: number;
   model: string;
   records: VectorRecord[];
@@ -22,89 +23,86 @@ export interface VectorSearchResult extends Omit<VectorRecord, "vector"> {
   score: number;
 }
 
-const DIMENSIONS = 384;
-const MODEL = "ruri-v3-70m";
-const MODEL_REPOSITORY = "sirasagi62/ruri-v3-70m-ONNX";
-const MODEL_REVISION = "5e9cd15";
+const DIMENSIONS = 256;
+const MODEL = "embeddinggemma-2";
+const MODEL_REPOSITORY = "onnx-community/embeddinggemma-2-ONNX";
 const MODEL_CACHE_DIR = path.join(
   process.env.SIGMA_STUDIO_MODEL_CACHE?.trim() || path.join(os.homedir(), ".sigma-studio", "models"),
-  MODEL_REPOSITORY.replace(/[^a-zA-Z0-9._-]+/gu, "_"),
-  MODEL_REVISION,
+  "embeddinggemma-2",
 );
-const MODEL_URL = `https://huggingface.co/${MODEL_REPOSITORY}/resolve/${MODEL_REVISION}/onnx/model_int8.onnx?download=true`;
-const TOKENIZER_URL = `https://huggingface.co/${MODEL_REPOSITORY}/resolve/${MODEL_REVISION}/tokenizer.json?download=true`;
 
 interface Embedder {
-  embedOne(text: string): Float32Array | number[];
+  embed(texts: string[]): Promise<number[][]>;
 }
 
 let embedderPromise: Promise<Embedder> | null = null;
 
-async function downloadModelFile(url: string, outputPath: string): Promise<void> {
-  try {
-    await fs.access(outputPath);
-    return;
-  } catch {
-    // Download below.
-  }
-  await fs.mkdir(path.dirname(outputPath), { recursive: true });
-  const response = await fetch(url);
-  if (!response.ok) {
-    throw new Error(`model download failed (${response.status} ${response.statusText}): ${url}`);
-  }
-  const bytes = Buffer.from(await response.arrayBuffer());
-  if (bytes.length < 1024) throw new Error(`model download was unexpectedly small: ${bytes.length} bytes`);
-  const tempPath = `${outputPath}.tmp`;
-  await fs.writeFile(tempPath, bytes);
-  await fs.rename(tempPath, outputPath);
-}
-
 async function getEmbedder(): Promise<Embedder> {
   if (!embedderPromise) {
     embedderPromise = (async () => {
-      const modelPath = path.join(MODEL_CACHE_DIR, "model_int8.onnx");
-      const tokenizerPath = path.join(MODEL_CACHE_DIR, "tokenizer.json");
-      await downloadModelFile(MODEL_URL, modelPath);
-      await downloadModelFile(TOKENIZER_URL, tokenizerPath);
-      const runtime = await import("ruvector-onnx-embeddings-wasm") as {
-        default?: () => Promise<unknown>;
-        WasmEmbedder?: (new (modelBytes: Uint8Array, tokenizerJson: string) => Embedder) & {\n          withConfig?: (modelBytes: Uint8Array, tokenizerJson: string, config: unknown) => Embedder;\n        };
-        WasmEmbedderConfig?: new () => {
-          setMaxLength(length: number): unknown;
-          setNormalize(normalize: boolean): unknown;
-          setPooling(strategy: number): unknown;
-        };
+      const { env, pipeline } = await import("@huggingface/transformers");
+      env.cacheDir = MODEL_CACHE_DIR;
+      env.allowRemoteModels = true;
+
+      const extractor = await pipeline("feature-extraction", MODEL_REPOSITORY, {
+        device: "cpu",
+        dtype: "q4",
+      });
+
+      return {
+        embed: async (texts: string[]) => {
+          if (texts.length === 0) return [];
+          const output = await extractor(texts, { pooling: "mean", normalize: true });
+          const rows = output.tolist() as number[][];
+          return rows.map((row) => {
+            if (row.length < DIMENSIONS) {
+              throw new Error(`EmbeddingGemma 2 returned ${row.length} dimensions; expected at least ${DIMENSIONS}`);
+            }
+            const truncated = row.slice(0, DIMENSIONS);
+            let norm = 0;
+            for (const value of truncated) norm += value * value;
+            norm = Math.sqrt(norm);
+            if (!Number.isFinite(norm) || norm === 0) {
+              throw new Error("EmbeddingGemma 2 produced a non-finite or zero vector");
+            }
+            return truncated.map((value) => value / norm);
+          });
+        },
       };
-      if (typeof runtime.default === "function") await runtime.default();
-      if (!runtime.WasmEmbedder || !runtime.WasmEmbedderConfig) throw new Error("ruvector WASM embedder exports are unavailable");
-      const modelBytes = new Uint8Array(await fs.readFile(modelPath));
-      const tokenizerJson = await fs.readFile(tokenizerPath, "utf8");
-      const config = new runtime.WasmEmbedderConfig();
-      config.setMaxLength(8192);
-      config.setNormalize(true);
-      config.setPooling(0);
-      const embedder = runtime.WasmEmbedder.withConfig
-        ? runtime.WasmEmbedder.withConfig(modelBytes, tokenizerJson, config)
-        : new runtime.WasmEmbedder(modelBytes, tokenizerJson);
-      return { embedOne: (text: string) => embedder.embedOne(text) };
     })().catch((error) => {
       embedderPromise = null;
-      throw new Error(`Knowledge DB Japanese semantic embedding model could not be initialized: ${error instanceof Error ? error.message : String(error)}`);
+      throw new Error(
+        `Knowledge DB EmbeddingGemma 2 could not be initialized: ${error instanceof Error ? error.message : String(error)}`,
+      );
     });
   }
   return embedderPromise;
 }
 
-async function embedText(text: string, role: "query" | "document" | "generic" = "generic"): Promise<number[]> {
+async function embedText(
+  text: string,
+  role: "query" | "document" | "generic" = "generic",
+): Promise<number[]> {
   const embedder = await getEmbedder();
-  // Ruri retrieval prefixes are model protocol strings, not user-facing UI copy.
-  // eslint-disable-next-line no-restricted-syntax
-  const prefix = role === "query" ? "検索クエリ: " : role === "document" ? "検索文書: " : "";
-  const vector = Array.from(embedder.embedOne(prefix + text));
-  if (vector.length !== DIMENSIONS) {
-    throw new Error(`Unexpected Japanese embedding dimension: ${vector.length}; expected ${DIMENSIONS}`);
+  const prefix =
+    role === "query"
+      ? "task: search result | query: "
+      : role === "document"
+        ? "title: none | text: "
+        : "";
+  const vectors = await embedder.embed([prefix + text]);
+  const vector = vectors[0];
+  if (!vector || vector.length !== DIMENSIONS) {
+    throw new Error(`Unexpected EmbeddingGemma 2 dimension: ${vector?.length ?? 0}; expected ${DIMENSIONS}`);
   }
   return vector;
+}
+
+async function embedDocuments(texts: string[]): Promise<number[][]> {
+  const embedder = await getEmbedder();
+  if (texts.length === 0) return [];
+  const vectors = await embedder.embed(texts.map((text) => "title: none | text: " + text));
+  return vectors;
 }
 
 const indexLocks = new Map<string, Promise<void>>();
@@ -112,7 +110,9 @@ const indexLocks = new Map<string, Promise<void>>();
 async function withIndexLock<T>(indexPath: string, task: () => Promise<T>): Promise<T> {
   const previous = indexLocks.get(indexPath) ?? Promise.resolve();
   let release!: () => void;
-  const current = new Promise<void>((resolve) => { release = resolve; });
+  const current = new Promise<void>((resolve) => {
+    release = resolve;
+  });
   const queued = previous.then(() => current);
   indexLocks.set(indexPath, queued);
   await previous;
@@ -139,17 +139,22 @@ export class LocalVectorIndex {
     if (records.length === 0) return;
     await withIndexLock(this.indexPath, async () => {
       const index = await this.read();
-      const keys = new Set(records.map((record) => record.sourceId + ":" + record.pageNumber + ":" + record.chunkIndex));
-      const next = index.records.filter((item) => !keys.has(item.sourceId + ":" + item.pageNumber + ":" + item.chunkIndex));
+      const keys = new Set(
+        records.map((record) => record.sourceId + ":" + record.pageNumber + ":" + record.chunkIndex),
+      );
+      const next = index.records.filter(
+        (item) => !keys.has(item.sourceId + ":" + item.pageNumber + ":" + item.chunkIndex),
+      );
+
       const vectors: number[][] = [];
       const batchSize = 32;
       for (let start = 0; start < records.length; start += batchSize) {
         const batch = records.slice(start, start + batchSize);
-        const embedded = await Promise.all(batch.map((record) => embedText(record.text, "document")));
-        vectors.push(...embedded);
+        vectors.push(...(await embedDocuments(batch.map((record) => record.text))));
       }
+
       next.push(...records.map((record, index) => ({ ...record, vector: vectors[index] })));
-      await this.write({ version: 3, dimensions: DIMENSIONS, model: MODEL, records: next });
+      await this.write({ version: 4, dimensions: DIMENSIONS, model: MODEL, records: next });
     });
   }
 
@@ -174,6 +179,7 @@ export class LocalVectorIndex {
     const queryVector = await embedText(normalized, "query");
     const index = await this.read();
     return index.records
+      .filter((record) => record.vector.length === DIMENSIONS)
       .map(({ vector, ...record }) => ({ ...record, score: cosine(queryVector, vector) }))
       .filter((item) => item.score > 0)
       .sort((a, b) => b.score - a.score)
@@ -186,7 +192,7 @@ export class LocalVectorIndex {
       raw = await fs.readFile(this.indexPath, "utf8");
     } catch (error) {
       if ((error as NodeJS.ErrnoException).code === "ENOENT") {
-        return { version: 3, dimensions: DIMENSIONS, model: MODEL, records: [] };
+        return { version: 4, dimensions: DIMENSIONS, model: MODEL, records: [] };
       }
       throw error;
     }
@@ -200,11 +206,11 @@ export class LocalVectorIndex {
     try {
       parsed = JSON.parse(raw) as typeof parsed;
     } catch {
-      return { version: 3, dimensions: DIMENSIONS, model: MODEL, records: [] };
+      return { version: 4, dimensions: DIMENSIONS, model: MODEL, records: [] };
     }
 
     if (
-      parsed.version === 3 &&
+      parsed.version === 4 &&
       parsed.dimensions === DIMENSIONS &&
       parsed.model === MODEL &&
       Array.isArray(parsed.records)
@@ -212,24 +218,22 @@ export class LocalVectorIndex {
       return parsed as VectorIndexFile;
     }
 
-    // A v3 index created by an older embedding model has the same shape but
-    // incompatible vector semantics. Re-embed its persisted text in place so
-    // changing the local model never silently disables semantic retrieval.
+    // Any previous semantic model (Ruri/GTE) uses incompatible vector semantics.
+    // Re-embed persisted text instead of silently returning stale results.
     if (
-      parsed.version === 3 &&
-      parsed.dimensions === DIMENSIONS &&
-      parsed.model !== MODEL &&
-      Array.isArray(parsed.records)
+      Array.isArray(parsed.records) &&
+      ((parsed.version === 3 && parsed.dimensions === 384) ||
+        (parsed.version === 4 && parsed.model !== MODEL))
     ) {
       const oldRecords = parsed.records as VectorRecord[];
       const migratedVectors: number[][] = [];
       const batchSize = 32;
       for (let start = 0; start < oldRecords.length; start += batchSize) {
         const batch = oldRecords.slice(start, start + batchSize);
-        migratedVectors.push(...await Promise.all(batch.map((record) => embedText(record.text, "document"))));
+        migratedVectors.push(...(await embedDocuments(batch.map((record) => record.text))));
       }
       const migrated: VectorIndexFile = {
-        version: 3,
+        version: 4,
         dimensions: DIMENSIONS,
         model: MODEL,
         records: oldRecords.map((record, index) => ({ ...record, vector: migratedVectors[index] })),
@@ -238,19 +242,18 @@ export class LocalVectorIndex {
       return migrated;
     }
 
-    // v2 contained deterministic hash vectors, not semantic embeddings.
-    // Rebuild those records in-place so existing Knowledge DB content survives.
-    // Migration errors intentionally propagate so the old index is never replaced by an empty one.
-    if (parsed.version === 2 && parsed.dimensions === DIMENSIONS && Array.isArray(parsed.records)) {
+    // v2 contained deterministic hash vectors. Preserve the records but rebuild
+    // their vectors with the current semantic model.
+    if (parsed.version === 2 && Array.isArray(parsed.records)) {
       const oldRecords = parsed.records as VectorRecord[];
       const migratedVectors: number[][] = [];
       const batchSize = 32;
       for (let start = 0; start < oldRecords.length; start += batchSize) {
         const batch = oldRecords.slice(start, start + batchSize);
-        migratedVectors.push(...await Promise.all(batch.map((record) => embedText(record.text, "document"))));
+        migratedVectors.push(...(await embedDocuments(batch.map((record) => record.text))));
       }
       const migrated: VectorIndexFile = {
-        version: 3,
+        version: 4,
         dimensions: DIMENSIONS,
         model: MODEL,
         records: oldRecords.map((record, index) => ({ ...record, vector: migratedVectors[index] })),
@@ -259,7 +262,7 @@ export class LocalVectorIndex {
       return migrated;
     }
 
-    return { version: 3, dimensions: DIMENSIONS, model: MODEL, records: [] };
+    return { version: 4, dimensions: DIMENSIONS, model: MODEL, records: [] };
   }
 
   private async write(index: VectorIndexFile): Promise<void> {
