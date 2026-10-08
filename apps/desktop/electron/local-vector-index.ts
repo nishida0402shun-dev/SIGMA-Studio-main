@@ -172,7 +172,19 @@ export class LocalVectorIndex {
         }
 
         next.push(...records.map((record, index) => ({ ...record, vector: vectors[index] })));
-        await this.write({ version: 5, dimensions: DIMENSIONS, model: MODEL, records: next });
+        // Re-read immediately before publication so an OS-level lock handoff cannot
+        // publish a stale snapshot when another process completed a write between
+        // the initial read and this point.
+        const latest = await this.read();
+        const merged = [...latest.records];
+        const mergedKeys = new Set(merged.map((record) => record.sourceId + ":" + record.pageNumber + ":" + record.chunkIndex));
+        for (const record of next) {
+          const key = record.sourceId + ":" + record.pageNumber + ":" + record.chunkIndex;
+          const existingIndex = merged.findIndex((item) => item.sourceId + ":" + item.pageNumber + ":" + item.chunkIndex === key);
+          if (existingIndex >= 0) merged[existingIndex] = record;
+          else if (!mergedKeys.has(key)) { merged.push(record); mergedKeys.add(key); }
+        }
+        await this.write({ version: 5, dimensions: DIMENSIONS, model: MODEL, records: merged });
       } finally {
         await fileLock.release();
       }
@@ -307,7 +319,7 @@ function testEmbed(text: string): number[] {
   const normalized = text.normalize("NFKC").toLocaleLowerCase();
   for (let index = 0; index < normalized.length; index += 1) {
     const code = normalized.codePointAt(index) ?? 0;
-    vector[(code + index * 31) % DIMENSIONS] += 1;
+    vector[code % DIMENSIONS] += 1;
     if (index + 1 < normalized.length) {
       const pair = ((code * 257) + (normalized.codePointAt(index + 1) ?? 0)) % DIMENSIONS;
       vector[pair] += 0.5;
