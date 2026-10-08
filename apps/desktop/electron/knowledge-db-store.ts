@@ -197,7 +197,7 @@ export class KnowledgeDbStore {
       const result = await analyzeKnowledgeVisualPage({
         filePath: source.storedPath,
         pageNumber,
-        pageText: page.text,
+        pageText: page.text?.split("\n[visual]\n")[0],
         dataDir: this.dataDir,
         force: true,
       });
@@ -207,7 +207,8 @@ export class KnowledgeDbStore {
       page.visualAnalysisVersion = result.version;
       page.visualAnalysisError = undefined;
       if (result.analysis?.trim()) {
-        const merged = [page.text?.trim(), result.analysis.trim()].filter(Boolean).join("\n[visual]\n");
+        const baseText = page.text?.split("\n[visual]\n")[0]?.trim();
+        const merged = [baseText, result.analysis.trim()].filter(Boolean).join("\n[visual]\n");
         page.text = merged;
         page.extractionStatus = "text";
         page.wordCount = countWords(merged);
