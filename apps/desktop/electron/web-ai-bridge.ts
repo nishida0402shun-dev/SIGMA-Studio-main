@@ -69,6 +69,7 @@ export interface WebAiRunState {
   runId: string;
   provider: WebAiProvider;
   fileId: string;
+  workspaceId: string;
   baseRevision: number;
   status: "running" | "completed" | "cancelled" | "error";
   startedAt: string;
@@ -218,6 +219,7 @@ function publicRunState(run: RunRecord): WebAiRunState {
     runId: run.runId,
     provider: run.provider,
     fileId: run.fileId,
+    workspaceId: run.workspaceId,
     baseRevision: run.baseRevision,
     status: run.status,
     startedAt: run.startedAt,
@@ -438,6 +440,7 @@ export function createWebAiBridgeServer(deps: CreateWebAiBridgeServerDeps): http
           runId,
           provider: body.provider,
           fileId: body.fileId,
+          workspaceId,
           baseRevision: snapshot.revision,
           status: "running",
           startedAt: new Date().toISOString(),
@@ -463,8 +466,8 @@ export function createWebAiBridgeServer(deps: CreateWebAiBridgeServerDeps): http
 
       if (req.method === "GET" && routeParts.length === 4 && routeParts[0] === "v1" && routeParts[1] === "agent" && routeParts[2] === "runs") {
         const run = runs.get(routeParts[3]!);
-        if (!run) {
-          sendJson(res, 404, { ok: false, error: "run not found" }, origin);
+        if (!run || !workspaceId || run.workspaceId !== workspaceId) {
+          sendJson(res, 404, { ok: false, error: "run not found in selected workspace" }, origin);
           return;
         }
         sendJson(res, 200, { ok: true, run: publicRunState(run), events: run.events }, origin);
@@ -473,8 +476,8 @@ export function createWebAiBridgeServer(deps: CreateWebAiBridgeServerDeps): http
 
       if (req.method === "GET" && routeParts.length === 5 && routeParts[0] === "v1" && routeParts[1] === "agent" && routeParts[2] === "runs" && routeParts[4] === "events") {
         const run = runs.get(routeParts[3]!);
-        if (!run) {
-          sendJson(res, 404, { ok: false, error: "run not found" }, origin);
+        if (!run || !workspaceId || run.workspaceId !== workspaceId) {
+          sendJson(res, 404, { ok: false, error: "run not found in selected workspace" }, origin);
           return;
         }
         res.writeHead(200, {
@@ -496,8 +499,8 @@ export function createWebAiBridgeServer(deps: CreateWebAiBridgeServerDeps): http
       if (req.method === "POST" && routeParts.length === 5 && routeParts[0] === "v1" && routeParts[1] === "agent" && routeParts[2] === "runs" && routeParts[4] === "cancel") {
         const runId = routeParts[3]!;
         const run = runs.get(runId);
-        if (!run || run.status !== "running") {
-          sendJson(res, 404, { ok: false, error: "running run not found" }, origin);
+        if (!run || run.status !== "running" || !workspaceId || run.workspaceId !== workspaceId) {
+          sendJson(res, 404, { ok: false, error: "running run not found in selected workspace" }, origin);
           return;
         }
         const cancelled = deps.cancelRun(runId);
