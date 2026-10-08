@@ -1,7 +1,7 @@
 import type { KnowledgePage, KnowledgeSemanticType, KnowledgeSearchResult } from "./knowledge-db-store";
 import type { KnowledgeStructureBlockType } from "./knowledge-db-structure-parser";
 
-function tokenizeForSearch(text: string): string[] {
+export function tokenizeForSearch(text: string): string[] {
   const normalized = text.normalize("NFKC").toLocaleLowerCase();
   const tokens = normalized.match(/[\\p{L}\\p{N}][\\p{P}\\p{L}\\p{N}_-]*/gu) ?? [];
   const japanese = normalized.match(/[一-龯々〆ヵヶぁ-ゖァ-ヺー]{2,}/gu) ?? [];
@@ -14,7 +14,7 @@ function tokenizeForSearch(text: string): string[] {
   return [...new Set([...tokens, ...morphemeLike])];
 }
 
-function selectDiverseContextResults(
+export function selectDiverseContextResults(
   results: KnowledgeSearchResult[],
   limit: number,
   maxChars: number,
@@ -96,7 +96,7 @@ function selectDiverseContextResults(
   return { primary, related };
 }
 
-function exactPhraseScore(text: string, query: string): number {
+export function exactPhraseScore(text: string, query: string): number {
   const normalizedText = text.normalize("NFKC").toLocaleLowerCase().replace(/\\s+/gu, " ").trim();
   const normalizedQuery = query.normalize("NFKC").toLocaleLowerCase().replace(/\\s+/gu, " ").trim();
   if (!normalizedText || !normalizedQuery) return 0;
@@ -106,7 +106,7 @@ function exactPhraseScore(text: string, query: string): number {
   return compactQuery.length >= 4 && compactText.includes(compactQuery) ? 0.7 : 0;
 }
 
-function buildDocumentFrequency(pages: KnowledgePage[]): Map<string, number> {
+export function buildDocumentFrequency(pages: KnowledgePage[]): Map<string, number> {
   const frequency = new Map<string, number>();
   for (const page of pages) {
     const uniqueTokens = new Set(tokenizeForSearch(page.text ?? ""));
@@ -115,7 +115,7 @@ function buildDocumentFrequency(pages: KnowledgePage[]): Map<string, number> {
   return frequency;
 }
 
-function lexicalScore(
+export function lexicalScore(
   text: string,
   queryTokens: string[],
   documentFrequency: Map<string, number>,
@@ -143,7 +143,7 @@ function lexicalScore(
   return Math.min(1, score / weight * 2.2);
 }
 
-function semanticQueryScore(page: KnowledgePage, queryTokens: string[]): number {
+export function semanticQueryScore(page: KnowledgePage, queryTokens: string[]): number {
   if (queryTokens.length === 0) return 0;
   const semanticText = [
     page.semanticType,
@@ -156,11 +156,11 @@ function semanticQueryScore(page: KnowledgePage, queryTokens: string[]): number 
   return Math.min(1, hits / queryTokens.length);
 }
 
-function normalizeSearchToken(token: string): string {
+export function normalizeSearchToken(token: string): string {
   return token.normalize("NFKC").toLocaleLowerCase().replace(/[\\p{P}\\p{S}]/gu, "");
 }
 
-function searchTokenVariants(token: string): string[] {
+export function searchTokenVariants(token: string): string[] {
   const normalized = normalizeSearchToken(token);
   const variants = new Set([normalized]);
   const aliases: Record<string, string[]> = {
@@ -182,7 +182,7 @@ function searchTokenVariants(token: string): string[] {
   return [...variants];
 }
 
-function metadataScore(page: KnowledgePage, query: string, queryTokens: string[]): number {
+export function metadataScore(page: KnowledgePage, query: string, queryTokens: string[]): number {
   if (queryTokens.length === 0) return 0;
   const title = page.title?.normalize("NFKC").toLocaleLowerCase() ?? "";
   const keywords = (page.keywords ?? []).map((keyword) => keyword.normalize("NFKC").toLocaleLowerCase());
@@ -200,7 +200,7 @@ function metadataScore(page: KnowledgePage, query: string, queryTokens: string[]
   return Math.min(1, score);
 }
 
-function selectCitationRegions(page: KnowledgePage, matchedText: string): Array<{
+export function selectCitationRegions(page: KnowledgePage, matchedText: string): Array<{
   type: KnowledgeStructureBlockType;
   text: string;
   bbox?: [number, number, number, number];
@@ -229,7 +229,7 @@ function selectCitationRegions(page: KnowledgePage, matchedText: string): Array<
     }));
 }
 
-function retrievalMatchReasons(
+export function retrievalMatchReasons(
   page: KnowledgePage,
   query: string,
   queryTokens: string[],
@@ -250,7 +250,7 @@ function retrievalMatchReasons(
   return reasons.slice(0, 5);
 }
 
-function semanticTypeFromQuery(query: string): KnowledgeSemanticType | undefined {
+export function semanticTypeFromQuery(query: string): KnowledgeSemanticType | undefined {
   const normalized = query.normalize("NFKC").toLocaleLowerCase();
   const rules: Array<[KnowledgeSemanticType, RegExp]> = [
     ["problem", /(?:問題|練習問題|演習|設問|例題|practice|exercise|problem|question)/u],
