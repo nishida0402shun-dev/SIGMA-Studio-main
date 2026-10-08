@@ -58,9 +58,9 @@ describe("LocalVectorIndex", () => {
         model: string;
         records: unknown[];
       };
-      expect(persisted.version).toBe(4);
+      expect(persisted.version).toBe(5);
       expect(persisted.dimensions).toBe(256);
-      expect(persisted.model).toBe("embeddinggemma-2");
+      expect(persisted.model).toBe("embeddinggemma-2-text");
       expect(persisted.records).toHaveLength(2);
     } finally {
       await rm(root, { recursive: true, force: true });
