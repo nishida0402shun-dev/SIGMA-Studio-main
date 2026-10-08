@@ -42,7 +42,6 @@ export async function renderAttachedPdfPages(
     cMapPacked: true,
     standardFontDataUrl: toPdfJsUrl(packageRoot, "standard_fonts"),
     wasmUrl: toPdfJsUrl(packageRoot, "wasm"),
-    isEvalSupported: false,
     verbosity: 0,
   });
 
