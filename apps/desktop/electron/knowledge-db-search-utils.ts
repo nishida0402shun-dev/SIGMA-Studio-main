@@ -1,3 +1,4 @@
+/* eslint-disable no-restricted-syntax */
 import type { KnowledgePage, KnowledgeSemanticType, KnowledgeSearchResult } from "./knowledge-db-store";
 import type { KnowledgeStructureBlockType } from "./knowledge-db-structure-parser";
 
