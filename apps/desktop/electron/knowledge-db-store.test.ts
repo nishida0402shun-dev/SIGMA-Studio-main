@@ -38,6 +38,12 @@ describe("KnowledgeDbStore", () => {
     expect(opened.getPageCount()).toBe(1);
     expect(await fs.stat(openedPath)).toBeTruthy();
 
+    const preview = await store.getPagePdfBase64(source!.id, 2);
+    const previewPdf = await PDFDocument.load(Buffer.from(preview.dataBase64, "base64"));
+    expect(previewPdf.getPageCount()).toBe(1);
+    expect(preview.width).toBeGreaterThan(0);
+    expect(preview.height).toBeGreaterThan(0);
+
     const regionPath = await store.extractRegion(source!.id, 2, { x: 10, y: 20, width: 200, height: 300 });
     const region = await PDFDocument.load(await fs.readFile(regionPath));
     expect(region.getPageCount()).toBe(1);
