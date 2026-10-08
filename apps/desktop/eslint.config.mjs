@@ -132,6 +132,7 @@ const eslintConfig = [
       "electron/knowledge-taxonomy.ts",
       "electron/knowledge-analysis-engine.ts",
       "electron/knowledge-db-store.ts",
+      "electron/knowledge-page-indexer.ts",
     ],
     rules: {
       "no-restricted-syntax": noUntranslatedJapaneseLiteral,
