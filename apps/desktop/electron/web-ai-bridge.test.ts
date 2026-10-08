@@ -217,6 +217,72 @@ describe("Web AI bridge", () => {
     expect(proposal.status).toBe(409);
   });
 
+  it("isolates agent run status, events, and cancellation by workspace", async () => {
+    let cancelCalls = 0;
+    const server = createWebAiBridgeServer({
+      token: "test-token",
+      getDocument: async (fileId) => ({
+        fileId,
+        revision: 1,
+        workspaceId: "workspace_a",
+        document: { docId: "doc_test" } as never,
+      }),
+      listDocuments: async () => [],
+      listProposals: async () => [],
+      getProposal: async () => null,
+      approveProposal: async () => null,
+      rejectProposal: async () => null,
+      startRun: async () => new Promise(() => undefined),
+      cancelRun: () => {
+        cancelCalls += 1;
+        return true;
+      },
+      mcpGateway,
+    });
+    servers.push(server);
+    const base = await listen(server);
+
+    const created = await fetch(`${base}/v1/agent/runs`, {
+      method: "POST",
+      headers: {
+        Authorization: "Bearer test-token",
+        "Content-Type": "application/json",
+        "X-Sigma-Workspace-Id": "workspace_a",
+      },
+      body: JSON.stringify({
+        provider: "chatgpt",
+        fileId: "file_test",
+        instruction: "test",
+      }),
+    });
+    expect(created.status).toBe(202);
+    const { runId } = await created.json() as { runId: string };
+
+    const wrongStatus = await fetch(`${base}/v1/agent/runs/${encodeURIComponent(runId)}`, {
+      headers: { Authorization: "Bearer test-token", "X-Sigma-Workspace-Id": "workspace_b" },
+    });
+    expect(wrongStatus.status).toBe(404);
+
+    const wrongEvents = await fetch(`${base}/v1/agent/runs/${encodeURIComponent(runId)}/events`, {
+      headers: { Authorization: "Bearer test-token", "X-Sigma-Workspace-Id": "workspace_b" },
+    });
+    expect(wrongEvents.status).toBe(404);
+
+    const wrongCancel = await fetch(`${base}/v1/agent/runs/${encodeURIComponent(runId)}/cancel`, {
+      method: "POST",
+      headers: { Authorization: "Bearer test-token", "X-Sigma-Workspace-Id": "workspace_b" },
+    });
+    expect(wrongCancel.status).toBe(404);
+    expect(cancelCalls).toBe(0);
+
+    const correctCancel = await fetch(`${base}/v1/agent/runs/${encodeURIComponent(runId)}/cancel`, {
+      method: "POST",
+      headers: { Authorization: "Bearer test-token", "X-Sigma-Workspace-Id": "workspace_a" },
+    });
+    expect(correctCancel.status).toBe(200);
+    expect(cancelCalls).toBe(1);
+  });
+
   it("rejects malformed JSON and oversized request bodies with client errors", async () => {
     const server = createWebAiBridgeServer({
       token: "test-token",
