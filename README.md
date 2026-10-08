@@ -115,7 +115,7 @@ Electronアプリの開発起動は `npm run electron:dev` です。
 
 ## Knowledge DB local decision reranking
 
-Knowledge DB uses Japanese Ruri v3 embeddings for the primary semantic retrieval path. When Ollama is available locally, SIGMA additionally uses **Tev1 4B** as a Jev-style evidence judge to rerank the top candidates. The decision layer is local-only and automatically falls back to the normal hybrid RAG path when Ollama is unavailable.
+Knowledge DB uses **EmbeddingGemma 2** (256-dimensional normalized embeddings) for the primary semantic retrieval path. Document text is indexed with title/text prefixes, while queries use the search-task prefix. For PDFs and image sources, SIGMA can additionally use **PaddleOCR PP-StructureV3** for OCR and document-structure extraction (tables, figures, formulas, titles, captions, and bounding boxes). When Ollama is available locally, SIGMA additionally uses **Tev1** as a Jev-style evidence judge to rerank the top candidates. The decision layer is local-only and automatically falls back to the normal hybrid RAG path when Ollama is unavailable.
 
 Install Ollama and pull the default decision model:
 
@@ -129,4 +129,4 @@ The default endpoint is `http://127.0.0.1:11434/v1/systemone`. Optional environm
 - `SIGMA_KNOWLEDGE_DECISION_MODEL=auto` — default; uses Tev1 0.8B on low-memory systems and Tev1 4B when at least 6.5GB free memory is available. Set `tev1:0.8b` or `tev1:4b` to force a model.
 - `SIGMA_KNOWLEDGE_DECISION_URL=http://127.0.0.1:11434/v1/systemone` — override the local endpoint.
 
-The decision model never replaces Ruri retrieval; it only judges the relevance of the highest-ranked local candidates. On 8GB-class machines, SIGMA defaults to Tev1 0.8B and keeps it warm for only 60 seconds; it automatically uses Tev1 4B only when enough free memory is available.
+The decision model never replaces EmbeddingGemma 2 retrieval; it only judges the relevance of the highest-ranked local candidates. On memory-constrained machines, SIGMA can fall back to Tev1 0.8B and keeps it warm for only 60 seconds; it uses Tev1 4B when enough memory is available.
