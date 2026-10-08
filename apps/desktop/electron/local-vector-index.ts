@@ -24,6 +24,7 @@ export interface VectorSearchResult extends Omit<VectorRecord, "vector"> {
 }
 
 const DIMENSIONS = 256;
+// Text-only EmbeddingGemma 2 encoder; multimodal encoders are intentionally not loaded for the vector index.
 const MODEL = "embeddinggemma-2-text";
 const MODEL_REPOSITORY = "onnx-community/embeddinggemma-2-ONNX";
 const MODEL_CACHE_DIR = path.join(
