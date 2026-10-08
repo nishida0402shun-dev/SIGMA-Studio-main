@@ -161,7 +161,7 @@ export class LocalVectorIndex {
       }
 
       next.push(...records.map((record, index) => ({ ...record, vector: vectors[index] })));
-      await this.write({ version: 4, dimensions: DIMENSIONS, model: MODEL, records: next });
+      await this.write({ version: 5, dimensions: DIMENSIONS, model: MODEL, records: next });
     });
   }
 
@@ -260,7 +260,7 @@ export class LocalVectorIndex {
         migratedVectors.push(...(await embedDocuments(batch.map((record) => record.text))));
       }
       const migrated: VectorIndexFile = {
-        version: 4,
+        version: 5,
         dimensions: DIMENSIONS,
         model: MODEL,
         records: oldRecords.map((record, index) => ({ ...record, vector: migratedVectors[index] })),
@@ -269,7 +269,7 @@ export class LocalVectorIndex {
       return migrated;
     }
 
-    return { version: 4, dimensions: DIMENSIONS, model: MODEL, records: [] };
+    return { version: 5, dimensions: DIMENSIONS, model: MODEL, records: [] };
   }
 
   private async write(index: VectorIndexFile): Promise<void> {
