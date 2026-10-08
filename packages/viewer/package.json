@@ -1,6 +1,6 @@
 {
   "name": "@sigma-studio/viewer",
-  "version": "0.469.149",
+  "version": "0.469.150",
   "description": "Read-only React renderer for SigmaDoc teaching materials.",
   "keywords": [
     "sigma-studio",
