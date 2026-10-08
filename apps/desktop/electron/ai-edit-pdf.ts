@@ -32,7 +32,6 @@ export async function renderAttachedPdfPages(
   }
 
   // Keep the ESM library external to the Electron/MCP CommonJS bundles.
-  const { createCanvas } = await import("@napi-rs/canvas");
   const { getDocument } = await import("pdfjs-dist/legacy/build/pdf.mjs");
   const packageRoot = path.dirname(require.resolve("pdfjs-dist/package.json"));
 
@@ -57,23 +56,21 @@ export async function renderAttachedPdfPages(
       const originalViewport = page.getViewport({ scale: 1 });
       const scale = Math.min(2, 2000 / Math.max(originalViewport.width, originalViewport.height));
       const viewport = page.getViewport({ scale });
-      const canvas = createCanvas(Math.max(1, Math.ceil(viewport.width)), Math.max(1, Math.ceil(viewport.height)));
+      const canvasAndContext = pdf.canvasFactory.create(Math.max(1, Math.ceil(viewport.width)), Math.max(1, Math.ceil(viewport.height)));
       try {
         await page.render({
-          canvas: null,
-          canvasContext: canvas.getContext("2d") as unknown as CanvasRenderingContext2D,
+          canvasContext: canvasAndContext.context,
           viewport,
         }).promise;
         const content = await page.getTextContent();
         const text = content.items.map((item) => "str" in item ? item.str + (item.hasEOL ? "\n" : " ") : "").join("");
-        const png = canvas.toBuffer("image/png");
+        const png = canvasAndContext.canvas.toBuffer("image/png");
         const previewFile = await options.writePage(pageNumber, png);
         pages.push({ pageNumber, text, previewFile });
         options.onPageImage?.(pageNumber, png);
       } finally {
         page.cleanup();
-        canvas.width = 0;
-        canvas.height = 0;
+        pdf.canvasFactory.destroy(canvasAndContext);
       }
     }
     return { pageCount: pdf.numPages, pages, nextPageStart: end < pdf.numPages ? end + 1 : null };
