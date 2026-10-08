@@ -68,7 +68,7 @@ async function getEmbedder(): Promise<Embedder> {
       await downloadModelFile(TOKENIZER_URL, tokenizerPath);
       const runtime = await import("ruvector-onnx-embeddings-wasm") as {
         default?: () => Promise<unknown>;
-        WasmEmbedder?: new (modelBytes: Uint8Array, tokenizerJson: string) => Embedder;
+        WasmEmbedder?: (new (modelBytes: Uint8Array, tokenizerJson: string) => Embedder) & {\n          withConfig?: (modelBytes: Uint8Array, tokenizerJson: string, config: unknown) => Embedder;\n        };
         WasmEmbedderConfig?: new () => {
           setMaxLength(length: number): unknown;
           setNormalize(normalize: boolean): unknown;
