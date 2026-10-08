@@ -243,7 +243,7 @@ export class LocalVectorIndex {
     }
 
     if (
-      parsed.version === 4 &&
+      (parsed.version === 4 || parsed.version === 5) &&
       parsed.dimensions === DIMENSIONS &&
       parsed.model === MODEL &&
       Array.isArray(parsed.records)
