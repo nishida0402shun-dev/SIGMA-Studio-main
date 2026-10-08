@@ -1,5 +1,6 @@
 import fs from "node:fs/promises";
 import path from "node:path";
+import { createRequire } from "node:module";
 export interface VectorRecord {
   id: string;
   sourceId: string;
@@ -33,9 +34,30 @@ let embedderPromise: Promise<Embedder> | null = null;
 async function getEmbedder(): Promise<Embedder> {
   if (!embedderPromise) {
     embedderPromise = (async () => {
-      const runtime = await import("ruvector-onnx-embeddings-wasm/loader.js") as {
-        createEmbedder(model: string): Promise<Embedder>;
+      // ruvector-onnx-embeddings-wasm 0.1.2 still touches CommonJS globals
+      // while its ESM loader initializes. Bridge that boundary only during
+      // module evaluation; the rest of Electron remains ESM.
+      const scope = globalThis as typeof globalThis & {
+        module?: { exports: unknown };
+        require?: NodeRequire;
       };
+      const hadModule = Object.prototype.hasOwnProperty.call(scope, "module");
+      const hadRequire = Object.prototype.hasOwnProperty.call(scope, "require");
+      const previousModule = scope.module;
+      const previousRequire = scope.require;
+      scope.module ??= { exports: {} };
+      scope.require ??= createRequire(import.meta.url);
+      let runtime: { createEmbedder(model: string): Promise<Embedder> };
+      try {
+        runtime = await import("ruvector-onnx-embeddings-wasm/loader.js") as {
+          createEmbedder(model: string): Promise<Embedder>;
+        };
+      } finally {
+        if (hadModule) scope.module = previousModule;
+        else delete scope.module;
+        if (hadRequire) scope.require = previousRequire;
+        else delete scope.require;
+      }
       const embedder = await runtime.createEmbedder(MODEL);
       return {
         embedOne: (text: string) => embedder.embedOne(text),
