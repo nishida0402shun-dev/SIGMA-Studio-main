@@ -147,6 +147,7 @@ export async function analyzeKnowledgeVisualPage(input: {
   ].join("\n\n");
 
   let output: any;
+  let inputLength = 0;
   inferenceQueue = inferenceQueue.then(async () => {
     const messages = [{
       role: "user",
@@ -157,6 +158,7 @@ export async function analyzeKnowledgeVisualPage(input: {
     }];
     const chatPrompt = processor.apply_chat_template(messages, { add_generation_prompt: true });
     const inputs = await processor(chatPrompt, image, { add_special_tokens: false });
+    inputLength = inputs.input_ids.dims.at(-1) ?? 0;
     output = await model.generate({
       ...inputs,
       max_new_tokens: 900,
@@ -166,9 +168,8 @@ export async function analyzeKnowledgeVisualPage(input: {
   await inferenceQueue;
 
   const { processor: outputProcessor } = await getVisualRuntime();
-  const inputLength = output?.dims?.length === 2 ? output.dims[1] : undefined;
-  const decoded = inputLength !== undefined
-    ? outputProcessor.batch_decode(output.slice(null, [0, null]), { skip_special_tokens: true })[0] ?? ""
+  const decoded = inputLength > 0
+    ? outputProcessor.batch_decode(output.slice(null, [inputLength, null]), { skip_special_tokens: true })[0] ?? ""
     : "";
   return {
     previewPath,
