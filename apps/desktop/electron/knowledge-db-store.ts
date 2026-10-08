@@ -749,7 +749,6 @@ export class KnowledgeDbStore {
       const child: KnowledgeSource = { id, name, originalPath: source.originalPath, storedPath, mimeType: "application/pdf", sizeBytes: bytes.byteLength, pageCount: end - start + 1, importedAt: now, updatedAt: now, contentHash, extractionStatus: "ocr-needed", pages: Array.from({ length: end - start + 1 }, (_, index) => ({ id: id + "_p" + (index + 1), sourceId: id, pageNumber: index + 1, semanticType: "unknown", extractionStatus: "ocr-needed", wordCount: 0, analysisStatus: "pending", analysisVersion: 0 })) };
       await fs.mkdir(paths.sourcesDir, { recursive: true });
       await fs.writeFile(storedPath, bytes);
-      library.sources.unshift(child);
       created.push(child);
     }
     if (created.length) {
