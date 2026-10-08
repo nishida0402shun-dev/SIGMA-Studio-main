@@ -933,8 +933,11 @@ export class KnowledgeDbStore {
       let fileCount = 0;
       for (const entry of Object.values(zip.files)) {
         if (entry.dir || entry.name === "backup-manifest.json") continue;
-        const normalized = path.posix.normalize(entry.name);
-        if (normalized.startsWith("../") || normalized === ".." || path.posix.isAbsolute(normalized)) {
+        const originalName = typeof entry.unsafeOriginalName === "string" ? entry.unsafeOriginalName : entry.name;
+        const normalizedOriginal = path.posix.normalize(originalName.replaceAll("\\", "/"));
+        const normalized = path.posix.normalize(entry.name.replaceAll("\\", "/"));
+        if (normalizedOriginal.startsWith("../") || normalizedOriginal === ".." || path.posix.isAbsolute(normalizedOriginal)
+          || normalized.startsWith("../") || normalized === ".." || path.posix.isAbsolute(normalized)) {
           throw new Error("Invalid Knowledge DB backup entry");
         }
         const target = path.join(tempRoot, ...normalized.split("/"));
