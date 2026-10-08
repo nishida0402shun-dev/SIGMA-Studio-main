@@ -212,6 +212,32 @@ export class LocalVectorIndex {
       return parsed as VectorIndexFile;
     }
 
+    // A v3 index created by an older embedding model has the same shape but
+    // incompatible vector semantics. Re-embed its persisted text in place so
+    // changing the local model never silently disables semantic retrieval.
+    if (
+      parsed.version === 3 &&
+      parsed.dimensions === DIMENSIONS &&
+      parsed.model !== MODEL &&
+      Array.isArray(parsed.records)
+    ) {
+      const oldRecords = parsed.records as VectorRecord[];
+      const migratedVectors: number[][] = [];
+      const batchSize = 32;
+      for (let start = 0; start < oldRecords.length; start += batchSize) {
+        const batch = oldRecords.slice(start, start + batchSize);
+        migratedVectors.push(...await Promise.all(batch.map((record) => embedText(record.text, "document"))));
+      }
+      const migrated: VectorIndexFile = {
+        version: 3,
+        dimensions: DIMENSIONS,
+        model: MODEL,
+        records: oldRecords.map((record, index) => ({ ...record, vector: migratedVectors[index] })),
+      };
+      await this.write(migrated);
+      return migrated;
+    }
+
     // v2 contained deterministic hash vectors, not semantic embeddings.
     // Rebuild those records in-place so existing Knowledge DB content survives.
     // Migration errors intentionally propagate so the old index is never replaced by an empty one.
