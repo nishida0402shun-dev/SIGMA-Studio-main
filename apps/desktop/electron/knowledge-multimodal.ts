@@ -23,7 +23,6 @@ async function renderPdfPage(filePath: string, pageNumber: number, outputDir: st
     throw new Error(`PDF page out of range: ${pageNumber}`);
   }
 
-  const { createCanvas } = await import("@napi-rs/canvas");
   const { getDocument } = await import("pdfjs-dist/legacy/build/pdf.mjs");
   const packageRoot = path.dirname(require.resolve("pdfjs-dist/package.json"));
   const toPdfJsUrl = (subDir: string) => path.join(packageRoot, subDir).replaceAll("\\", "/") + "/";
@@ -43,22 +42,20 @@ async function renderPdfPage(filePath: string, pageNumber: number, outputDir: st
     const originalViewport = page.getViewport({ scale: 1 });
     const scale = Math.min(2, 2200 / Math.max(originalViewport.width, originalViewport.height));
     const viewport = page.getViewport({ scale });
-    const canvas = createCanvas(Math.max(1, Math.ceil(viewport.width)), Math.max(1, Math.ceil(viewport.height)));
+    const canvasAndContext = document.canvasFactory.create(Math.max(1, Math.ceil(viewport.width)), Math.max(1, Math.ceil(viewport.height)));
 
     try {
       await page.render({
-        canvas: null,
-        canvasContext: canvas.getContext("2d") as unknown as CanvasRenderingContext2D,
+        canvasContext: canvasAndContext.context,
         viewport,
       }).promise;
       await fs.mkdir(outputDir, { recursive: true });
       const outputPath = path.join(outputDir, `page-${pageNumber}.png`);
-      await fs.writeFile(outputPath, canvas.toBuffer("image/png"));
+      await fs.writeFile(outputPath, canvasAndContext.canvas.toBuffer("image/png"));
       return outputPath;
     } finally {
       page.cleanup();
-      canvas.width = 0;
-      canvas.height = 0;
+      document.canvasFactory.destroy(canvasAndContext);
     }
   } finally {
     await loading.destroy();
