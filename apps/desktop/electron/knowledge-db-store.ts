@@ -1093,7 +1093,7 @@ export class KnowledgeDbStore {
       const needsText = source.pages.some((page) => page.text === undefined);
       const needsAnalysis = source.pages.some((page) => Boolean(page.text) && (page.analysisVersion !== KNOWLEDGE_ANALYSIS_VERSION || page.analysisStatus !== "analyzed"));
       const needsTaxonomy = source.pages.some((page) => Boolean(page.text) && page.taxonomyVersion !== KNOWLEDGE_TAXONOMY_VERSION);
-      const needsIndex = !(await this.vectorIndex().hasSource(source.id));
+      const needsIndex = Boolean(source.storedPath) && !(await this.vectorIndex().hasSource(source.id));
       if (!needsText && !needsAnalysis && !needsTaxonomy && !needsIndex) { continue; }
       this.indexStatus = { ...this.indexStatus, currentSourceId: source.id };
       try {
