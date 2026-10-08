@@ -1130,7 +1130,7 @@ export class KnowledgeDbStore {
             const shouldVisualize = shouldRunKnowledgeVisualAnalysis({
               filePath: source.storedPath,
               pageText: nativeText,
-              extractionStatus: page.extractionStatus,
+              extractionStatus: nativeText ? "text" : "ocr-needed",
               hasFigureOrTable: pageHasVisualBlocks(structureByPage.get(page.pageNumber)?.blocks),
             });
             if (shouldVisualize && page.visualAnalysisVersion !== KNOWLEDGE_VISUAL_ANALYSIS_VERSION) {
