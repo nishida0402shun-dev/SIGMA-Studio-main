@@ -9,7 +9,7 @@ describe("LocalVectorIndex", () => {
     const first = await embed("二次関数の頂点");
     const second = await embed("二次関数の頂点");
     expect(first).toEqual(second);
-    expect(first).toHaveLength(384);
+    expect(first).toHaveLength(256);
     expect(Math.sqrt(first.reduce((sum, value) => sum + value * value, 0))).toBeCloseTo(1);
   });
 
@@ -58,9 +58,9 @@ describe("LocalVectorIndex", () => {
         model: string;
         records: unknown[];
       };
-      expect(persisted.version).toBe(3);
-      expect(persisted.dimensions).toBe(384);
-      expect(persisted.model).toBe("ruri-v3-70m");
+      expect(persisted.version).toBe(4);
+      expect(persisted.dimensions).toBe(256);
+      expect(persisted.model).toBe("embeddinggemma-2");
       expect(persisted.records).toHaveLength(2);
     } finally {
       await rm(root, { recursive: true, force: true });
