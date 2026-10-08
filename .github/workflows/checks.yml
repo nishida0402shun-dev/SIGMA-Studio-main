@@ -37,6 +37,11 @@ jobs:
       - run: npm --workspace @sigma-studio/desktop run test -- --maxWorkers=2 --testTimeout=30000
       - run: npm run build
       - run: npm run electron:build
+      # Exercise the shipped Electron runtime against a real window, not only Chromium.
+      - name: Install Electron smoke-test display server
+        run: sudo apt-get update && sudo apt-get install -y xvfb
+      - name: Run Electron smoke test
+        run: xvfb-run -a npm --workspace @sigma-studio/desktop run test:e2e:electron -- tests/electron/open-document.spec.ts
 
   public-packages:
     name: Public package build and contracts
