@@ -60,7 +60,7 @@ describe("LocalVectorIndex", () => {
       };
       expect(persisted.version).toBe(3);
       expect(persisted.dimensions).toBe(384);
-      expect(persisted.model).toBe("gte-small");
+      expect(persisted.model).toBe("ruri-v3-70m");
       expect(persisted.records).toHaveLength(2);
     } finally {
       await rm(root, { recursive: true, force: true });
