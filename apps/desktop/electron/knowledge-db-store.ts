@@ -9,6 +9,7 @@ import { rerankKnowledgeCandidates } from "./knowledge-decision-reranker";
 import { KnowledgeStructureParser, type KnowledgeStructureBlock, type KnowledgeStructureBlockType, type StructureParserStatus } from "./knowledge-db-structure-parser";
 import { analyzeKnowledgePage, KNOWLEDGE_ANALYSIS_VERSION } from "./knowledge-analysis-engine";
 import { classifyKnowledgeTaxonomy, KNOWLEDGE_TAXONOMY_VERSION } from "./knowledge-taxonomy";
+import { analyzeKnowledgeVisualPage, KNOWLEDGE_VISUAL_ANALYSIS_VERSION, KNOWLEDGE_VISUAL_MODEL, shouldRunKnowledgeVisualAnalysis } from "./knowledge-multimodal";
 
 export type KnowledgeSemanticType =
   | "problem" | "example" | "explanation" | "column" | "definition"
@@ -38,6 +39,11 @@ export interface KnowledgePage {
   classificationReviewConfidence?: number;
   classificationReviewReason?: string;
   classificationReviewEvidence?: string[];
+  visualPreviewPath?: string;
+  visualAnalysis?: string;
+  visualAnalysisModel?: string;
+  visualAnalysisVersion?: number;
+  visualAnalysisError?: string;
 }
 
 interface KnowledgeSearchResult extends VectorSearchResult {
@@ -128,6 +134,10 @@ export interface KnowledgeIndexStatus {
   finishedAt?: string;
 }
 
+function pageHasVisualBlocks(blocks: KnowledgeStructureBlock[] | undefined): boolean {
+  return Boolean(blocks?.some((block) => block.type === "figure" || block.type === "table"));
+}
+
 export class KnowledgeDbStore {
   private readonly dataDir: string;
   private indexPromise: Promise<void> | null = null;
@@ -174,6 +184,58 @@ export class KnowledgeDbStore {
       taxonomyCurrent: pages.filter((page) => page.taxonomyVersion === KNOWLEDGE_TAXONOMY_VERSION).length,
       taxonomyStale: pages.filter((page) => page.taxonomyVersion !== KNOWLEDGE_TAXONOMY_VERSION).length,
     };
+  }
+
+  async analyzePageVisual(sourceId: string, pageNumber: number): Promise<KnowledgePage> {
+    const library = await this.readLibrary();
+    const source = library.sources.find((item) => item.id === sourceId);
+    if (!source) throw new Error("knowledge source not found");
+    const page = source.pages.find((item) => item.pageNumber === pageNumber);
+    if (!page) throw new Error("knowledge page not found");
+
+    try {
+      const result = await analyzeKnowledgeVisualPage({
+        filePath: source.storedPath,
+        pageNumber,
+        pageText: page.text,
+        dataDir: this.dataDir,
+        force: true,
+      });
+      page.visualPreviewPath = result.previewPath;
+      page.visualAnalysis = result.analysis || undefined;
+      page.visualAnalysisModel = result.model;
+      page.visualAnalysisVersion = result.version;
+      page.visualAnalysisError = undefined;
+      if (result.analysis?.trim()) {
+        const merged = [page.text?.trim(), result.analysis.trim()].filter(Boolean).join("\n[visual]\n");
+        page.text = merged;
+        page.extractionStatus = "text";
+        page.wordCount = countWords(merged);
+        const analysis = analyzeKnowledgePage(merged, page.structureBlocks ?? []);
+        page.semanticType = page.semanticType === "unknown" ? analysis.semanticType : page.semanticType;
+        page.title ??= analysis.title;
+        page.keywords = analysis.keywords;
+        page.analysisSignals = [...new Set([...(page.analysisSignals ?? []), ...analysis.signals, "gemma-3-visual"])].slice(0, 20);
+        page.analysisStatus = "analyzed";
+        page.analysisVersion = KNOWLEDGE_ANALYSIS_VERSION;
+        const taxonomy = classifyKnowledgeTaxonomy(merged, analysis.keywords);
+        page.taxonomyNodeIds = taxonomy.map((item) => item.nodeId);
+        page.taxonomyPaths = taxonomy.map((item) => item.path);
+        page.taxonomyConfidence = taxonomy[0]?.confidence ?? 0;
+        page.taxonomyVersion = KNOWLEDGE_TAXONOMY_VERSION;
+      }
+      source.updatedAt = new Date().toISOString();
+      await this.writeLibrary(library);
+      await this.vectorIndex().removeSource(source.id);
+      await this.indexSource(source);
+      source.indexedAt = new Date().toISOString();
+      return page;
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      page.visualAnalysisError = message;
+      await this.writeLibrary(library);
+      throw error;
+    }
   }
 
   async reanalyze(sourceIds?: string[]): Promise<KnowledgeIndexStatus> {
@@ -1060,11 +1122,34 @@ export class KnowledgeDbStore {
             }
           }
           const structureByPage = new Map(structureResults.map((result) => [result.pageNumber, result]));
-          source.pages = source.pages.map((page, index) => {
+          source.pages = await Promise.all(source.pages.map(async (page, index) => {
             const nativeText = pageTexts[index]?.trim() ?? "";
+            let visualAnalysis = page.visualAnalysis;
+            let visualPreviewPath = page.visualPreviewPath;
+            let visualAnalysisError: string | undefined;
+            const shouldVisualize = shouldRunKnowledgeVisualAnalysis({
+              filePath: source.storedPath,
+              pageText: nativeText,
+              extractionStatus: page.extractionStatus,
+              hasFigureOrTable: pageHasVisualBlocks(structureByPage.get(page.pageNumber)?.blocks),
+            });
+            if (shouldVisualize && page.visualAnalysisVersion !== KNOWLEDGE_VISUAL_ANALYSIS_VERSION) {
+              try {
+                const visual = await analyzeKnowledgeVisualPage({
+                  filePath: source.storedPath,
+                  pageNumber: page.pageNumber,
+                  pageText: nativeText,
+                  dataDir: this.dataDir,
+                });
+                visualAnalysis = visual.analysis;
+                visualPreviewPath = visual.previewPath;
+              } catch (error) {
+                visualAnalysisError = error instanceof Error ? error.message : String(error);
+              }
+            }
             const structured = structureByPage.get(page.pageNumber);
             const blocks = structured?.blocks ?? [];
-            const extractedContent = [nativeText, structured?.text ?? "", ...blocks.map((block) => block.text)]
+            const extractedContent = [nativeText, structured?.text ?? "", ...blocks.map((block) => block.text), visualAnalysis ? `[visual]\\n${visualAnalysis}` : ""]
               .map((value) => value.trim())
               .filter(Boolean)
               .join("\n");
