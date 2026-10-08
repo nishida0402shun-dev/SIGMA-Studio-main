@@ -396,6 +396,9 @@ const desktopAPI = {
     getAnalysisStatus(): Promise<unknown> {
       return ipcRenderer.invoke("knowledge-db:analysis-status");
     },
+    analyzePageVisual(payload: { sourceId: string; pageNumber: number }): Promise<unknown> {
+      return ipcRenderer.invoke("knowledge-db:visual-analyze-page", payload);
+    },
     getStructureParserStatus(): Promise<unknown> {
       return ipcRenderer.invoke("knowledge-db:structure-status");
     },
