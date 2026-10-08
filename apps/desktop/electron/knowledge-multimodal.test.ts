@@ -3,7 +3,7 @@ import { KNOWLEDGE_VISUAL_MODEL, KNOWLEDGE_VISUAL_ANALYSIS_VERSION, shouldRunKno
 
 describe("knowledge multimodal", () => {
   it("uses the Gemma 3 4B ONNX runtime metadata", () => {
-    expect(KNOWLEDGE_VISUAL_MODEL).toBe("onnx-community/gemma-3-4b-it-ONNX");
+    expect(KNOWLEDGE_VISUAL_MODEL).toBe("onnx-community/PaddleOCR PP-StructureV3");
     expect(KNOWLEDGE_VISUAL_ANALYSIS_VERSION).toBe(1);
   });
 
