@@ -37,7 +37,7 @@ async function getEmbedder(): Promise<Embedder> {
       // ruvector-onnx-embeddings-wasm 0.1.2 still touches CommonJS globals
       // while its ESM loader initializes. Bridge that boundary only during
       // module evaluation; the rest of Electron remains ESM.
-      const scope = globalThis as typeof globalThis & {
+      const scope = globalThis as unknown as {
         module?: { exports: unknown };
         require?: NodeRequire;
       };
