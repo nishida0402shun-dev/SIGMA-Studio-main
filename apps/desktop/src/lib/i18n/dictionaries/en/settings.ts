@@ -538,6 +538,7 @@ export const settings = {
       aiAgents: "AI agent codex claude antigravity gemini connection エージェント",
       autoApply: "auto apply proposal verified 自動適用 提案",
       webSearch: "web search internet citation Web検索 出典",
+      knowledgeDecision: "Knowledge DB local Jev decision Tev1 reranking semantic search precision",
       paper: "paper size A4 A3 B5 B4 orientation 用紙 向き",
       margins: "margin margins top bottom left right 余白",
       columns: "column columns gap count 段組み 段数",
