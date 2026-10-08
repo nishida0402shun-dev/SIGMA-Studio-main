@@ -21,7 +21,7 @@ jobs:
         with:
           node-version: 24
       - run: rm -f package-lock.json
-      npm install --package-lock-only --ignore-scripts --no-audit --no-fund --include=optional
+      - run: npm install --package-lock-only --ignore-scripts --no-audit --no-fund --include=optional
       - name: Commit generated lockfile
         run: |
           git config user.name "github-actions[bot]"
