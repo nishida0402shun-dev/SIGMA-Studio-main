@@ -1179,7 +1179,7 @@ export class KnowledgeDbStore {
               wordCount: text ? countWords(text) : 0,
               ...(blocks.length ? { structureBlocks: blocks } : {}),
             };
-          });
+          }));
           source.extractionStatus = source.pages.every((page) => page.text) ? "complete" : "ocr-needed";
           source.updatedAt = new Date().toISOString();
           changed = true;
