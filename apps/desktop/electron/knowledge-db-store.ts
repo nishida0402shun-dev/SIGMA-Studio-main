@@ -3,6 +3,7 @@ import path from "node:path";
 import { KnowledgeLearningStore } from "./knowledge-learning-store";
 import { createHash, randomUUID } from "node:crypto";
 import { PDFDocument } from "pdf-lib";
+import JSZip from "jszip";
 import { LocalVectorIndex, type VectorSearchResult } from "./local-vector-index";
 import { rerankKnowledgeCandidates } from "./knowledge-decision-reranker";
 import { KnowledgeStructureParser, type KnowledgeStructureBlock, type KnowledgeStructureBlockType, type StructureParserStatus } from "./knowledge-db-structure-parser";
@@ -11,7 +12,7 @@ import { classifyKnowledgeTaxonomy, KNOWLEDGE_TAXONOMY_VERSION } from "./knowled
 import { buildKnowledgeIndexedPage } from "./knowledge-page-indexer";
 import { analyzeKnowledgeVisualPage } from "./knowledge-multimodal";
 import { acquireFileLock } from "./file-lock";
-import { extractKnowledgeFilePageTexts } from "./knowledge-db-extractor";
+import { extractKnowledgeFilePageTexts, extractPdfPageTexts } from "./knowledge-db-extractor";
 import { buildDocumentFrequency, exactPhraseScore, lexicalScore, metadataScore, retrievalMatchReasons, searchTokenVariants, selectCitationRegions, selectDiverseContextResults, semanticQueryScore, semanticTypeFromQuery, tokenizeForSearch } from "./knowledge-db-search-utils";
 
 export type KnowledgeSemanticType =
