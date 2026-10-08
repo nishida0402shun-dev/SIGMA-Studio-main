@@ -126,7 +126,7 @@ ollama pull tev1:4b
 The default endpoint is `http://127.0.0.1:11434/v1/systemone`. Optional environment variables:
 
 - `SIGMA_KNOWLEDGE_DECISION_ENABLED=false` — disable the local decision layer.
-- `SIGMA_KNOWLEDGE_DECISION_MODEL=auto` — default; uses Tev1 0.8B on low-memory systems and Tev1 4B when at least 6.5GB free memory is available. Set `tev1:0.8b` or `tev1:4b` to force a model.
+- `SIGMA_KNOWLEDGE_DECISION_MODEL=auto` — default; uses Tev1 0.8B when system RAM is below 16GB and Tev1 4B when system RAM is at least 16GB. Set `tev1:0.8b` or `tev1:4b` to force a model.
 - `SIGMA_KNOWLEDGE_DECISION_URL=http://127.0.0.1:11434/v1/systemone` — override the local endpoint.
 
 The decision model never replaces EmbeddingGemma 2 retrieval; it only judges the relevance of the highest-ranked local candidates. On memory-constrained machines, SIGMA can fall back to Tev1 0.8B and keeps it warm for only 60 seconds; it uses Tev1 4B when enough memory is available.
