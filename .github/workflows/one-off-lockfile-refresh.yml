@@ -1,0 +1,29 @@
+name: One-off lockfile refresh
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: "24"
+          cache: npm
+      - run: npm install --package-lock-only --ignore-scripts --no-audit --no-fund
+      - name: Commit lockfile and remove workflow
+        run: |
+          rm -f .github/workflows/one-off-lockfile-refresh.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add package-lock.json .github/workflows/one-off-lockfile-refresh.yml
+          if git diff --cached --quiet; then exit 0; fi
+          git commit -m "chore: refresh lockfile after dependency updates"
+          git push
