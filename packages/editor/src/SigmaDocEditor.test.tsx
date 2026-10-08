@@ -144,7 +144,8 @@ describe("SigmaDocEditor", () => {
   });
 
   it("prints the current embedded preview without navigating to the desktop print route", async () => {
-    const print = vi.spyOn(window, "print").mockImplementation(() => undefined);
+    const print = vi.fn();
+    Object.defineProperty(window, "print", { configurable: true, writable: true, value: print });
     const open = vi.spyOn(window, "open").mockImplementation(() => null);
     vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockReturnValue(
       new DOMRect(0, 0, 800, 1_100),
