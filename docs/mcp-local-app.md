@@ -44,6 +44,8 @@ MCPからの書き込み系ツールは、既定では教材ファイルを直�
 ## 公開ツール
 
 - `get_local_app_status` - ローカル保存先を確認します。
+- `get_ai_resource` - Studio管理下のAIリソース(skill/instruction)を名前で取得します。skillの内容確認や更新前の読み取りに使います。
+- `list_ai_resources` - Studio管理下のAIリソース(skill/instruction)を一覧します。スコープやプロバイダ対象も返します。
 - `save_ai_resource` - Studio管理下のAIリソース(skill/instruction)を新規作成または更新します。skillは常にアプリ全体スコープ(全ワークスペースで使用)・全プロバイダ(Codex/Claude/Antigravity)向けに保存されます。`kind:"instruction"` はnameに既存の `global-instructions` のみ指定できます。
 - `delete_ai_resource` - Studio管理下のskillをnameで削除します。ユーザーが明示的に削除を依頼した場合のみ使用してください。
 - `update_ai_settings` - `aiAutoApplyVerifiedProposals` / `aiWebSearchEnabled` を部分更新します。変更内容は必ずユーザーへ報告してください。
