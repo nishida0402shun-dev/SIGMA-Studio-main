@@ -731,7 +731,6 @@ export class KnowledgeDbStore {
     const source = (await this.getPage(sourceId, 1)).source;
     if (source.mimeType !== "application/pdf") throw new Error("smart split requires PDF");
     const input = await fs.readFile(source.storedPath);
-    const library = await this.readLibrary();
     const paths = this.paths();
     const created: KnowledgeSource[] = [];
     for (const segment of segments) {
@@ -753,7 +752,32 @@ export class KnowledgeDbStore {
       library.sources.unshift(child);
       created.push(child);
     }
-    if (created.length) await this.writeLibrary(library);
+    if (created.length) {
+      // Background indexing can update library metadata while PDF pages are
+      // being materialized. Re-read immediately before committing children and
+      // retry stale snapshots instead of turning a harmless race into a failed
+      // import.
+      let committed = false;
+      for (let attempt = 0; attempt < 3 && !committed; attempt += 1) {
+        const library = await this.readLibrary();
+        for (const child of created) {
+          if (!library.sources.some((item) => item.id === child.id)) {
+            library.sources.unshift(child);
+          }
+        }
+        try {
+          await this.writeLibrary(library);
+          committed = true;
+        } catch (error) {
+          if (!(error instanceof Error) || !error.message.includes("changed concurrently")) {
+            throw error;
+          }
+        }
+      }
+      if (!committed) {
+        throw new Error("Knowledge DB changed concurrently; could not commit smart-split sources.");
+      }
+    }
     this.startBackgroundIndexing();
     return created;
   }
