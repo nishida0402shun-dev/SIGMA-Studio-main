@@ -55,7 +55,7 @@ async function renderPdfPage(filePath: string, pageNumber: number, outputDir: st
       return outputPath;
     } finally {
       page.cleanup();
-      document.canvasFactory.destroy(canvasAndContext);
+      canvasFactory.destroy(canvasAndContext);
     }
   } finally {
     await loading.destroy();
