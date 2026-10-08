@@ -20,7 +20,6 @@ jobs:
         with:
           node-version: 24
       - run: npm install --package-lock-only --ignore-scripts
-      - run: git rm .github/workflows/regenerate-lockfile.yml
       - name: Commit generated lockfile
         run: |
           git config user.name "github-actions[bot]"
