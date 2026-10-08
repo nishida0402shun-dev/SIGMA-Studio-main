@@ -121,6 +121,15 @@ export function registerKnowledgeDbIpc(deps: RegisterKnowledgeDbIpcDeps): void {
     return store.getIndexStatus();
   });
 
+  ipcMain.handle("knowledge-db:visual-analyze-page", async (event, payload: unknown) => {
+    if (event.sender !== getMainWindow()?.webContents) return null;
+    if (!payload || typeof payload !== "object") throw new Error("invalid visual analysis request");
+    const sourceId = "sourceId" in payload && typeof payload.sourceId === "string" ? payload.sourceId.trim() : "";
+    const pageNumber = "pageNumber" in payload && typeof payload.pageNumber === "number" ? payload.pageNumber : 0;
+    if (!sourceId || !Number.isInteger(pageNumber) || pageNumber < 1) throw new Error("invalid visual analysis request");
+    return store.analyzePageVisual(sourceId, pageNumber);
+  });
+
   ipcMain.handle("knowledge-db:analysis-status", async (event) => {
     if (event.sender !== getMainWindow()?.webContents) return null;
     return store.getAnalysisStatus();
