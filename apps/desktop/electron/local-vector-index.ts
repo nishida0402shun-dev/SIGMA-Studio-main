@@ -45,8 +45,12 @@ async function getEmbedder(): Promise<Embedder> {
       env.allowRemoteModels = true;
 
       const config = await AutoConfig.from_pretrained(MODEL_REPOSITORY);
-      config.vision_config = null;
-      config.audio_config = null;
+      const multimodalConfig = config as typeof config & {
+        vision_config?: unknown;
+        audio_config?: unknown;
+      };
+      multimodalConfig.vision_config = null;
+      multimodalConfig.audio_config = null;
 
       const tokenizer = await AutoTokenizer.from_pretrained(MODEL_REPOSITORY);
       const model = await AutoModel.from_pretrained(MODEL_REPOSITORY, {
