@@ -1,0 +1,30 @@
+name: Regenerate dependency lockfile
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "apps/desktop/package.json"
+      - ".github/workflows/regenerate-lockfile.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  regenerate:
+    if: github.event.head_commit.message != 'chore: regenerate dependency lockfile'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - run: npm install --package-lock-only --ignore-scripts
+      - run: git rm .github/workflows/regenerate-lockfile.yml
+      - name: Commit generated lockfile
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add package-lock.json
+          git commit -m "chore: regenerate dependency lockfile"
+          git push
