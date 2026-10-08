@@ -126,10 +126,12 @@ export const MCP_TOOL_CATEGORY_MAP = {
   "AI設定・アプリ文脈": [
     "conversation_memory_save",
     "delete_ai_resource",
+    "get_ai_resource",
     "get_edit_proposal",
     "get_local_app_status",
     "list_edit_proposals",
     "list_all_pending_proposals",
+    "list_ai_resources",
     "save_ai_resource",
     "update_ai_settings",
     "withdraw_current_edit_proposal",
