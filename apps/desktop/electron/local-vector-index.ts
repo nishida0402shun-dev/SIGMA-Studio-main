@@ -1,6 +1,7 @@
 import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
+import { acquireFileLock } from "./file-lock";
 
 export interface VectorRecord {
   id: string;
@@ -39,6 +40,9 @@ interface Embedder {
 let embedderPromise: Promise<Embedder> | null = null;
 
 async function getEmbedder(): Promise<Embedder> {
+  if (process.env.NODE_ENV === "test") {
+    return { embed: async (texts) => texts.map((text) => testEmbed(text)) };
+  }
   if (!embedderPromise) {
     embedderPromise = (async () => {
       const { env, AutoConfig, AutoModel, AutoTokenizer } = await import("@huggingface/transformers");
@@ -150,7 +154,9 @@ export class LocalVectorIndex {
   async upsertMany(records: Array<Omit<VectorRecord, "vector">>): Promise<void> {
     if (records.length === 0) return;
     await withIndexLock(this.indexPath, async () => {
-      const index = await this.read();
+      const fileLock = await acquireFileLock(this.indexPath + ".lock", { op: "knowledge-vector-upsert" });
+      try {
+        const index = await this.read();
       const keys = new Set(
         records.map((record) => record.sourceId + ":" + record.pageNumber + ":" + record.chunkIndex),
       );
@@ -166,7 +172,10 @@ export class LocalVectorIndex {
       }
 
       next.push(...records.map((record, index) => ({ ...record, vector: vectors[index] })));
-      await this.write({ version: 5, dimensions: DIMENSIONS, model: MODEL, records: next });
+        await this.write({ version: 5, dimensions: DIMENSIONS, model: MODEL, records: next });
+      } finally {
+        await fileLock.release();
+      }
     });
   }
 
@@ -277,6 +286,10 @@ export class LocalVectorIndex {
     return { version: 5, dimensions: DIMENSIONS, model: MODEL, records: [] };
   }
 
+  async hasRecords(): Promise<boolean> {
+    return (await this.read()).records.length > 0;
+  }
+
   private async write(index: VectorIndexFile): Promise<void> {
     await fs.mkdir(path.dirname(this.indexPath), { recursive: true });
     const temp = this.indexPath + ".tmp";
@@ -287,6 +300,22 @@ export class LocalVectorIndex {
 
 export async function embed(text: string): Promise<number[]> {
   return embedText(text);
+}
+
+function testEmbed(text: string): number[] {
+  const vector = new Array<number>(DIMENSIONS).fill(0);
+  const normalized = text.normalize("NFKC").toLocaleLowerCase();
+  for (let index = 0; index < normalized.length; index += 1) {
+    const code = normalized.codePointAt(index) ?? 0;
+    vector[(code + index * 31) % DIMENSIONS] += 1;
+    if (index + 1 < normalized.length) {
+      const pair = ((code * 257) + (normalized.codePointAt(index + 1) ?? 0)) % DIMENSIONS;
+      vector[pair] += 0.5;
+    }
+  }
+  let norm = Math.sqrt(vector.reduce((sum, value) => sum + value * value, 0));
+  if (!norm) norm = 1;
+  return vector.map((value) => value / norm);
 }
 
 function cosine(a: number[], b: number[]): number {
