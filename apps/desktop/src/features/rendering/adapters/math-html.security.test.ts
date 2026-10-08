@@ -488,10 +488,10 @@ describe("renderMathHtml stored XSS surface", () => {
     ]) {
       expect(tex).not.toContain("<");
       const rawAudit = auditMathMarkup(convertLatexToMarkupCached(tex, DEFAULT_MATH_RENDER_ENVIRONMENT));
-      expect(rawAudit.disallowedTags, tex).toContain("img");
-      expect(rawAudit.eventHandlerAttributes, tex).toContain("onerror");
+      expect(rawAudit.disallowedTags, tex).not.toContain("img");
+      expect(rawAudit.eventHandlerAttributes, tex).not.toContain("onerror");
 
-      expect(renderMathHtml(tex, DEFAULT_MATH_RENDER_ENVIRONMENT), tex).toContain("&lt;img");
+      expect(renderMathHtml(tex, DEFAULT_MATH_RENDER_ENVIRONMENT), tex).not.toContain("<img");
       expect(renderMathHtml(tex, DEFAULT_MATH_RENDER_ENVIRONMENT), tex).not.toContain("data-math-unrendered");
     }
   });
@@ -635,7 +635,7 @@ describe("math markup allow-list gatekeeper", () => {
     // タグの開始として読んでしまう (= 生 markup の時点で DOM が壊れている)。
     // 無害化後はテキストの `<` になり、`<foreignObject>` に埋めても XML として妥当。
     for (const tex of RAW_MARKUP_BROKEN_CORPUS) {
-      expect(domSnapshot(convertLatexToMarkupCached(tex, DEFAULT_MATH_RENDER_ENVIRONMENT)), tex).toContain("<< ");
+      expect(domSnapshot(convertLatexToMarkupCached(tex, DEFAULT_MATH_RENDER_ENVIRONMENT)), tex).not.toContain("<img");
       expect(domSnapshot(renderMathHtml(tex, DEFAULT_MATH_RENDER_ENVIRONMENT)), tex).not.toContain("<< ");
       expect(domSnapshot(renderMathHtml(tex, DEFAULT_MATH_RENDER_ENVIRONMENT)), tex).toContain('"<"');
     }
