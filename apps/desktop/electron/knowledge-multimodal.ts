@@ -34,7 +34,6 @@ async function renderPdfPage(filePath: string, pageNumber: number, outputDir: st
     cMapPacked: true,
     standardFontDataUrl: toPdfJsUrl("standard_fonts"),
     wasmUrl: toPdfJsUrl("wasm"),
-    isEvalSupported: false,
     verbosity: 0,
   });
 
