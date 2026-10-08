@@ -65,24 +65,36 @@ async function renderPdfPage(filePath: string, pageNumber: number, outputDir: st
   }
 }
 
-let pipelinePromise: Promise<any> | null = null;
+let visualRuntimePromise: Promise<{ processor: any; model: any; loadImage: any }> | null = null;
 let inferenceQueue: Promise<void> = Promise.resolve();
 
-async function getPipeline(): Promise<any> {
-  if (!pipelinePromise) {
-    pipelinePromise = (async () => {
-      const { pipeline, env } = await import("@huggingface/transformers");
+async function getVisualRuntime(): Promise<{ processor: any; model: any; loadImage: any }> {
+  if (!visualRuntimePromise) {
+    visualRuntimePromise = (async () => {
+      const {
+        AutoProcessor,
+        AutoModelForImageTextToText,
+        load_image,
+      } = await import("@huggingface/transformers");
       const cacheDir = process.env.SIGMA_STUDIO_MODEL_CACHE
         ? path.join(process.env.SIGMA_STUDIO_MODEL_CACHE, "gemma-3-4b-it")
         : path.join(process.env.HOME || process.env.USERPROFILE || process.cwd(), ".sigma-studio", "models", "gemma-3-4b-it");
+      const { env } = await import("@huggingface/transformers");
       env.cacheDir = cacheDir;
-      return pipeline("image-text-to-text", KNOWLEDGE_VISUAL_MODEL, {
+
+      const processor = await AutoProcessor.from_pretrained(KNOWLEDGE_VISUAL_MODEL);
+      const model = await AutoModelForImageTextToText.from_pretrained(KNOWLEDGE_VISUAL_MODEL, {
         device: "cpu",
-        dtype: "q4",
+        dtype: {
+          embed_tokens: "q4",
+          vision_encoder: "q4",
+          decoder_model_merged: "q4",
+        },
       });
+      return { processor, model, loadImage: load_image };
     })();
   }
-  return pipelinePromise;
+  return visualRuntimePromise;
 }
 
 function extractGeneratedText(output: any): string {
@@ -120,9 +132,8 @@ export async function analyzeKnowledgeVisualPage(input: {
     ? await renderPdfPage(input.filePath, input.pageNumber, path.join(previewDir, path.basename(input.filePath, extension)))
     : input.filePath;
 
-  const pipeline = await getPipeline();
-  const { RawImage } = await import("@huggingface/transformers");
-  const image = await RawImage.read(previewPath);
+  const { processor, model, loadImage } = await getVisualRuntime();
+  const image = await loadImage(previewPath);
   const context = input.pageText?.trim()
     ? `The page's extracted text is below. Use it as supporting context, but inspect the image for information that extraction may have missed.\n\n${input.pageText.slice(0, 12000)}`
     : "There is little or no reliable extracted text. Read the page image directly.";
@@ -137,16 +148,31 @@ export async function analyzeKnowledgeVisualPage(input: {
 
   let output: any;
   inferenceQueue = inferenceQueue.then(async () => {
-    output = await pipeline([{ role: "user", content: [{ type: "image", image }, { type: "text", text: prompt }] }], {
+    const messages = [{
+      role: "user",
+      content: [
+        { type: "image" },
+        { type: "text", text: prompt },
+      ],
+    }];
+    const chatPrompt = processor.apply_chat_template(messages, { add_generation_prompt: true });
+    const inputs = await processor(chatPrompt, image, { add_special_tokens: false });
+    output = await model.generate({
+      ...inputs,
       max_new_tokens: 900,
       do_sample: false,
     });
   });
   await inferenceQueue;
 
+  const { processor: outputProcessor } = await getVisualRuntime();
+  const inputLength = output?.dims?.length === 2 ? output.dims[1] : undefined;
+  const decoded = inputLength !== undefined
+    ? outputProcessor.batch_decode(output.slice(null, [0, null]), { skip_special_tokens: true })[0] ?? ""
+    : "";
   return {
     previewPath,
-    analysis: extractGeneratedText(output),
+    analysis: decoded.trim() || extractGeneratedText(output),
     model: KNOWLEDGE_VISUAL_MODEL,
     version: KNOWLEDGE_VISUAL_ANALYSIS_VERSION,
   };
