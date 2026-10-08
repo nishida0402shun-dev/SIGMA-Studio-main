@@ -10,6 +10,7 @@ import { KnowledgeStructureParser, type KnowledgeStructureBlock, type KnowledgeS
 import { analyzeKnowledgePage, KNOWLEDGE_ANALYSIS_VERSION } from "./knowledge-analysis-engine";
 import { classifyKnowledgeTaxonomy, KNOWLEDGE_TAXONOMY_VERSION } from "./knowledge-taxonomy";
 import { buildKnowledgeIndexedPage } from "./knowledge-page-indexer";
+import { analyzeKnowledgeVisualPage } from "./knowledge-multimodal";
 
 export type KnowledgeSemanticType =
   | "problem" | "example" | "explanation" | "column" | "definition"
@@ -1303,7 +1304,7 @@ async function extractPdfPageTexts(bytes: Uint8Array, pageCount: number): Promis
       texts.push(text);
       page.cleanup();
     }
-    await document.destroy();
+    await loadingTask.destroy();
     return texts;
   } catch {
     return Array.from({ length: pageCount }, () => "");
