@@ -9,7 +9,7 @@ permissions:
 
 jobs:
   refresh:
-    if: contains(github.event.head_commit.message, 'update napi canvas for PDF rendering compatibility')
+    if: contains(github.event.head_commit.message, 'temporarily refresh lockfile after canvas update')
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
