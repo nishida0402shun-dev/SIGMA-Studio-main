@@ -37,6 +37,7 @@ jobs:
       ref: ${{ steps.release.outputs.ref }}
       version: ${{ steps.release.outputs.version }}
       channel: ${{ steps.release.outputs.channel }}
+      tag: ${{ steps.release.outputs.tag }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -59,6 +60,7 @@ jobs:
           if [[ "${GITHUB_REF_TYPE}" == "tag" ]]; then
             version="$(node -p "require('./package.json').version")"
             ref="${GITHUB_REF_NAME}"
+            if [[ "${GITHUB_REF_NAME}" == *"-beta."* ]]; then channel="beta"; fi
           elif [[ "${GITHUB_EVENT_NAME}" == "workflow_dispatch" ]]; then
             version="$(node -p "require('./package.json').version")"
             ref="${GITHUB_SHA}"
@@ -78,7 +80,20 @@ jobs:
 
           echo "ref=${ref}" >> "${GITHUB_OUTPUT}"
           echo "version=${version}" >> "${GITHUB_OUTPUT}"
+          tag="v${version}"
+          if [[ "${GITHUB_REF_TYPE}" == "tag" ]]; then tag="${GITHUB_REF_NAME}"; fi
+          echo "tag=${tag}" >> "${GITHUB_OUTPUT}"
           echo "channel=${channel}" >> "${GITHUB_OUTPUT}"
+
+          # Create the release once, before parallel OS jobs upload their distinct assets.
+          # Keeping it as a draft prevents users from downloading an incomplete asset set.
+          if ! gh release view "${tag}" >/dev/null 2>&1; then
+            release_args=(--draft --title "Sigma Studio ${tag}" --generate-notes --target "${ref}")
+            if [[ "${channel}" == "beta" ]]; then release_args+=(--prerelease); fi
+            gh release create "${tag}" "${release_args[@]}"
+          fi
+        env:
+          GH_TOKEN: ${{ github.token }}
 
   release:
     needs: prepare
@@ -212,3 +227,24 @@ jobs:
           }
 
 
+
+  publish-release:
+    name: Publish complete release
+    needs: [prepare, release]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Publish after all platform assets are uploaded
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ needs.prepare.outputs.tag }}
+          RELEASE_CHANNEL: ${{ needs.prepare.outputs.channel }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ "${RELEASE_CHANNEL}" == "beta" ]]; then
+            gh release edit "${RELEASE_TAG}" --draft=false --prerelease
+          else
+            gh release edit "${RELEASE_TAG}" --draft=false --latest
+          fi
