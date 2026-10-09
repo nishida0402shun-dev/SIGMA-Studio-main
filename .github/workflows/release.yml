@@ -81,9 +81,6 @@ jobs:
           echo "channel=${channel}" >> "${GITHUB_OUTPUT}"
 
   release:
-    # A push to main only bumps the version and pushes its tag. The tag-triggered
-    # run is the sole publisher, avoiding a second run for the same release.
-    if: github.ref_type == 'tag' || github.event_name == 'workflow_dispatch'
     needs: prepare
     strategy:
       fail-fast: false
