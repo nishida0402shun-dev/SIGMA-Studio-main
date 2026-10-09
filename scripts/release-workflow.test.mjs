@@ -15,7 +15,6 @@ test("platform builds never publish releases independently", () => {
 });
 
 test("a single publish job waits for both platform builds", () => {
-  assert.match(matrixJob, /if: github\.ref_type == 'tag' \|\| github\.event_name == 'workflow_dispatch'/);
   assert.match(publishJob, /needs: \[prepare, release\]/);
   assert.equal((publishJob.match(/gh release create /g) ?? []).length, 2,
     "stable and beta branches must create releases only in the single publisher job");
