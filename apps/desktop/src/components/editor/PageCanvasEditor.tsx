@@ -6811,7 +6811,7 @@ function ProblemAreaFlowUnit({
   } as CSSProperties;
   const problemNumber = unit.problemNumber;
   const isFirstArea = unit.isFirstProblemArea;
-  const showNumber = area === "lead" && typeof problemNumber === "number";
+  const showNumber = (area === "lead" || unit.isFirstProblemArea) && typeof problemNumber === "number";
   const problemNumberStyle = showNumber ? { fontSize: `${getProblemNumberFontSize(problem)}pt` } : undefined;
   const hasFrame = problem.frame?.enabled === true && isProblemFrameArea(area);
   const frameStyleId = hasFrame ? getProblemFrameStyleId(problem) : undefined;
