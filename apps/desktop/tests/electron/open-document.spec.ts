@@ -41,7 +41,8 @@ test("opens startup/second-instance/macOS files through real storage and preserv
   env.SIGMA_STUDIO_USER_DATA_DIR = path.join(root, "profile");
   let app: ElectronApplication | undefined;
   try {
-    app = await electron.launch({ args: [APP_ROOT, first, first, ordinary], cwd: APP_ROOT, env });
+    app = await electron.launch({ args: [APP_ROOT, first, first, ordinary], cwd: APP_ROOT, env, chromiumSandbox: true });
+    expect(await app.evaluate(({ app }) => app.commandLine.hasSwitch("no-sandbox"))).toBe(false);
     const page = await app.firstWindow();
     await expect(page.locator(BODY).first()).toContainText("STARTUP_CONTENT", { timeout: 90_000 });
     await expect(page.locator("[data-startup-splash]")).toHaveCount(0, { timeout: 30_000 });
