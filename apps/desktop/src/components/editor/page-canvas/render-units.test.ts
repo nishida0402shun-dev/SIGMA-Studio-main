@@ -297,3 +297,43 @@ describe("pickUnitCommentThreads", () => {
     expect(pickUnitCommentThreads(blocks, [])).toBe(pickUnitCommentThreads([paragraph("p9")], []));
   });
 });
+
+
+describe("buildRenderUnits with problem display filters", () => {
+  it("omits hidden problem areas without changing the underlying document", () => {
+    const question = {
+      type: "problem",
+      id: "q-filter",
+      lead: [],
+      prompt: [paragraph("q-filter_prompt")],
+      hints: [paragraph("q-filter_hint")],
+      solution: [paragraph("q-filter_solution")],
+    } as unknown as SigmaBlock;
+    const display = { problem: true, solution: false, hints: false } as const;
+
+    const units = buildRenderUnits([question], null, null, undefined, display);
+    const areas = units
+      .filter((unit): unit is Extract<RenderUnit, { type: "problemArea" | "problemLayoutSection" }> =>
+        unit.type === "problemArea" || unit.type === "problemLayoutSection")
+      .map((unit) => unit.area);
+
+    expect(areas).toEqual(["lead", "prompt"]);
+    expect(question).toHaveProperty("solution");
+    expect(question).toHaveProperty("hints");
+  });
+
+  it("keeps the usual rendering when no filter is supplied", () => {
+    const question = {
+      type: "problem",
+      id: "q-default",
+      lead: [],
+      prompt: [paragraph("q-default_prompt")],
+      hints: [paragraph("q-default_hint")],
+      solution: [paragraph("q-default_solution")],
+    } as unknown as SigmaBlock;
+
+    const units = buildRenderUnits([question]);
+    expect(units.filter((unit) => unit.type === "problemArea").map((unit) => unit.area))
+      .toEqual(["lead", "prompt", "hints", "solution"]);
+  });
+});
