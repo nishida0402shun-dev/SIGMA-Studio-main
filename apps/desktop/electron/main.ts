@@ -1,4 +1,5 @@
-import { app, BrowserWindow, ipcMain, Menu, nativeImage, shell } from "electron";
+import { app, BrowserWindow, ipcMain as electronIpcMain, Menu, nativeImage, shell } from "electron";
+import { authorizePreviewSender, configureTrustedIpc, ipcMain } from "./trusted-ipc";
 import crypto from "node:crypto";
 import { createInterface } from "node:readline";
 import { resolveDevServerUrl, isDevServerNavigation } from "./dev-server";
@@ -114,6 +115,7 @@ if (!hasSingleInstanceLock) {
   } else app.exit(0);
 }
 let mainWindow: BrowserWindow | null = null;
+configureTrustedIpc({ getMainWebContents: () => mainWindow?.webContents ?? null, rendererDirectory: DIST_RENDERER_DIR, devServerUrl: DEV_SERVER_URL });
 const WEB_AI_ALLOWED_HOSTS = new Set([
   "chatgpt.com",
   "chat.openai.com",
@@ -123,14 +125,14 @@ const WEB_AI_ALLOWED_HOSTS = new Set([
   "www.aistudio.google.com",
 ]);
 
-ipcMain.handle("web-ai:get-preload-url", (event) => {
+electronIpcMain.handle("web-ai:get-preload-url", (event) => {
   if (event.sender !== mainWindow?.webContents) {
     throw new Error("web AI preload URL is only available to the main renderer");
   }
   return pathToFileURL(path.join(__dirname, "web-ai-preload.cjs")).toString();
 });
 
-ipcMain.handle("web-ai:get-conversation-capture-setting", (event) => {
+electronIpcMain.handle("web-ai:get-conversation-capture-setting", (event) => {
   const frameUrl = event.senderFrame?.url ?? "";
   let hostname = "";
   try { hostname = new URL(frameUrl).hostname; } catch { throw new Error("invalid Web AI frame origin"); }
@@ -139,7 +141,7 @@ ipcMain.handle("web-ai:get-conversation-capture-setting", (event) => {
   return readDesktopSettingsSync(SIGMA_STUDIO_DATA_PATH).webAiConversationCaptureEnabled !== false;
 });
 
-ipcMain.handle("web-ai:get-bridge-info", (event) => {
+electronIpcMain.handle("web-ai:get-bridge-info", (event) => {
   const url = event.senderFrame?.url ?? "";
   let hostname = "";
   try {
@@ -157,7 +159,7 @@ ipcMain.handle("web-ai:get-bridge-info", (event) => {
   };
 });
 
-ipcMain.handle("web-ai:capture-conversation", async (event, payload: unknown) => {
+electronIpcMain.handle("web-ai:capture-conversation", async (event, payload: unknown) => {
   const frameUrl = event.senderFrame?.url ?? "";
   let origin: string;
   try {
@@ -898,15 +900,18 @@ async function renderAiPageContextPng(request: RenderPageContextRequest): Promis
     return { action: "deny" };
   });
 
+  const query = { renderId, profile: request.profile ?? "teacher" };
+  const previewUrl = DEV_SERVER_URL
+    ? new URL("/print", DEV_SERVER_URL)
+    : pathToFileURL(path.join(DIST_RENDERER_DIR, "print.html"));
+  previewUrl.search = new URLSearchParams(query).toString();
+  const revokePreview = authorizePreviewSender(renderWindow.webContents, renderId, previewUrl.href);
+  renderWindow.once("closed", revokePreview);
+  renderWindow.webContents.on("will-navigate", (event) => event.preventDefault());
+  renderWindow.webContents.on("will-redirect", (event) => event.preventDefault());
+
   try {
-    const query = { renderId, profile: request.profile ?? "teacher" };
-    if (DEV_SERVER_URL) {
-      const url = new URL("/print", DEV_SERVER_URL);
-      url.search = new URLSearchParams(query).toString();
-      await renderWindow.loadURL(url.toString());
-    } else {
-      await renderWindow.loadFile(path.join(DIST_RENDERER_DIR, "print.html"), { query });
-    }
+    await renderWindow.loadURL(previewUrl.href);
     await waitForPrintPreviewReady(renderWindow);
 
     // First measure without scrolling: if the target page already fits
@@ -1020,6 +1025,7 @@ async function renderAiPageContextPng(request: RenderPageContextRequest): Promis
   } catch (error) {
     return { ok: false, error: error instanceof Error ? error.message : te("electron.preview.renderFailed") };
   } finally {
+    revokePreview();
     if (!renderWindow.isDestroyed()) {
       renderWindow.close();
     }
