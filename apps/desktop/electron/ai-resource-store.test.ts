@@ -78,7 +78,7 @@ describe("LocalAiResourceStore", () => {
       const file = await store.readFile(resource.id);
       expect(file.content.length).toBeGreaterThan(0);
       const parsed = parseSkillFile(file.content);
-      expect(parsed.name).toBe(path.basename(resource.sourcePath, ".md"));
+      expect(parsed.name).toBe(path.basename(path.dirname(resource.sourcePath)));
       expect(parsed.description).toBe(resource.description);
     }));
   });
