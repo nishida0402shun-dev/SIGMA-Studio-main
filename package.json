@@ -44,9 +44,13 @@
     "electron:dist:mac": "npm --workspace @sigma-studio/desktop run electron:dist:mac",
     "electron:dist:win": "npm --workspace @sigma-studio/desktop run electron:dist:win",
     "electron:dist:store": "npm --workspace @sigma-studio/desktop run electron:dist:store",
-    "audit:production": "npm audit --omit=dev --audit-level=high"
+    "audit:production": "npm audit --omit=dev --audit-level=high",
+    "postinstall": "node scripts/patch-http-cache-semantics.mjs",
+    "dependencies:check": "node scripts/check-desktop-dependencies.mjs",
+    "security:audit": "node --test scripts/dependency-security.test.mjs && npm audit --audit-level=high"
   },
   "overrides": {
-    "postcss": "^8.5.14"
+    "postcss": "^8.5.14",
+    "http-cache-semantics": "4.3.0"
   }
 }
