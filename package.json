@@ -51,6 +51,12 @@
   },
   "overrides": {
     "postcss": "^8.5.14",
-    "http-cache-semantics": "4.3.0"
+    "http-cache-semantics": "4.3.0",
+    "@next/eslint-plugin-next@16.4.0": {
+      "fast-glob": "npm:tinyglobby@0.2.17"
+    }
+  },
+  "devDependencies": {
+    "@next/eslint-plugin-next": "16.4.0"
   }
 }
