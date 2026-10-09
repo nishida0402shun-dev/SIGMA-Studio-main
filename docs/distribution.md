@@ -1,6 +1,6 @@
 # 配布とパッケージ
 
-ソースとデスクトップ配布物の公開先は `Atsu-Taiyo/SIGMA-Studio` です。
+このフォークのデスクトップ配布物と自動更新メタデータの公開先は `nishida0402shun-dev/SIGMA-Studio-main` です。大元のOSSは `Atsu-Taiyo/SIGMA-Studio` で、ソースの上流追跡先として扱います。
 
 ## ローカル検証
 
