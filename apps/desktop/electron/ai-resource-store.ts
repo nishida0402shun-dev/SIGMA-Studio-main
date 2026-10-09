@@ -4,6 +4,7 @@ import path from "node:path";
 
 import { composeSkillFile, parseSkillFile } from "@/lib/ai/skill-frontmatter";
 import { createCurrentLocaleTranslator } from "@/lib/i18n";
+import { OFFICIAL_SKILL_DEFINITIONS, type OfficialSkillDefinition } from "./official-skill-definitions";
 
 const ta = createCurrentLocaleTranslator("ai");
 
@@ -22,7 +23,6 @@ export {
   OFFICIAL_SKILL_DEFINITIONS,
   OFFICIAL_SVG_FIGURE_SKILL_ID,
 } from "./official-skill-definitions";
-import { OFFICIAL_SKILL_DEFINITIONS, type OfficialSkillDefinition } from "./official-skill-definitions";
 const ALL_PROVIDERS: AiResourceProvider[] = ["codex", "claude", "antigravity"];
 
 export type AiResourceKind = "instruction" | "skill";
