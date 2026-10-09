@@ -99,10 +99,10 @@ it("keeps privileged IPC behind the common boundary while isolating Web AI", () 
   const files = ["main.ts", "cli-bin-ipc.ts", ...["ipc", "collaboration"].flatMap(dir => readdirSync(path.join(root, dir)).filter(name => name.endsWith(".ts") && !name.endsWith(".test.ts")).map(name => `${dir}/${name}`))];
   for (const file of files) {
     const source = readFileSync(path.join(root, file), "utf8");
-    if (/ipcMain\\.(?:handle|on)\\(/u.test(source)) expect(source, file).toMatch(/import \\{[^\\n]*ipcMain[^\\n]*\\} from "\\.\\.?\\/trusted-ipc"/u);
+    if (/ipcMain\.(?:handle|on)\(/u.test(source)) expect(source, file).toMatch(/import \{[^\n]*ipcMain[^\n]*\} from "\.\.?\/trusted-ipc"/u);
   }
   const main = readFileSync(path.join(root, "main.ts"), "utf8");
-  const rawChannels = [...main.matchAll(/electronIpcMain\\.handle\\("([^"]+)"/gu)].map(match => match[1]);
+  const rawChannels = [...main.matchAll(/electronIpcMain\.handle\("([^"]+)"/gu)].map(match => match[1]);
   expect(rawChannels).toEqual([
     "web-ai:get-preload-url",
     "web-ai:get-conversation-capture-setting",
