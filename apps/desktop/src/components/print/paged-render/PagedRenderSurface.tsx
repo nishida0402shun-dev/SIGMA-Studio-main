@@ -264,6 +264,7 @@ export function PagedRenderSurface({
       <div className="paged-surface-stage" ref={stageRef} aria-hidden="true">
         <PageCanvasEditor
           presentation="paged"
+          problemDisplay={problemDisplay}
           document={printable}
           selectedId={null}
           selectedInlineMath={null}
