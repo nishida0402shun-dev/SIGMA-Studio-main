@@ -6458,7 +6458,9 @@ function EditorShellBody({ embeddedHost, editorStore }: EditorShellProps & { edi
     },
     appMenu: {
       activeDocumentOpenFailure, activeFileId, addBlock, aiMenuButtonRef, appUpdateState,
-      closeDocumentTab, commentsPanelOpen, commitDocumentTitle, copyDocumentText, createDocumentTab, createWhiteboardDocumentTab, degradedWatcherScopes,
+      closeDocumentTab, commentsPanelOpen, problemDisplay, problemDisplayAvailable,
+      toggleProblemDisplayPart: toggleProblemDisplay,
+      commitDocumentTitle, copyDocumentText, createDocumentTab, createWhiteboardDocumentTab, degradedWatcherScopes,
       deleteActiveDocument, documentMetadatas, documentTitle, duplicateActiveDocument, exportJson,
       exportMenuOpen, fileMenuButtonRef, handleTitleUpdateAction,
       importDocumentFile, importInputRef, insertMenuButtonRef, loadingFileId,
