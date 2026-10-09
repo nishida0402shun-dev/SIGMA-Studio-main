@@ -6706,7 +6706,7 @@ function EditorShellBody({ embeddedHost, editorStore }: EditorShellProps & { edi
               onReload={handleReloadFailedDocument}
             />
           )}
-          {pageEditorMounted && <AiPageCanvasEditor
+          {pageEditorMounted && !problemDisplayActive && <AiPageCanvasEditor
             key={`${activeFileId}:${documentInstanceRevision}`}
             aiEnabled={!isEmbedded}
             onPageCountChange={setEditorPageCount}
@@ -6795,6 +6795,19 @@ function EditorShellBody({ embeddedHost, editorStore }: EditorShellProps & { edi
             documentWorkspaceId={activeDocumentMetadata?.workspaceId ?? null}
             onFocusAiSession={focusAiSession}
           />}
+          {pageEditorMounted && problemDisplayActive && (
+            <div className="problem-display-preview" data-problem-display-view="true">
+              <div className="problem-display-chip" role="status">
+                <span>{t("problemDisplay.viewing", { parts: problemDisplaySummary })}</span>
+                <button type="button" className="button" onClick={showAllProblemParts}>
+                  {t("problemDisplay.showAll")}
+                </button>
+              </div>
+              <div className="problem-display-preview-scroll">
+                <PagedRenderSurface document={document} profile="teacher" problemDisplay={problemDisplay} />
+              </div>
+            </div>
+          )}
           {versionHistoryPreview && (
             <div className="version-history-preview" data-version-history-preview="true">
               <div className="version-history-preview-banner" role="status">
