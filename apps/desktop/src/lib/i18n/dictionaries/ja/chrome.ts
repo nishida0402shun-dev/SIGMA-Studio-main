@@ -63,6 +63,10 @@ export const chrome = {
       texEnvironment: "TeX環境設定",
       pageSettings: "ページ設定",
       appSettings: "アプリ設定",
+      problemDisplay: "表示",
+      displayProblem: "問題",
+      displaySolution: "解答",
+      displayHints: "コメント",
     },
   },
   title: {
@@ -390,6 +394,10 @@ export const chrome = {
       help: "ヘルプ",
     },
     openDocuments: "開いている教材",
+  },
+  problemDisplay: {
+    viewing: "{{parts}}だけを表示中",
+    showAll: "すべて表示に戻す",
   },
   versionHistory: {
     title: "バージョン履歴",

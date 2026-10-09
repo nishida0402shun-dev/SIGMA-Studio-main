@@ -30,6 +30,7 @@ import { Inline, Inset } from "@/components/ui/layout";
 import { resolveTabsKeyboardIndex } from "@/components/ui/settings/Tabs";
 import { LINE_HEIGHT_STEP, MAX_LINE_HEIGHT, MIN_LINE_HEIGHT } from "@/features/document";
 import { DocumentTitleText } from "@/features/rendering/adapters/react";
+import { PROBLEM_DISPLAY_PARTS } from "@/features/rendering/core";
 import type { Translate } from "@/lib/i18n";
 import { SUPPORTED_OVERLAY_IMAGE_MIME_TYPES } from "@/lib/overlay-image-files";
 import { POWERPOINT_IMPORT_ACCEPT } from "@/lib/powerpoint-import";
@@ -66,7 +67,7 @@ interface RibbonGroupDefinition {
 }
 
 export function renderEditorChrome(chrome: EditorChromeValue) {
-  const { activeDocumentOpenFailure, activeFileId, addBlock, aiMenuButtonRef, appUpdateState, closeDocumentTab, commentsPanelOpen, commitDocumentTitle, copyDocumentText, createDocumentTab, createWhiteboardDocumentTab, degradedWatcherScopes, deleteActiveDocument, documentMetadatas, documentTitle, duplicateActiveDocument, exportJson, exportMenuOpen, fileMenuButtonRef, handleTitleUpdateAction, importDocumentFile, importInputRef, insertMenuButtonRef, loadingFileId, newDocButtonRef, newDocMenuOpen, openCommandSettings, openDocumentInWorkspace, openDocumentListDialog, openDocumentTabs, openImportDialog, openNewDocMenu, openOtherImportDialog, openPrintPreview, openTextImportDialog, openVersionHistory, openWorkspaceScreen, otherImportInputRef, promoteAiToSidebar, openKnowledgeDb, reportIssue, requestOverlayImages, resolvedDocumentTitle, scheduleCloseNewDocMenu, setAiSettingsOpen, setDesktopSettingsOpen, setExportMenuOpen, setNewDocMenuOpen, setOutlineDialogOpen, setOverlayEditing, setPageSettingsOpen, setTemplateGalleryOpen, setTexCommandReferenceOpen, setTexEnvironmentSettingsOpen, setTitleInputFocused, settingsMenuButtonRef, showRichTitle, showTitleUpdateButton, titleInputValue, titleRichNodes, titleUpdateButtonDisabled, toggleCommentsPanel, uiLayoutPreference, updateMetadata, versionHistoryOpen } = chrome.appMenu;
+  const { activeDocumentOpenFailure, activeFileId, addBlock, aiMenuButtonRef, appUpdateState, closeDocumentTab, commentsPanelOpen, problemDisplay, problemDisplayAvailable, toggleProblemDisplayPart, commitDocumentTitle, copyDocumentText, createDocumentTab, createWhiteboardDocumentTab, degradedWatcherScopes, deleteActiveDocument, documentMetadatas, documentTitle, duplicateActiveDocument, exportJson, exportMenuOpen, fileMenuButtonRef, handleTitleUpdateAction, importDocumentFile, importInputRef, insertMenuButtonRef, loadingFileId, newDocButtonRef, newDocMenuOpen, openCommandSettings, openDocumentInWorkspace, openDocumentListDialog, openDocumentTabs, openImportDialog, openNewDocMenu, openOtherImportDialog, openPrintPreview, openTextImportDialog, openVersionHistory, openWorkspaceScreen, otherImportInputRef, promoteAiToSidebar, openKnowledgeDb, reportIssue, requestOverlayImages, resolvedDocumentTitle, scheduleCloseNewDocMenu, setAiSettingsOpen, setDesktopSettingsOpen, setExportMenuOpen, setNewDocMenuOpen, setOutlineDialogOpen, setOverlayEditing, setPageSettingsOpen, setTemplateGalleryOpen, setTexCommandReferenceOpen, setTexEnvironmentSettingsOpen, setTitleInputFocused, settingsMenuButtonRef, showRichTitle, showTitleUpdateButton, titleInputValue, titleRichNodes, titleUpdateButtonDisabled, toggleCommentsPanel, uiLayoutPreference, updateMetadata, versionHistoryOpen } = chrome.appMenu;
   const { commandTooltip, renderMenuShortcut } = chrome.commands;
   const { setMaterialLibraryOpen } = chrome.editing;
   const { ActiveTextAlignIcon, activeFontFamilyLabel, activeTextAlignOption, activeTextFontSize, activeTextFontSizeMixed, applyBlockStructure, applyBoxedTextPaddingY, applyInlineFormat, applyLineHeight, applyTextAlign, applyTextStyle, blockStyleState, boldActive, boxedTextActive, boxedTextButtonRef, boxedTextMenuOpen, boxedTextPaddingY, boxedTextVariant, canUseBlockStructure, canUseLineHeight, canUseTextAlign, canUseTextBlockStyle, canUseTextToolbar, fontFamily, fontFamilyButtonRef, fontFamilyIsKnownOption, fontFamilyIsMixed, fontFamilyMenuOpen, fontFamilyQuery, handleLineHeightStepClick, italicActive, lineHeight, lineHeightButtonRef, lineHeightCustomOpen, lineHeightInput, lineHeightInputError, lineHeightMenuOpen, moreBlocksMenuButtonRef, moreBlocksMenuOpen, orderedListMenuButtonRef, orderedListMenuOpen, setMoreBlocksMenuOpen, setOrderedListMenuOpen, saveEditorFontFamilyPreference, selectBoxedTextVariant, selectedTextAlign, selectedTextStyle, setFontFamily, setFontFamilyQuery, setLineHeightCustomOpen, setLineHeightInput, setLineHeightInputError, setTextBackgroundColor, setTextColor, setTextFontSize, startLineHeightStepping, stopLineHeightStepping, textAlignButtonRef, textAlignMenuOpen, textBackgroundColor, textBackgroundColorButtonRef, textColor, textColorButtonRef, toggleBoxedText, underlineActive, visibleCustomFontOptions, visibleFontFamilyGroups, blockStyleButtonRef, blockStyleMenuOpen, fontSizeInputRef, fontSizeInput, setFontSizeInput } = chrome.format;
@@ -354,6 +355,43 @@ export function renderEditorChrome(chrome: EditorChromeValue) {
             {commentsPanelOpen ? <Check size={16} /> : <span aria-hidden="true" />}
             <span>{t("appMenu.settings.comments")}</span>
           </button>
+          {problemDisplayAvailable && (
+            <div className="app-menu-submenu">
+              <button
+                type="button"
+                role="menuitem"
+                className="app-menu-submenu-trigger"
+                aria-haspopup="menu"
+              >
+                <span aria-hidden="true" />
+                <span>{t("appMenu.settings.problemDisplay")}</span>
+                <ChevronRight size={14} aria-hidden="true" />
+              </button>
+              <div className="app-menu-submenu-panel" role="menu" aria-label={t("appMenu.settings.problemDisplay")}>
+                {PROBLEM_DISPLAY_PARTS.map((part) => {
+                  const visibleCount = PROBLEM_DISPLAY_PARTS.filter((candidate) => problemDisplay[candidate]).length;
+                  const label = part === "problem"
+                    ? t("appMenu.settings.displayProblem")
+                    : part === "solution"
+                      ? t("appMenu.settings.displaySolution")
+                      : t("appMenu.settings.displayHints");
+                  return (
+                    <button
+                      key={part}
+                      type="button"
+                      role="menuitemcheckbox"
+                      aria-checked={problemDisplay[part]}
+                      disabled={problemDisplay[part] && visibleCount === 1}
+                      onClick={() => toggleProblemDisplayPart(part)}
+                    >
+                      {problemDisplay[part] ? <Check size={16} /> : <span aria-hidden="true" />}
+                      <span>{label}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
           <button type="button" role="menuitem" onClick={() => { setActiveMenu(null); setOutlineDialogOpen(true); }}>
             <ListTree size={16} />
             <span>{t("appMenu.settings.outline")}</span>

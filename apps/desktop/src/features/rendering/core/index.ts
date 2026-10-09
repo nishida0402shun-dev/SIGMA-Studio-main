@@ -21,6 +21,7 @@ export * from "./overlay-text-line-count";
 export * from "./overlay-visibility-projection";
 export * from "./problem-area-column-flow";
 export * from "./problem-area-visibility";
+export * from "./problem-display-filter";
 export * from "./rich-text-render-model";
 export * from "./text-block-typography";
 

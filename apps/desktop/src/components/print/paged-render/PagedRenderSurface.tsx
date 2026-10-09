@@ -19,7 +19,8 @@ import {
   type SigmaDocument,
   type OutputProfileName,
 } from "@/features/document";
-import { getPrintableDocument } from "@/lib/print-renderer";
+import { isProblemDisplayFiltered, type ProblemDisplayFilter } from "@/features/rendering/core";
+import { getPrintableDocument, getProblemDisplayDocument } from "@/lib/print-renderer";
 import { useCustomFonts } from "@/lib/use-custom-fonts";
 
 /** How often the canvas layout is sampled while waiting for it to settle. */
@@ -47,6 +48,8 @@ export interface PagedRenderSurfaceProps {
   document: SigmaDocument;
   profile: OutputProfileName;
   displayMode?: PagedRenderDisplayMode;
+  /** Display-only problem filter; PDF export and print preview intentionally omit it. */
+  problemDisplay?: ProblemDisplayFilter;
   onRenderStateChange?: (snapshot: PagedRenderStateSnapshot) => void;
 }
 
@@ -62,6 +65,7 @@ export function PagedRenderSurface({
   document: sourceDocument,
   profile,
   displayMode = "vertical",
+  problemDisplay,
   onRenderStateChange,
 }: PagedRenderSurfaceProps) {
   const t = useT("print");
@@ -70,8 +74,10 @@ export function PagedRenderSurface({
   const surfaceId = `pdf_surface_${reactSurfaceId.replace(/[^a-zA-Z0-9_-]/g, "")}`;
 
   const printable = useMemo(
-    () => getPrintableDocument(sourceDocument, profile, t),
-    [sourceDocument, profile, t],
+    () => problemDisplay && isProblemDisplayFiltered(problemDisplay)
+      ? getProblemDisplayDocument(sourceDocument, problemDisplay)
+      : getPrintableDocument(sourceDocument, profile, t),
+    [sourceDocument, profile, problemDisplay, t],
   );
   // The paper size the PDF is cut to comes from the document, never from a default.
   const paper = useMemo(() => {
@@ -258,6 +264,7 @@ export function PagedRenderSurface({
       <div className="paged-surface-stage" ref={stageRef} aria-hidden="true">
         <PageCanvasEditor
           presentation="paged"
+          problemDisplay={problemDisplay}
           document={printable}
           selectedId={null}
           selectedInlineMath={null}

@@ -41,14 +41,15 @@ test("opens startup/second-instance/macOS files through real storage and preserv
   env.SIGMA_STUDIO_USER_DATA_DIR = path.join(root, "profile");
   let app: ElectronApplication | undefined;
   try {
-    app = await electron.launch({ args: [APP_ROOT, first, first, ordinary], cwd: APP_ROOT, env });
+    app = await electron.launch({ args: [APP_ROOT, first, first, ordinary], cwd: APP_ROOT, env, chromiumSandbox: true });
+    expect(await app.evaluate(({ app }) => app.commandLine.hasSwitch("no-sandbox"))).toBe(false);
     const page = await app.firstWindow();
     await expect(page.locator(BODY).first()).toContainText("STARTUP_CONTENT", { timeout: 90_000 });
     await expect(page.locator("[data-startup-splash]")).toHaveCount(0, { timeout: 30_000 });
     const filesBefore = await page.evaluate(() => window.desktopAPI!.storage.listFiles());
-    expect(filesBefore.filter((file) => file.title === "起動 数学")).toHaveLength(1);
+    expect(filesBefore.filter((file) => file.title === "起動-数学")).toHaveLength(1);
     expect(filesBefore.some((file) => file.title.includes("ordinary"))).toBe(false);
-    const imported = filesBefore.find((file) => file.title === "起動 数学")!;
+    const imported = filesBefore.find((file) => file.title === "起動-数学")!;
     expect(imported.docId).not.toBe("shared-source-id");
     const userData = await app.evaluate(({ app }) => app.getPath("userData"));
     expect(userData).toBe(env.SIGMA_STUDIO_USER_DATA_DIR);
@@ -57,27 +58,30 @@ test("opens startup/second-instance/macOS files through real storage and preserv
     await page.keyboard.type(" EDIT_BEFORE_OPEN");
 
     // A real second process exercises Electron's lock and additionalData transport.
-    const executable = app.process().spawnfile;
+    const executable = await app.evaluate(() => process.execPath);
     await new Promise<void>((resolve, reject) => {
       const child = spawn(executable, [APP_ROOT, second, third], {
-        cwd: root, env: { ...env, NODE_ENV: process.env.NODE_ENV }, stdio: "ignore",
+        cwd: root, env: { ...env, NODE_ENV: process.env.NODE_ENV }, stdio: ["ignore", "ignore", "pipe"],
       });
-      const timer = setTimeout(() => { child.kill(); reject(new Error("Secondary launch did not exit")); }, 30_000);
+      let stderr = "";
+      child.stderr.setEncoding("utf8");
+      child.stderr.on("data", (chunk: string) => { stderr = (stderr + chunk).slice(-16_384); });
+      const timer = setTimeout(() => { child.kill(); reject(new Error(`Secondary launch did not exit\n${stderr}`)); }, 30_000);
       child.once("error", (error) => { clearTimeout(timer); reject(error); });
-      child.once("exit", (code) => {
+      child.once("close", (code, signal) => {
         clearTimeout(timer);
         if (code === 0) resolve();
-        else reject(new Error(`Secondary exit ${code}`));
+        else reject(new Error(`Secondary exit ${code}, signal ${signal}\n${stderr}`));
       });
     });
     await expect(page.locator(BODY).first()).toContainText("THIRD_CONTENT");
     const files = await page.evaluate(() => window.desktopAPI!.storage.listFiles());
-    expect(files.filter((file) => ["既存 教材", "追加 教材"].includes(file.title))).toHaveLength(2);
+    expect(files.filter((file) => ["既存-教材", "追加-教材"].includes(file.title))).toHaveLength(2);
     const savedFirst = await page.evaluate((fileId) => window.desktopAPI!.storage.loadDocument(fileId), imported.fileId);
     expect(JSON.stringify(savedFirst)).toContain("EDIT_BEFORE_OPEN");
     const dataDir = await page.evaluate(() => window.desktopAPI!.storage.getDataDir());
     const workspace = JSON.parse(readFileSync(path.join(dataDir.path, "workspace.json"), "utf8"));
-    for (const file of files.filter((file) => ["起動 数学", "既存 教材", "追加 教材"].includes(file.title))) {
+    for (const file of files.filter((file) => ["起動-数学", "既存-教材", "追加-教材"].includes(file.title))) {
       expect(workspace.openFileIds).toContain(file.fileId);
     }
 

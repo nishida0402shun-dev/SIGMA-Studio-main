@@ -4,6 +4,7 @@ import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import { setAppLocale } from "@/lib/i18n";
+import { parseSkillFile } from "@/lib/ai/skill-frontmatter";
 
 import {
   GLOBAL_INSTRUCTIONS_ID,
@@ -53,25 +54,32 @@ describe("LocalAiResourceStore", () => {
       .rejects.toMatchObject({ code: "ENOENT" });
   });
 
-  it("seeds both official skills as managed resources on a fresh install", async () => {
+  it("seeds every bundled official skill as a managed resource on a fresh install", async () => {
     const tree = await store.getTree();
     const officialSkills = tree.resources.filter((resource) => resource.origin === "official");
 
-    expect(officialSkills).toEqual([
-      expect.objectContaining({
-        id: OFFICIAL_IMAGE_MATERIAL_SKILL_ID,
-        origin: "official",
-        officialState: "managed",
-      }),
-      expect.objectContaining({
-        id: OFFICIAL_GRAPH_SKILL_ID,
-        origin: "official",
-        officialState: "managed",
-      }),
-    ]);
+    expect(officialSkills).toHaveLength(12);
+    expect(officialSkills.map((resource) => resource.id)).toEqual(expect.arrayContaining([
+      OFFICIAL_IMAGE_MATERIAL_SKILL_ID,
+      OFFICIAL_GRAPH_SKILL_ID,
+      "official-svg-figure",
+      "official-graph3d",
+      "official-problem",
+      "official-body",
+      "official-table",
+      "official-page-layout",
+      "official-proofreading",
+      "official-shape",
+      "official-material-library",
+      "official-document-management",
+    ]));
+    expect(officialSkills.every((resource) => resource.officialState === "managed")).toBe(true);
     await Promise.all(officialSkills.map(async (resource) => {
       const file = await store.readFile(resource.id);
       expect(file.content.length).toBeGreaterThan(0);
+      const parsed = parseSkillFile(file.content);
+      expect(parsed.name).toBe(path.basename(path.dirname(resource.sourcePath)));
+      expect(parsed.description).toBe(resource.description);
     }));
   });
 

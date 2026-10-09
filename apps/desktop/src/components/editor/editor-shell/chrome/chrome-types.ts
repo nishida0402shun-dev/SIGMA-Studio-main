@@ -23,6 +23,7 @@ import type { BoxedVariant, InlineNode, SigmaBlock, SigmaDocument, TextAlign } f
 import type { OverlayDash, OverlayTextSize } from "@/features/document/overlay-model";
 import type { ResolvedDocumentTitle } from "@/lib/document-title";
 import type { Translate } from "@/lib/i18n";
+import type { ProblemDisplayFilter, ProblemDisplayPart } from "@/features/rendering/core";
 import type { EditorCommandId } from "@/lib/editor-command-shortcuts";
 import type { Graph2DPreset } from "@/lib/graph2d";
 import type { DocumentMetadata } from "@/lib/storage";
@@ -266,6 +267,9 @@ export interface EditorChromeAppMenu {
   closeDocumentTab: (fileId: string) => Promise<void>;
   commitDocumentTitle: () => Promise<void>;
   commentsPanelOpen: boolean;
+  problemDisplay: ProblemDisplayFilter;
+  problemDisplayAvailable: boolean;
+  toggleProblemDisplayPart: (part: ProblemDisplayPart) => void;
   createDocumentTab: () => Promise<void>;
   createWhiteboardDocumentTab: () => Promise<void>;
   /** 教材をクリップボードのテキストとして書き出す。 */

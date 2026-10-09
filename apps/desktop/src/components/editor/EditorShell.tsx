@@ -233,7 +233,15 @@ import  {
 import { readRenderedTextFontSize, type SelectionFontSize } from "@/components/tiptap/text-format-font-size";
 import { getTextShapeFontSizePt, type MeasuredBlock } from "@/features/drawing";
 import { DocumentTitleText, MathEnvironmentProvider } from "@/features/rendering/adapters/react";
-import { parseDocumentTitleInlineNodes } from "@/features/rendering/core";
+import {
+  FULL_PROBLEM_DISPLAY,
+  isProblemDisplayFiltered,
+  parseDocumentTitleInlineNodes,
+  PROBLEM_DISPLAY_PARTS,
+  toggleProblemDisplayPart,
+  type ProblemDisplayFilter,
+  type ProblemDisplayPart,
+} from "@/features/rendering/core";
 import  {
   convertBlockStyle,
   countTextMatches,
@@ -922,6 +930,28 @@ function EditorShellBody({ embeddedHost, editorStore }: EditorShellProps & { edi
     ? versionHistoryPreviewState.version
     : null;
   const versionHistoryPreviewActive = versionHistoryPreview !== null;
+  const [problemDisplayByFileId, setProblemDisplayByFileId] = useState<Record<string, ProblemDisplayFilter>>({});
+  const problemDisplay = problemDisplayByFileId[activeFileId] ?? FULL_PROBLEM_DISPLAY;
+  const problemDisplayAvailable = !isWhiteboardDocument;
+  const problemDisplayActive = problemDisplayAvailable
+    && isProblemDisplayFiltered(problemDisplay)
+    && !versionHistoryPreviewActive;
+  const problemDisplaySummary = PROBLEM_DISPLAY_PARTS
+    .filter((part) => problemDisplay[part])
+    .map((part) => part === "problem" ? t("appMenu.settings.displayProblem")
+      : part === "solution" ? t("appMenu.settings.displaySolution")
+      : t("appMenu.settings.displayHints"))
+    .join("・");
+  const toggleProblemDisplay = useCallback((part: ProblemDisplayPart) => {
+    setProblemDisplayByFileId((current) => {
+      const previous = current[activeFileId] ?? FULL_PROBLEM_DISPLAY;
+      const next = toggleProblemDisplayPart(previous, part);
+      return next === previous ? current : { ...current, [activeFileId]: next };
+    });
+  }, [activeFileId]);
+  const showAllProblemParts = useCallback(() => {
+    setProblemDisplayByFileId((current) => ({ ...current, [activeFileId]: FULL_PROBLEM_DISPLAY }));
+  }, [activeFileId]);
   const [versionHistoryRestoreError, setVersionHistoryRestoreError] = useState<string | null>(null);
   const [versionHistoryRestoring, setVersionHistoryRestoring] = useState(false);
   const [versionHistoryWarnings, setVersionHistoryWarnings] = useState<Record<string, string>>({});
@@ -6428,7 +6458,9 @@ function EditorShellBody({ embeddedHost, editorStore }: EditorShellProps & { edi
     },
     appMenu: {
       activeDocumentOpenFailure, activeFileId, addBlock, aiMenuButtonRef, appUpdateState,
-      closeDocumentTab, commentsPanelOpen, commitDocumentTitle, copyDocumentText, createDocumentTab, createWhiteboardDocumentTab, degradedWatcherScopes,
+      closeDocumentTab, commentsPanelOpen, problemDisplay, problemDisplayAvailable,
+      toggleProblemDisplayPart: toggleProblemDisplay,
+      commitDocumentTitle, copyDocumentText, createDocumentTab, createWhiteboardDocumentTab, degradedWatcherScopes,
       deleteActiveDocument, documentMetadatas, documentTitle, duplicateActiveDocument, exportJson,
       exportMenuOpen, fileMenuButtonRef, handleTitleUpdateAction,
       importDocumentFile, importInputRef, insertMenuButtonRef, loadingFileId,
@@ -6674,7 +6706,7 @@ function EditorShellBody({ embeddedHost, editorStore }: EditorShellProps & { edi
               onReload={handleReloadFailedDocument}
             />
           )}
-          {pageEditorMounted && <AiPageCanvasEditor
+          {pageEditorMounted && !problemDisplayActive && <AiPageCanvasEditor
             key={`${activeFileId}:${documentInstanceRevision}`}
             aiEnabled={!isEmbedded}
             onPageCountChange={setEditorPageCount}
@@ -6763,6 +6795,19 @@ function EditorShellBody({ embeddedHost, editorStore }: EditorShellProps & { edi
             documentWorkspaceId={activeDocumentMetadata?.workspaceId ?? null}
             onFocusAiSession={focusAiSession}
           />}
+          {pageEditorMounted && problemDisplayActive && (
+            <div className="problem-display-preview" data-problem-display-view="true">
+              <div className="problem-display-chip" role="status">
+                <span>{t("problemDisplay.viewing", { parts: problemDisplaySummary })}</span>
+                <button type="button" className="button" onClick={showAllProblemParts}>
+                  {t("problemDisplay.showAll")}
+                </button>
+              </div>
+              <div className="version-history-preview-scroll problem-display-preview-scroll">
+                <PagedRenderSurface document={document} profile="teacher" problemDisplay={problemDisplay} />
+              </div>
+            </div>
+          )}
           {versionHistoryPreview && (
             <div className="version-history-preview" data-version-history-preview="true">
               <div className="version-history-preview-banner" role="status">
