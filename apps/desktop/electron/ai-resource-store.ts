@@ -146,7 +146,7 @@ const GLOBAL_INSTRUCTIONS_ENTRY: Omit<AiResourceManifestEntry, "updatedAt"> = {
   workspaceId: null,
 };
 
-interface OfficialSkillDefinition {
+export interface OfficialSkillDefinition {
   id: string;
   title: string;
   sourcePath: string;
@@ -155,7 +155,7 @@ interface OfficialSkillDefinition {
   bundledPath: string;
 }
 
-const OFFICIAL_SKILL_DEFINITIONS: OfficialSkillDefinition[] = [
+export const OFFICIAL_SKILL_DEFINITIONS: OfficialSkillDefinition[] = [
   {
     id: OFFICIAL_IMAGE_MATERIAL_SKILL_ID,
     title: "画像からSigma Studio教材を作成",
