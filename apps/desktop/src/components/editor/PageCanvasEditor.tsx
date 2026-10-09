@@ -142,6 +142,7 @@ import  {
   createIndependentColumnLayout,
   getVisibleOverlayShapes,
   type OverlayPreviewStackLayer,
+  type ProblemDisplayFilter,
   type TextFlowColumnBlockLayout,
 } from "@/features/rendering/core";
 import { EDITOR_ZOOM_CHANGE_EVENT } from "@/features/rendering/adapters/editor-zoom-event";
@@ -564,6 +565,8 @@ export interface PageCanvasEditorProps {
    * clone of this DOM — see docs/pdf-parity-architecture.md.
    */
   presentation?: "edit" | "paged";
+  /** Read-only display filter for problem / solution / comment areas. */
+  problemDisplay?: ProblemDisplayFilter;
 }
 
 function PageCanvasEditorImpl({
@@ -638,6 +641,7 @@ function PageCanvasEditorImpl({
   onCommentThreadSelect,
   suppressSelectionActions = false,
   presentation = "edit",
+  problemDisplay,
 }: PageCanvasEditorProps) {
   const tEditorText = useT("editor");
   const isPagedRender = presentation === "paged";
@@ -689,12 +693,13 @@ function PageCanvasEditorImpl({
           // 割った併合が合成中のエディタの key を消し、unmount で IME セッションごと落ちる。
           getFocusedTextRunUnitIds(),
           pageDocument.metadata.headingNumbering,
+          problemDisplay,
         ),
       );
       return nextUnits;
     },
     /* eslint-enable react-hooks/refs */
-    [pageDocument.content, pageDocument.docId, pageDocument.metadata.headingNumbering],
+    [pageDocument.content, pageDocument.docId, pageDocument.metadata.headingNumbering, problemDisplay],
   );
   const textRunGroupByUnitId = useMemo(
     () => assignTextRunGroupIds(units, textRunDocumentId),
