@@ -6803,7 +6803,7 @@ function EditorShellBody({ embeddedHost, editorStore }: EditorShellProps & { edi
                   {t("problemDisplay.showAll")}
                 </button>
               </div>
-              <div className="problem-display-preview-scroll">
+              <div className="version-history-preview-scroll problem-display-preview-scroll">
                 <PagedRenderSurface document={document} profile="teacher" problemDisplay={problemDisplay} />
               </div>
             </div>
