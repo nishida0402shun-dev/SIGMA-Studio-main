@@ -1899,7 +1899,8 @@ nav.app-menu-list[inert] *,
 .problem-display-chip {
   position: absolute;
   top: 10px;
-  right: 16px;
+  left: 50%;
+  transform: translateX(-50%);
   z-index: 5;
   display: flex;
   align-items: center;
