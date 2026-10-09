@@ -233,7 +233,15 @@ import  {
 import { readRenderedTextFontSize, type SelectionFontSize } from "@/components/tiptap/text-format-font-size";
 import { getTextShapeFontSizePt, type MeasuredBlock } from "@/features/drawing";
 import { DocumentTitleText, MathEnvironmentProvider } from "@/features/rendering/adapters/react";
-import { parseDocumentTitleInlineNodes } from "@/features/rendering/core";
+import {
+  FULL_PROBLEM_DISPLAY,
+  isProblemDisplayFiltered,
+  parseDocumentTitleInlineNodes,
+  PROBLEM_DISPLAY_PARTS,
+  toggleProblemDisplayPart,
+  type ProblemDisplayFilter,
+  type ProblemDisplayPart,
+} from "@/features/rendering/core";
 import  {
   convertBlockStyle,
   countTextMatches,
@@ -922,6 +930,28 @@ function EditorShellBody({ embeddedHost, editorStore }: EditorShellProps & { edi
     ? versionHistoryPreviewState.version
     : null;
   const versionHistoryPreviewActive = versionHistoryPreview !== null;
+  const [problemDisplayByFileId, setProblemDisplayByFileId] = useState<Record<string, ProblemDisplayFilter>>({});
+  const problemDisplay = problemDisplayByFileId[activeFileId] ?? FULL_PROBLEM_DISPLAY;
+  const problemDisplayAvailable = !isWhiteboardDocument;
+  const problemDisplayActive = problemDisplayAvailable
+    && isProblemDisplayFiltered(problemDisplay)
+    && !versionHistoryPreviewActive;
+  const problemDisplaySummary = PROBLEM_DISPLAY_PARTS
+    .filter((part) => problemDisplay[part])
+    .map((part) => part === "problem" ? t("appMenu.settings.displayProblem")
+      : part === "solution" ? t("appMenu.settings.displaySolution")
+      : t("appMenu.settings.displayHints"))
+    .join("・");
+  const toggleProblemDisplay = useCallback((part: ProblemDisplayPart) => {
+    setProblemDisplayByFileId((current) => {
+      const previous = current[activeFileId] ?? FULL_PROBLEM_DISPLAY;
+      const next = toggleProblemDisplayPart(previous, part);
+      return next === previous ? current : { ...current, [activeFileId]: next };
+    });
+  }, [activeFileId]);
+  const showAllProblemParts = useCallback(() => {
+    setProblemDisplayByFileId((current) => ({ ...current, [activeFileId]: FULL_PROBLEM_DISPLAY }));
+  }, [activeFileId]);
   const [versionHistoryRestoreError, setVersionHistoryRestoreError] = useState<string | null>(null);
   const [versionHistoryRestoring, setVersionHistoryRestoring] = useState(false);
   const [versionHistoryWarnings, setVersionHistoryWarnings] = useState<Record<string, string>>({});
