@@ -356,30 +356,41 @@ export function renderEditorChrome(chrome: EditorChromeValue) {
             <span>{t("appMenu.settings.comments")}</span>
           </button>
           {problemDisplayAvailable && (
-            <>
-              <div className="menu-section-label">{t("appMenu.settings.problemDisplay")}</div>
-              {PROBLEM_DISPLAY_PARTS.map((part) => {
-                const visibleCount = PROBLEM_DISPLAY_PARTS.filter((candidate) => problemDisplay[candidate]).length;
-                const label = part === "problem"
-                  ? t("appMenu.settings.displayProblem")
-                  : part === "solution"
-                    ? t("appMenu.settings.displaySolution")
-                    : t("appMenu.settings.displayHints");
-                return (
-                  <button
-                    key={part}
-                    type="button"
-                    role="menuitemcheckbox"
-                    aria-checked={problemDisplay[part]}
-                    disabled={problemDisplay[part] && visibleCount === 1}
-                    onClick={() => toggleProblemDisplayPart(part)}
-                  >
-                    {problemDisplay[part] ? <Check size={16} /> : <span aria-hidden="true" />}
-                    <span>{label}</span>
-                  </button>
-                );
-              })}
-            </>
+            <div className="app-menu-submenu">
+              <button
+                type="button"
+                role="menuitem"
+                className="app-menu-submenu-trigger"
+                aria-haspopup="menu"
+              >
+                <span aria-hidden="true" />
+                <span>{t("appMenu.settings.problemDisplay")}</span>
+                <ChevronRight size={14} aria-hidden="true" />
+              </button>
+              <div className="app-menu-submenu-panel" role="menu" aria-label={t("appMenu.settings.problemDisplay")}>
+                {PROBLEM_DISPLAY_PARTS.map((part) => {
+                  const visibleCount = PROBLEM_DISPLAY_PARTS.filter((candidate) => problemDisplay[candidate]).length;
+                  const label = part === "problem"
+                    ? t("appMenu.settings.displayProblem")
+                    : part === "solution"
+                      ? t("appMenu.settings.displaySolution")
+                      : t("appMenu.settings.displayHints");
+                  return (
+                    <button
+                      key={part}
+                      type="button"
+                      role="menuitemcheckbox"
+                      aria-checked={problemDisplay[part]}
+                      disabled={problemDisplay[part] && visibleCount === 1}
+                      onClick={() => toggleProblemDisplayPart(part)}
+                    >
+                      {problemDisplay[part] ? <Check size={16} /> : <span aria-hidden="true" />}
+                      <span>{label}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
           )}
           <button type="button" role="menuitem" onClick={() => { setActiveMenu(null); setOutlineDialogOpen(true); }}>
             <ListTree size={16} />
