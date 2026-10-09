@@ -140,6 +140,11 @@ export const INTENTIONAL_RUNTIME_JAPANESE: readonly IntentionalJapaneseRule[] = 
     reason: "Canonical resource metadata is persisted and included in model context; only renderer display adapters localize it.",
   },
   {
+    path: /^electron\/official-skill-definitions\.ts$/,
+    classification: "official AI skill metadata contract",
+    reason: "Canonical official skill titles, descriptions, and tags are persisted and included in model context; renderer display adapters localize presentation separately.",
+  },
+  {
     path: /^electron\/ai-edit\.ts$/,
     value: /^(?:グラフ|表|増減|問題|証明)$/,
     classification: "AI instruction matching vocabulary",
