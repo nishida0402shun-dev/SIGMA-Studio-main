@@ -169,7 +169,7 @@ jobs:
 
       - name: Build and publish installer
         working-directory: apps/desktop
-        run: npx --no-install electron-builder --${{ matrix.platform }} --publish always --config electron-builder.config.cjs
+        run: npx --no-install electron-builder --${{ matrix.platform }} --publish never --config electron-builder.config.cjs
         env:
           GH_TOKEN: ${{ github.token }}
           RELEASE_CONTENT_RULES: ${{ secrets.RELEASE_CONTENT_RULES }}
@@ -211,4 +211,90 @@ jobs:
             Stop-Process -Id $launched.Id -Force
           }
 
+      - name: Upload platform release artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-${{ matrix.platform }}
+          path: apps/desktop/release/*
+          if-no-files-found: error
+          retention-days: 3
+
+  publish:
+    name: Publish complete release
+    needs: [prepare, release]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download macOS artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: release-mac
+          path: release-assets/mac
+
+      - name: Download Windows artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: release-win
+          path: release-assets/win
+
+      - name: Assemble and validate updater assets
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p release-assets/final
+          for platform in mac win; do
+            while IFS= read -r -d '' file; do
+              name="$(basename "$file")"
+              case "$name" in
+                latest*.yml|*.dmg|*.dmg.blockmap|*.zip|*.zip.blockmap|*.exe|*.exe.blockmap|*.appx|*.appxupload|*.msix) ;;
+                *) continue ;;
+              esac
+              target="release-assets/final/$name"
+              if [[ -e "$target" ]]; then
+                echo "Duplicate release asset basename: $name" >&2
+                exit 1
+              fi
+              cp "$file" "$target"
+            done < <(find "release-assets/$platform" -maxdepth 1 -type f -print0)
+          done
+          test -f release-assets/final/latest.yml
+          test -f release-assets/final/latest-mac.yml
+          find release-assets/final -maxdepth 1 -type f -printf '%f\n' | sort
+          count="$(find release-assets/final -maxdepth 1 -type f | wc -l)"
+          if [[ "$count" -lt 6 ]]; then
+            echo "Expected update metadata and installers from both platforms; found only $count assets." >&2
+            exit 1
+          fi
+
+      - name: Create or resume draft and publish once
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: v${{ needs.prepare.outputs.version }}
+          RELEASE_REF: ${{ needs.prepare.outputs.ref }}
+          RELEASE_CHANNEL: ${{ needs.prepare.outputs.channel }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          tag="$RELEASE_TAG"
+          title="Sigma Studio $tag"
+          notes="Sigma Studio $tag. See the repository changelog and release notes for details."
+
+          if gh release view "$tag" --json isDraft --jq '.isDraft' >/tmp/release-is-draft 2>/dev/null; then
+            if [[ "$(cat /tmp/release-is-draft)" != "true" ]]; then
+              echo "Release $tag already exists and is published; refusing to overwrite a public release." >&2
+              exit 1
+            fi
+            gh release upload "$tag" release-assets/final/* --clobber
+            if [[ "$RELEASE_CHANNEL" == "beta" ]]; then
+              gh release edit "$tag" --title "$title" --notes "$notes" --prerelease --draft=false
+            else
+              gh release edit "$tag" --title "$title" --notes "$notes" --draft=false
+            fi
+          else
+            if [[ "$RELEASE_CHANNEL" == "beta" ]]; then
+              gh release create "$tag" release-assets/final/* --target "$RELEASE_REF" --title "$title" --notes "$notes" --draft --prerelease
+            else
+              gh release create "$tag" release-assets/final/* --target "$RELEASE_REF" --title "$title" --notes "$notes" --draft
+            fi
+            gh release edit "$tag" --draft=false
+          fi
 
