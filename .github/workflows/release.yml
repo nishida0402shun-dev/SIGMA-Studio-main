@@ -59,6 +59,9 @@ jobs:
           if [[ "${GITHUB_REF_TYPE}" == "tag" ]]; then
             version="$(node -p "require('./package.json').version")"
             ref="${GITHUB_REF_NAME}"
+            if [[ "${GITHUB_REF_NAME}" == *"-beta."* ]]; then
+              channel="beta"
+            fi
           elif [[ "${GITHUB_EVENT_NAME}" == "workflow_dispatch" ]]; then
             version="$(node -p "require('./package.json').version")"
             ref="${GITHUB_SHA}"
