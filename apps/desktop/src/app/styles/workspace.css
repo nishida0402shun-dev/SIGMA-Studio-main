@@ -1880,6 +1880,46 @@ nav.app-menu-list[inert] *,
   justify-content: space-between;
 }
 
+.problem-display-preview {
+  position: relative;
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  background: var(--surface-muted);
+}
+
+.problem-display-preview-scroll {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+}
+
+.problem-display-chip {
+  position: absolute;
+  top: 10px;
+  right: 16px;
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  max-width: calc(100% - 32px);
+  padding: 5px 8px 5px 12px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--text-primary);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
+  font-size: 12px;
+}
+
+.problem-display-chip button {
+  flex: 0 0 auto;
+  min-height: 24px;
+  padding: 3px 9px;
+}
+
 .version-history-preview {
   display: flex;
   flex: 1 1 auto;
