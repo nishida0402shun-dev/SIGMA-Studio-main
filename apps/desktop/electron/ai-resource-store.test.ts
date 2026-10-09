@@ -214,7 +214,7 @@ describe("LocalAiResourceStore", () => {
     ]);
 
     expect(results[0].resources.filter((resource) => resource.origin === "official")).toHaveLength(12);
-    expect(results[1].resources.filter((resource) => resource.origin === "official")).toHaveLength(2);
+    expect(results[1].resources.filter((resource) => resource.origin === "official")).toHaveLength(12);
     const rawManifest = await fs.readFile(path.join(store.getSourceRoot(), "manifest.json"), "utf8");
     const parsedManifest = JSON.parse(rawManifest) as { resources: unknown[] };
     expect(parsedManifest.resources).toHaveLength(13);
