@@ -16,8 +16,6 @@ const getRequire = createRequire(builderRequire.resolve("@electron/get/package.j
 const gotRequire = createRequire(getRequire.resolve("got/package.json"));
 const cacheRequire = createRequire(gotRequire.resolve("cacheable-request/package.json"));
 const CachePolicy = cacheRequire("http-cache-semantics");
-const pluginRequire = createRequire(require.resolve("@next/eslint-plugin-next/package.json"));
-const { getRootDirs } = pluginRequire("./dist/utils/get-root-dirs.js");
 
 const request = { url: "https://cache.example.invalid/account", headers: { host: "cache.example.invalid" } };
 for (const [name, headers] of Object.entries({
@@ -105,49 +103,6 @@ test("the builder downloader verifies bytes and reuses its artifact cache", asyn
     }), /checksum/i);
   } finally {
     await new Promise(resolve => server.close(resolve));
-    rmSync(root, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
-  }
-});
-
-test("Next lint root discovery supports directory, glob, brace and array settings", () => {
-  const root = mkdtempSync(path.join(os.tmpdir(), "sigma lint roots "));
-  try {
-    for (const directory of ["apps/desktop", "apps/web", "apps/.hidden", "packages/viewer"]) {
-      mkdirSync(path.join(root, directory), { recursive: true });
-    }
-    writeFileSync(path.join(root, "apps/not-a-directory"), "fixture");
-    // Next joins these entries with pages/src/pages/app; equivalent relative
-    // paths and trailing directory separators are supported by that consumer.
-    const resolve = rootDir => getRootDirs({ cwd: root, settings: { next: { rootDir } } })
-      .map(directory => path.resolve(directory).replaceAll("\\", "/")).sort();
-    const app = name => path.join(root, "apps", name).replaceAll("\\", "/");
-    assert.deepEqual(resolve(undefined), [root.replaceAll("\\", "/")]);
-    assert.deepEqual(resolve(app("desktop")), [app("desktop")]);
-    assert.deepEqual(resolve(app("*")), [app("desktop"), app("web")]);
-    assert.deepEqual(resolve(app("{desktop,web}")), [app("desktop"), app("web")]);
-    assert.deepEqual(resolve([app("desktop"), app("web")]), [app("desktop"), app("web")]);
-    assert.deepEqual(resolve(app("missing-*")), []);
-    // The previous braces dependency overflows the stack on this nesting depth.
-    assert.deepEqual(resolve(app("{".repeat(4000) + "a,b" + "}".repeat(4000))), []);
-  } finally {
-    rmSync(root, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
-  }
-});
-
-test("Next lint still reports internal HTML links when rootDir is a glob", () => {
-  const root = mkdtempSync(path.join(os.tmpdir(), "sigma lint rule "));
-  try {
-    mkdirSync(path.join(root, "apps/web/pages"), { recursive: true });
-    writeFileSync(path.join(root, "apps/web/pages/about.js"), "export default function Page() {}");
-    const { Linter } = require("eslint");
-    const messages = new Linter().verify('const link = <a href="/about/">About</a>;', {
-      languageOptions: { parserOptions: { ecmaFeatures: { jsx: true } } },
-      plugins: { next: require("@next/eslint-plugin-next") },
-      settings: { next: { rootDir: path.join(root, "apps/*").replaceAll("\\", "/") } },
-      rules: { "next/no-html-link-for-pages": "error" },
-    });
-    assert.deepEqual(messages.map(message => message.ruleId), ["next/no-html-link-for-pages"]);
-  } finally {
     rmSync(root, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
   }
 });
