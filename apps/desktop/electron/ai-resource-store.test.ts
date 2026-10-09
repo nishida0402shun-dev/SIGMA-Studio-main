@@ -4,6 +4,7 @@ import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import { setAppLocale } from "@/lib/i18n";
+import { parseSkillFile } from "@/lib/ai/skill-frontmatter";
 
 import {
   GLOBAL_INSTRUCTIONS_ID,
@@ -76,6 +77,9 @@ describe("LocalAiResourceStore", () => {
     await Promise.all(officialSkills.map(async (resource) => {
       const file = await store.readFile(resource.id);
       expect(file.content.length).toBeGreaterThan(0);
+      const parsed = parseSkillFile(file.content);
+      expect(parsed.name).toBe(path.basename(resource.sourcePath, ".md"));
+      expect(parsed.description).toBe(resource.description);
     }));
   });
 
