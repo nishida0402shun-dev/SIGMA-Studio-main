@@ -63,7 +63,7 @@ export const chrome = {
       texEnvironment: "TeX環境設定",
       pageSettings: "ページ設定",
       appSettings: "アプリ設定",
-      problemDisplay: "問題の表示",
+      problemDisplay: "表示",
       displayProblem: "問題",
       displaySolution: "解答",
       displayHints: "コメント",
@@ -396,8 +396,8 @@ export const chrome = {
     openDocuments: "開いている教材",
   },
   problemDisplay: {
-    viewing: "表示中：{{parts}}",
-    showAll: "すべて表示",
+    viewing: "{{parts}}だけを表示中",
+    showAll: "すべて表示に戻す",
   },
   versionHistory: {
     title: "バージョン履歴",
