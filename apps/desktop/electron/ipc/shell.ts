@@ -1,4 +1,5 @@
-import { ipcMain, shell } from "electron";
+import { shell } from "electron";
+import { ipcMain } from "../trusted-ipc";
 import { createCurrentLocaleTranslator } from "@/lib/i18n";
 
 const te = createCurrentLocaleTranslator("error");

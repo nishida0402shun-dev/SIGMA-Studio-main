@@ -1,5 +1,6 @@
 import { CodexGeneratedImageStore } from "../codex-generated-images";
-import { app, ipcMain } from "electron";
+import { app } from "electron";
+import { ipcMain, registerPreviewDocumentIpc } from "../trusted-ipc";
 
 import type { AiEditRunEvent } from "@/lib/ai/ai-edit-runtime";
 import { toAiResourceProvider } from "@/lib/ai/ai-providers";
@@ -412,7 +413,7 @@ export function registerAiEditIpc(deps: RegisterAiEditIpcDeps): void {
     return localAiEditChatRoomStore.deleteRoom(typeof roomId === "string" ? roomId : "");
   });
 
-  ipcMain.handle("ai-render:get-document", async (_event, renderId: unknown) => {
+  registerPreviewDocumentIpc(async (_event, renderId: unknown) => {
     if (typeof renderId !== "string") {
       return null;
     }

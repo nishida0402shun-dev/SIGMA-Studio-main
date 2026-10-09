@@ -1,4 +1,5 @@
-import { ipcMain, type BrowserWindow } from "electron";
+import { type BrowserWindow } from "electron";
+import { ipcMain } from "../trusted-ipc";
 import { ResearchSessionStore, type ResearchSourceReference } from "../research-session-store";
 
 export interface RegisterResearchSessionIpcDeps {
