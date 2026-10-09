@@ -16,8 +16,13 @@ const SYNC_MANIFEST_FILE_NAME = ".sync-manifest.json";
 // ワークスペース指示は `workspace-instructions:<workspaceId>` で、初回保存まで
 // manifest に存在しない(空扱い)。
 export const GLOBAL_INSTRUCTIONS_ID = "global-instructions";
-export const OFFICIAL_IMAGE_MATERIAL_SKILL_ID = "official-image-material";
-export const OFFICIAL_GRAPH_SKILL_ID = "official-graph";
+export {
+  OFFICIAL_GRAPH_SKILL_ID,
+  OFFICIAL_IMAGE_MATERIAL_SKILL_ID,
+  OFFICIAL_SKILL_DEFINITIONS,
+  OFFICIAL_SVG_FIGURE_SKILL_ID,
+} from "./official-skill-definitions";
+import { OFFICIAL_SKILL_DEFINITIONS, type OfficialSkillDefinition } from "./official-skill-definitions";
 const ALL_PROVIDERS: AiResourceProvider[] = ["codex", "claude", "antigravity"];
 
 export type AiResourceKind = "instruction" | "skill";
@@ -146,33 +151,6 @@ const GLOBAL_INSTRUCTIONS_ENTRY: Omit<AiResourceManifestEntry, "updatedAt"> = {
   workspaceId: null,
 };
 
-interface OfficialSkillDefinition {
-  id: string;
-  title: string;
-  sourcePath: string;
-  description: string;
-  tags: string[];
-  bundledPath: string;
-}
-
-const OFFICIAL_SKILL_DEFINITIONS: OfficialSkillDefinition[] = [
-  {
-    id: OFFICIAL_IMAGE_MATERIAL_SKILL_ID,
-    title: "画像からSigma Studio教材を作成",
-    sourcePath: "skills/sigma-image-material-reconstruction/SKILL.md",
-    description: "画像、写真、スクリーンショット、手書きラフを基に、本文・数式・表・グラフ・図形・注記を編集可能なSigma Studio教材として再構成するときに使う。",
-    tags: ["画像", "教材再構成", "OCR", "図形"],
-    bundledPath: "sigma-image-material-reconstruction/SKILL.md",
-  },
-  {
-    id: OFFICIAL_GRAPH_SKILL_ID,
-    title: "グラフを挿入・更新する",
-    sourcePath: "skills/sigma-graph-editing/SKILL.md",
-    description: "Sigma Studio教材で関数グラフ、座標平面、数直線、領域図を挿入・更新し、軸・曲線・点・ラベルまで検証するときに使う。",
-    tags: ["グラフ", "Graph2D", "関数", "座標"],
-    bundledPath: "sigma-graph-editing/SKILL.md",
-  },
-];
 /* eslint-enable no-restricted-syntax */
 
 export interface LocalAiResourceStoreOptions {
