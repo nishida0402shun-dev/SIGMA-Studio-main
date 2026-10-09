@@ -53,11 +53,12 @@ describe("LocalAiResourceStore", () => {
       .rejects.toMatchObject({ code: "ENOENT" });
   });
 
-  it("seeds both official skills as managed resources on a fresh install", async () => {
+  it("seeds all bundled official skills as managed resources on a fresh install", async () => {
     const tree = await store.getTree();
     const officialSkills = tree.resources.filter((resource) => resource.origin === "official");
 
-    expect(officialSkills).toEqual([
+    expect(officialSkills).toHaveLength(12);
+    expect(officialSkills).toEqual(expect.arrayContaining([
       expect.objectContaining({
         id: OFFICIAL_IMAGE_MATERIAL_SKILL_ID,
         origin: "official",
@@ -68,7 +69,12 @@ describe("LocalAiResourceStore", () => {
         origin: "official",
         officialState: "managed",
       }),
-    ]);
+      expect.objectContaining({
+        id: "official-svg-figure",
+        origin: "official",
+        officialState: "managed",
+      }),
+    ]));
     await Promise.all(officialSkills.map(async (resource) => {
       const file = await store.readFile(resource.id);
       expect(file.content.length).toBeGreaterThan(0);
@@ -207,11 +213,11 @@ describe("LocalAiResourceStore", () => {
       store.readFile(OFFICIAL_GRAPH_SKILL_ID),
     ]);
 
-    expect(results[0].resources.filter((resource) => resource.origin === "official")).toHaveLength(2);
+    expect(results[0].resources.filter((resource) => resource.origin === "official")).toHaveLength(12);
     expect(results[1].resources.filter((resource) => resource.origin === "official")).toHaveLength(2);
     const rawManifest = await fs.readFile(path.join(store.getSourceRoot(), "manifest.json"), "utf8");
     const parsedManifest = JSON.parse(rawManifest) as { resources: unknown[] };
-    expect(parsedManifest.resources).toHaveLength(3);
+    expect(parsedManifest.resources).toHaveLength(13);
   });
 
   it("preserves a hand-edited official SKILL.md and marks it as modified", async () => {
@@ -292,10 +298,13 @@ describe("LocalAiResourceStore", () => {
     expect(legacy?.origin).toBeUndefined();
     expect(legacy?.bundledHash).toBeUndefined();
     expect(legacy?.officialState).toBeUndefined();
-    expect(tree.resources.filter((resource) => resource.origin === "official").map((resource) => resource.id)).toEqual([
+    expect(tree.resources.filter((resource) => resource.origin === "official")).toHaveLength(12);
+    expect(tree.resources.filter((resource) => resource.origin === "official").map((resource) => resource.id)).toContain(
       OFFICIAL_IMAGE_MATERIAL_SKILL_ID,
+    );
+    expect(tree.resources.filter((resource) => resource.origin === "official").map((resource) => resource.id)).toContain(
       OFFICIAL_GRAPH_SKILL_ID,
-    ]);
+    );
   });
 
   it("rejects deleting official skills", async () => {
