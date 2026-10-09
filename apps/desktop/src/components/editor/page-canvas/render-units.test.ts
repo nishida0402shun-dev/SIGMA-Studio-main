@@ -323,10 +323,16 @@ describe("buildRenderUnits with a problem display filter", () => {
     expect(areasOf(units)).toEqual(["lead", "prompt"]);
   });
 
-  it("keeps only 解答 and makes it the first problem area for 解答だけ", () => {
+  it("keeps only 解答 and makes it the first and last problem area for 解答だけ", () => {
     const units = buildRenderUnits([problem], null, null, undefined, { problem: false, solution: true, hints: false });
     const [first] = units.filter((unit) => unit.type === "problemArea");
     expect(areasOf(units)).toEqual(["solution"]);
     expect(first?.type === "problemArea" && first.isFirstProblemArea).toBe(true);
+    expect(first?.type === "problemArea" && first.isLastProblemArea).toBe(true);
+  });
+
+  it("keeps コメント and 解答 in page order for コメント+解答", () => {
+    const units = buildRenderUnits([problem], null, null, undefined, { problem: false, solution: true, hints: true });
+    expect(areasOf(units)).toEqual(["hints", "solution"]);
   });
 });
