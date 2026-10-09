@@ -50,7 +50,7 @@ export const chrome = {
       texEnvironment: "TeX environment",
       pageSettings: "Page setup",
       appSettings: "App settings",
-      problemDisplay: "Problem display",
+      problemDisplay: "View",
       displayProblem: "Problem",
       displaySolution: "Solution",
       displayHints: "Comments",
@@ -379,8 +379,8 @@ export const chrome = {
     openDocuments: "Open materials",
   },
   problemDisplay: {
-    viewing: "Showing: {{parts}}",
-    showAll: "Show all",
+    viewing: "Showing only: {{parts}}",
+    showAll: "Show all again",
   },
   versionHistory: {
     title: "Version history",
