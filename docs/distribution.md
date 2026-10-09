@@ -1,6 +1,6 @@
 # 配布とパッケージ
 
-ソースとデスクトップ配布物の公開先は `Atsu-Taiyo/SIGMA-Studio` です。
+ソースとデスクトップ配布物の公開先は `nishida0402shun-dev/SIGMA-Studio-main` です。
 
 ## ローカル検証
 
