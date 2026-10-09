@@ -27,6 +27,7 @@ jobs:
           node-version: "24"
           cache: npm
       - run: npm ci
+      - run: npm run dependencies:check
       - run: npm run audit:production
       - run: npm run version:check
       - run: npm run test:scripts
@@ -66,6 +67,20 @@ jobs:
             export XDG_CURRENT_DESKTOP=GNOME
             npm --workspace @sigma-studio/desktop run test:e2e:electron -- tests/electron/open-document.spec.ts
           '
+
+  dependency-security:
+    name: Dependency security
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: "24"
+          cache: npm
+      - run: npm ci
+      - run: npm run dependencies:check
+      - run: npm run security:audit
 
   public-packages:
     name: Public package build and contracts
