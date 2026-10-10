@@ -120,5 +120,5 @@ it("fails closed when the Web AI conversation-capture setting is unavailable", (
   const source = readFileSync(path.join(root, "web-ai-preload.ts"), "utf8");
   expect(source).toContain("let conversationCaptureEnabled = false;");
   expect(source).toContain("conversationCaptureEnabled = enabled === true;");
-  expect(source).toContain("} catch {\\n    conversationCaptureEnabled = false;\\n  }\\n  if (!(await ensureBridgeConfig()))");
+  expect(source).toContain("} catch {\n    conversationCaptureEnabled = false;\n  }\n  if (!(await ensureBridgeConfig()))");
 });
