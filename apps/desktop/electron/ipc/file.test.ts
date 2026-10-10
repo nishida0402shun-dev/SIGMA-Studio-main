@@ -59,6 +59,8 @@ vi.mock("node:fs/promises", () => ({
   },
 }));
 
+vi.mock("../trusted-ipc", () => ({ ipcMain: { handle: vi.fn((channel: string, handler: (...args: unknown[]) => unknown) => { mocks.handlers.set(channel, handler); }), on: vi.fn() } }));
+
 import { registerFileIpc } from "./file";
 
 it("only lets the main editor receive and acknowledge OS-selected paths", async () => {
