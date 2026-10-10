@@ -38,16 +38,16 @@ const registeredIpcChannels = new Set([
   ...electronSources.flatMap((source) =>
     extractChannels(
       source,
-      /ipcMain\\.handle\\(\\s*["']([^"']+)["']/gu,
+      /ipcMain\.handle\(\s*["']([^"']+)["']/gu,
     ),
   ),
   ...electronSources.flatMap((source) =>
     extractChannels(
       source,
-      /electronIpcMain\\.handle\\(\\s*["']([^"']+)["']/gu,
+      /electronIpcMain\.handle\(\s*["']([^"']+)["']/gu,
     ),
   ),
-  ...(electronSources.some((source) => /registerPreviewDocumentIpc\\(/u.test(source)) ? ["ai-render:get-document"] : []),
+  ...(electronSources.some((source) => /registerPreviewDocumentIpc\(/u.test(source)) ? ["ai-render:get-document"] : []),
 ]);
 
 for (const source of electronSources) {
