@@ -119,10 +119,7 @@ let mainWindow: BrowserWindow | null = null;
 configureTrustedIpc({ getMainWebContents: () => mainWindow?.webContents ?? null, rendererDirectory: DIST_RENDERER_DIR, devServerUrl: DEV_SERVER_URL });
 
 
-electronIpcMain.handle("web-ai:get-preload-url", (event) => {
-  if (event.sender !== mainWindow?.webContents) {
-    throw new Error("web AI preload URL is only available to the main renderer");
-  }
+ipcMain.handle("web-ai:get-preload-url", () => {
   return pathToFileURL(path.join(__dirname, "web-ai-preload.cjs")).toString();
 });
 
