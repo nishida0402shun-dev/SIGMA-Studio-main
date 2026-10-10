@@ -12,6 +12,8 @@ vi.mock("electron", () => ({
   },
 }));
 
+vi.mock("../trusted-ipc", () => ({ ipcMain: { handle: vi.fn((channel: string, handler: (...args: unknown[]) => unknown) => { mocks.handlers.set(channel, handler); }), on: vi.fn() } }));
+
 import { registerWorkspacePreviewIpc } from "./workspace-preview";
 import { writeWorkspacePreviewPng } from "../workspace-preview-cache";
 import fs from "node:fs/promises";
