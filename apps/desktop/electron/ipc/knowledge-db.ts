@@ -1,5 +1,6 @@
 /* eslint-disable no-restricted-syntax -- Native Knowledge DB picker titles are intentionally localized at the Electron boundary. */
-import { dialog, ipcMain, shell, type BrowserWindow } from "electron";
+import { dialog, shell, type BrowserWindow } from "electron";
+import { ipcMain } from "../trusted-ipc";
 import fs from "node:fs/promises";
 import path from "node:path";
 import { KnowledgeDbStore, type KnowledgeSemanticType } from "../knowledge-db-store";

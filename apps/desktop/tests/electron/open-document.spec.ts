@@ -59,15 +59,29 @@ test("opens startup/second-instance/macOS files through real storage and preserv
     // A real second process exercises Electron's lock and additionalData transport.
     const executable = app.process().spawnfile;
     await new Promise<void>((resolve, reject) => {
-      const child = spawn(executable, [APP_ROOT, second, third], {
-        cwd: root, env: { ...env, NODE_ENV: process.env.NODE_ENV }, stdio: "ignore",
+      // Playwright's primary Electron launch applies --no-sandbox on Linux CI.
+      // The manually spawned second instance must receive the same switch or Chromium
+      // aborts before Electron can acquire the single-instance lock and forward paths.
+      const secondaryArgs = [
+        ...(process.platform === "linux" ? ["--no-sandbox"] : []),
+        APP_ROOT, second, third,
+      ];
+      const child = spawn(executable, secondaryArgs, {
+        cwd: root, env: { ...env, NODE_ENV: process.env.NODE_ENV }, stdio: ["ignore", "pipe", "pipe"],
       });
-      const timer = setTimeout(() => { child.kill(); reject(new Error("Secondary launch did not exit")); }, 30_000);
+      let output = "";
+      child.stdout?.on("data", (chunk: Buffer) => { output += chunk.toString(); });
+      child.stderr?.on("data", (chunk: Buffer) => { output += chunk.toString(); });
+      const timer = setTimeout(() => {
+        const diagnostic = output.slice(-8_000);
+        child.kill();
+        reject(new Error(`Secondary launch did not exit within 30s. Output: ${diagnostic}`));
+      }, 30_000);
       child.once("error", (error) => { clearTimeout(timer); reject(error); });
       child.once("exit", (code) => {
         clearTimeout(timer);
         if (code === 0) resolve();
-        else reject(new Error(`Secondary exit ${code}`));
+        else reject(new Error(`Secondary exit ${code}. Output: ${output.slice(-8_000)}`));
       });
     });
     await expect(page.locator(BODY).first()).toContainText("THIRD_CONTENT");

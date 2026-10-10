@@ -34,14 +34,21 @@ const electronSources = collectTypeScriptSources(electronDir).map((filePath) =>
   readFileSync(filePath, "utf8"),
 );
 
-const registeredIpcChannels = new Set(
-  electronSources.flatMap((source) =>
+const registeredIpcChannels = new Set([
+  ...electronSources.flatMap((source) =>
     extractChannels(
       source,
       /ipcMain\.handle\(\s*["']([^"']+)["']/gu,
     ),
   ),
-);
+  ...electronSources.flatMap((source) =>
+    extractChannels(
+      source,
+      /electronIpcMain\.handle\(\s*["']([^"']+)["']/gu,
+    ),
+  ),
+  ...(electronSources.some((source) => /registerPreviewDocumentIpc\(/u.test(source)) ? ["ai-render:get-document"] : []),
+]);
 
 for (const source of electronSources) {
   for (const match of source.matchAll(/registerCliBinIpc\(\s*\{[\s\S]*?prefix:\s*["']([^"']+)["']/gu)) {

@@ -21,6 +21,8 @@ vi.mock("electron", () => ({
   },
 }));
 
+vi.mock("../trusted-ipc", () => ({ ipcMain: { handle: vi.fn((channel: string, handler: (...args: unknown[]) => unknown) => { mocks.handlers.set(channel, handler); }), on: vi.fn() } }));
+
 const { registerSettingsIpc } = await import("./settings");
 
 const dataDir = mkdtempSync(path.join(tmpdir(), "settings-ui-locale-test-"));
