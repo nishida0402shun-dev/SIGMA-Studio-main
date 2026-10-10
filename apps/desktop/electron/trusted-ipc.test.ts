@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { existsSync, readdirSync, readFileSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import type { IpcMainInvokeEvent, WebContents } from "electron";
@@ -96,10 +96,25 @@ describe("privileged IPC sender boundary", () => {
 
 it("keeps privileged IPC behind the common boundary while isolating Web AI", () => {
   const root = fileURLToPath(new URL("./", import.meta.url));
-  const files = ["main.ts", "cli-bin-ipc.ts", ...["ipc", "collaboration"].flatMap(dir => existsSync(path.join(root, dir)) ? readdirSync(path.join(root, dir)).filter(name => name.endsWith(".ts") && !name.endsWith(".test.ts")).map(name => `${dir}/${name}`) : [])];
-  for (const file of files) {
-    const source = readFileSync(path.join(root, file), "utf8");
-    if (/ipcMain\.(?:handle|on)\(/u.test(source)) expect(source, file).toMatch(/import \{[^\n]*ipcMain[^\n]*\} from "\.\.?\/trusted-ipc"/u);
+  const listSourceFiles = (directory: string): string[] => readdirSync(directory, { withFileTypes: true }).flatMap(entry => {
+    const fullPath = path.join(directory, entry.name);
+    if (entry.isDirectory()) return listSourceFiles(fullPath);
+    return /\.(?:ts|tsx|js|cjs|mjs)$/u.test(entry.name)
+      && !/\.test\.(?:ts|tsx|js|cjs|mjs)$/u.test(entry.name)
+      ? [fullPath]
+      : [];
+  });
+  const files = listSourceFiles(root);
+  for (const fullPath of files) {
+    const file = path.relative(root, fullPath).replaceAll(path.sep, "/");
+    const source = readFileSync(fullPath, "utf8");
+    if (/\bipcMain\.(?:handle|on)\s*\(/u.test(source)) {
+      expect(source, file).toMatch(/import \{[^\n]*ipcMain[^\n]*\} from "\.\.?\/trusted-ipc"/u);
+    }
+    if (file !== "trusted-ipc.ts" && file !== "main.ts") {
+      expect(source, file).not.toMatch(/\belectronIpcMain\.(?:handle|on)\s*\(/u);
+      expect(source, file).not.toMatch(/import\s*\{[^}]*\bipcMain\b[^}]*\}\s*from ["']electron["']/su);
+    }
   }
   const main = readFileSync(path.join(root, "main.ts"), "utf8");
   const rawChannels = [...main.matchAll(/electronIpcMain\.handle\("([^"]+)"/gu)].map(match => match[1]);
@@ -108,13 +123,13 @@ it("keeps privileged IPC behind the common boundary while isolating Web AI", () 
     "web-ai:get-bridge-info",
     "web-ai:capture-conversation",
   ]);
+  expect(main).not.toMatch(/electronIpcMain\.on\s*\(/u);
   expect(main).toContain('ipcMain.handle("web-ai:get-preload-url"');
   expect(main).toContain("configureTrustedIpc({");
   expect(main).toContain("authorizePreviewSender(renderWindow.webContents, renderId, previewUrl.href)");
   const aiEdit = readFileSync(path.join(root, "ipc", "ai-edit.ts"), "utf8");
   expect(aiEdit).toContain("registerPreviewDocumentIpc(async");
 });
-
 it("fails closed when the Web AI conversation-capture setting is unavailable", () => {
   const root = fileURLToPath(new URL("./", import.meta.url));
   const source = readFileSync(path.join(root, "web-ai-preload.ts"), "utf8");
