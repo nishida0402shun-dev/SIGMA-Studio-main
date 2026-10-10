@@ -58,6 +58,17 @@ jobs:
           }
           EOF
           sudo apparmor_parser --replace "$profile"
+      - name: Upload Electron smoke-test diagnostics
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: electron-smoke-diagnostics
+          path: |
+            apps/desktop/test-results/
+            apps/desktop/playwright-report/
+          if-no-files-found: ignore
+          retention-days: 7
+
       - name: Run Electron persistence smoke test
         shell: bash
         run: |
