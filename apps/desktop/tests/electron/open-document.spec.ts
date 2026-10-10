@@ -59,7 +59,14 @@ test("opens startup/second-instance/macOS files through real storage and preserv
     // A real second process exercises Electron's lock and additionalData transport.
     const executable = app.process().spawnfile;
     await new Promise<void>((resolve, reject) => {
-      const child = spawn(executable, [APP_ROOT, second, third], {
+      // Playwright's primary Electron launch applies --no-sandbox on Linux CI.
+      // The manually spawned second instance must receive the same switch or Chromium
+      // aborts before Electron can acquire the single-instance lock and forward paths.
+      const secondaryArgs = [
+        ...(process.platform === "linux" ? ["--no-sandbox"] : []),
+        APP_ROOT, second, third,
+      ];
+      const child = spawn(executable, secondaryArgs, {
         cwd: root, env: { ...env, NODE_ENV: process.env.NODE_ENV }, stdio: ["ignore", "pipe", "pipe"],
       });
       let output = "";
