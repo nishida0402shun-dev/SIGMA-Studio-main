@@ -104,11 +104,11 @@ it("keeps privileged IPC behind the common boundary while isolating Web AI", () 
   const main = readFileSync(path.join(root, "main.ts"), "utf8");
   const rawChannels = [...main.matchAll(/electronIpcMain\.handle\("([^"]+)"/gu)].map(match => match[1]);
   expect(rawChannels).toEqual([
-    "web-ai:get-preload-url",
     "web-ai:get-conversation-capture-setting",
     "web-ai:get-bridge-info",
     "web-ai:capture-conversation",
   ]);
+  expect(main).toContain('ipcMain.handle("web-ai:get-preload-url"');
   expect(main).toContain("configureTrustedIpc({");
   expect(main).toContain("authorizePreviewSender(renderWindow.webContents, renderId, previewUrl.href)");
   const aiEdit = readFileSync(path.join(root, "ipc", "ai-edit.ts"), "utf8");
