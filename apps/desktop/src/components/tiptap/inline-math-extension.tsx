@@ -1631,15 +1631,18 @@ function InlineMathLiveField({
       }
       mathField.readOnly = locked;
       // クリックされた placeholder に入るには、無名の `\placeholder{}` に一時的な id を振る。
+      const editableTex = normalizeMathTextRuns(tex).replace(/#\?/g, "\\placeholder{}");
       mathField.value = initialPlaceholderIndex === null
-        ? tex
-        : indexAnonymousInlineMathPlaceholders(tex);
+        ? editableTex
+        : indexAnonymousInlineMathPlaceholders(editableTex);
+      // Size the static layout box from the field's serialized TeX before the first keystroke.
+      onInputRef.current(syncInlineMathFieldLineBreaks(mathField));
       mathField.addEventListener("input", handleMathFieldInput);
       mathField.addEventListener("blur", handleMathFieldBlur);
       mathField.ownerDocument.addEventListener("keydown", handleMathFieldKeyDown, true);
       const mountedMathField = mathField;
       const focusMathField = () => {
-        if (cancelled || locked) {
+        if (cancelled || locked || initialFocusApplied) {
           return;
         }
         configureInlineMathField(mountedMathField, mathEnvironment);
