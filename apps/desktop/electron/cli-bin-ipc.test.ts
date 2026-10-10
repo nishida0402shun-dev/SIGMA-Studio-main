@@ -19,6 +19,8 @@ vi.mock("electron", () => ({
   shell: { openExternal: vi.fn() },
 }));
 
+vi.mock("./trusted-ipc", () => ({ ipcMain: { handle: vi.fn((channel: string, handler: (...args: unknown[]) => unknown) => { mocks.handlers.set(channel, handler); }), on: vi.fn() } }));
+
 const { registerCliBinIpc } = await import("./cli-bin-ipc");
 
 const workDir = mkdtempSync(path.join(tmpdir(), "cli-bin-ipc-test-"));
