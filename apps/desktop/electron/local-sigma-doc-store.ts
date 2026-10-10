@@ -1,5 +1,6 @@
 import { mkdirSync, watch, type FSWatcher, type WatchEventType } from "node:fs";
 import fs from "node:fs/promises";
+import { atomicRename } from "./atomic-rename";
 import path from "node:path";
 import { createHash, randomUUID } from "node:crypto";
 import { AsyncLocalStorage } from "node:async_hooks";
@@ -874,7 +875,7 @@ export class LocalSigmaDocStore {
       } finally {
         await handle.close();
       }
-      await fs.rename(temporaryPath, targetPath);
+      await atomicRename(temporaryPath, targetPath);
     } catch (error) {
       await fs.rm(temporaryPath, { force: true }).catch(() => undefined);
       throw error;
