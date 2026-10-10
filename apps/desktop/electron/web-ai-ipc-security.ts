@@ -1,4 +1,4 @@
-import type { IpcMainInvokeEvent } from "electron";
+import type { IpcMainInvokeEvent, WebContents } from "electron";
 
 export const WEB_AI_ALLOWED_ORIGINS = new Set([
   "https://chatgpt.com",
@@ -21,8 +21,17 @@ export function isAllowedWebAiOrigin(value: string): boolean {
   }
 }
 
-/** Web AI privileges belong only to the top frame of an explicitly allowed HTTPS origin. */
+const authorizedWebAiContents = new WeakSet<WebContents>();
+
+/** Only webContents attached through the main window's validated Web AI webview path may use this bridge. */
+export function authorizeWebAiContents(sender: WebContents): () => void {
+  authorizedWebAiContents.add(sender);
+  return () => { authorizedWebAiContents.delete(sender); };
+}
+
+/** Web AI privileges belong only to an authorized webview's top frame at an approved HTTPS origin. */
 export function isTrustedWebAiFrame(event: Pick<IpcMainInvokeEvent, "sender" | "senderFrame">): boolean {
   const frame = event.senderFrame;
-  return Boolean(frame && frame === event.sender.mainFrame && isAllowedWebAiOrigin(frame.url));
+  return Boolean(authorizedWebAiContents.has(event.sender)
+    && frame && frame === event.sender.mainFrame && isAllowedWebAiOrigin(frame.url));
 }
