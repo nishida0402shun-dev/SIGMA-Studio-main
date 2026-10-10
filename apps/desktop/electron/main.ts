@@ -1,6 +1,6 @@
 import { app, BrowserWindow, ipcMain as electronIpcMain, Menu, nativeImage, shell } from "electron";
 import { authorizePreviewSender, configureTrustedIpc, ipcMain } from "./trusted-ipc";
-import { isTrustedWebAiFrame, isAllowedWebAiOrigin } from "./web-ai-ipc-security";
+import { authorizeWebAiContents, isTrustedWebAiFrame, isAllowedWebAiOrigin } from "./web-ai-ipc-security";
 import crypto from "node:crypto";
 import { createInterface } from "node:readline";
 import { resolveDevServerUrl, isDevServerNavigation } from "./dev-server";
@@ -592,6 +592,12 @@ function createWindow() {
     webPreferences.nodeIntegration = false;
     webPreferences.contextIsolation = true;
     webPreferences.sandbox = false;
+  });
+
+  // IPC authorization is tied to webContents that passed the validated webview attach checks above.
+  win.webContents.on("did-attach-webview", (_event, webContents) => {
+    const revoke = authorizeWebAiContents(webContents);
+    webContents.once("destroyed", revoke);
   });
 
   win.webContents.setWindowOpenHandler(({ url }) => {
