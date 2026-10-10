@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { isAllowedWebAiOrigin, isTrustedWebAiFrame } from "./web-ai-ipc-security";
+import { authorizeWebAiContents, isAllowedWebAiOrigin, isTrustedWebAiFrame } from "./web-ai-ipc-security";
 
 describe("isAllowedWebAiOrigin", () => {
   it.each([
@@ -30,21 +30,37 @@ describe("isAllowedWebAiOrigin", () => {
 describe("isTrustedWebAiFrame", () => {
   const topFrame = { url: "https://chatgpt.com/c/123" };
   const sender = { mainFrame: topFrame };
-  const event = (senderFrame: unknown) => ({
-    sender,
+  const event = (senderFrame: unknown, source = sender) => ({
+    sender: source,
     senderFrame,
   }) as never;
 
-  it("allows the trusted top frame at an approved HTTPS origin", () => {
+  it("allows the trusted top frame at an approved HTTPS origin only after webview authorization", () => {
+    expect(isTrustedWebAiFrame(event(topFrame))).toBe(false);
+    const revoke = authorizeWebAiContents(sender as never);
     expect(isTrustedWebAiFrame(event(topFrame))).toBe(true);
+    revoke();
+    expect(isTrustedWebAiFrame(event(topFrame))).toBe(false);
   });
 
   it("rejects a subframe even when its URL uses an approved origin", () => {
+    const revoke = authorizeWebAiContents(sender as never);
     expect(isTrustedWebAiFrame(event({ url: "https://chatgpt.com/embedded" }))).toBe(false);
+    revoke();
   });
 
   it("rejects an unapproved subdomain in the top frame", () => {
     const frame = { url: "https://sub.chatgpt.com/" };
+    const revoke = authorizeWebAiContents(sender as never);
     expect(isTrustedWebAiFrame(event(frame))).toBe(false);
+    revoke();
+  });
+
+  it("rejects a different webContents even if its frame uses an approved origin", () => {
+    const revoke = authorizeWebAiContents(sender as never);
+    const otherFrame = { url: "https://chatgpt.com/c/456" };
+    const otherSender = { mainFrame: otherFrame };
+    expect(isTrustedWebAiFrame(event(otherFrame, otherSender))).toBe(false);
+    revoke();
   });
 });
