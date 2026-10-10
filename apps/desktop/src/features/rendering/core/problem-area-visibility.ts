@@ -1,12 +1,21 @@
 import type { ProblemAreaKind, ProblemNode } from "@/features/document";
 
+import { isProblemAreaDisplayed, type ProblemDisplayFilter } from "./problem-display-filter";
+
 /**
  * Which of a problem's areas the editor and the print renderer materialize.
  *
  * `lead`/`prompt` always render so a problem is never a blank hole; the optional
  * areas render once they hold content or the author has reserved height for them.
  */
-export function shouldShowProblemArea(problem: ProblemNode, area: ProblemAreaKind): boolean {
+export function shouldShowProblemArea(
+  problem: ProblemNode,
+  area: ProblemAreaKind,
+  display?: ProblemDisplayFilter,
+): boolean {
+  if (display && !isProblemAreaDisplayed(display, area)) {
+    return false;
+  }
   return (
     area === "lead" ||
     area === "prompt" ||

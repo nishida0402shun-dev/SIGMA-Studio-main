@@ -91,8 +91,8 @@ const APP_NAME = IS_BETA_BUILD ? "Sigma Studio Beta" : "Sigma Studio";
 const DIST_RENDERER_DIR = path.join(__dirname, "..", "out");
 const APP_ICON_PATH = path.join(__dirname, "..", "build", "icon.png");
 const RELEASE_PAGE_URL = IS_BETA_BUILD
-  ? "https://github.com/Atsu-Taiyo/SIGMA-Studio/releases"
-  : "https://github.com/Atsu-Taiyo/SIGMA-Studio/releases/latest";
+  ? "https://github.com/nishida0402shun-dev/SIGMA-Studio-main/releases"
+  : "https://github.com/nishida0402shun-dev/SIGMA-Studio-main/releases/latest";
 const UPDATE_CHECK_INTERVAL_MS = 60 * 60 * 1000;
 app.setName(APP_NAME);
 loadElectronEnvFiles();

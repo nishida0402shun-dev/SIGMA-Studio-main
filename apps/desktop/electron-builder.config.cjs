@@ -66,7 +66,7 @@ if (
 module.exports = {
   appId: isBetaBuild ? "com.atsutaiyo.sigmastudio.beta" : "com.atsutaiyo.sigmastudio",
   productName: isBetaBuild ? "Sigma Studio Beta" : "Sigma Studio",
-  electronVersion: "44.5.1",
+  electronVersion: "44.7.0",
   npmRebuild: false,
   afterPack: "./scripts/check-native-lock-package.cjs",
   directories: {
@@ -107,7 +107,7 @@ module.exports = {
     provider: "github",
     owner: "nishida0402shun-dev",
     repo: "SIGMA-Studio-main",
-    releaseType: isBetaBuild ? "prerelease" : "release",
+    releaseType: "draft",
     ...(isBetaBuild ? { channel: "beta" } : {}),
   },
   mac: {

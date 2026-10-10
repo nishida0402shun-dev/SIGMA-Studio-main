@@ -81,7 +81,7 @@
     "@types/three": "^0.185.4",
     "builder-util": "^26.15.3",
     "cross-env": "^7.0.3",
-    "electron": "^44.5.1",
+    "electron": "44.7.0",
     "electron-builder": "^26.15.3",
     "esbuild": "^0.28.2",
     "eslint": "^9.39.1",

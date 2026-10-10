@@ -1,4 +1,5 @@
 import fs from "node:fs/promises";
+import { atomicRename } from "./atomic-rename";
 import { randomUUID } from "node:crypto";
 import path from "node:path";
 
@@ -84,7 +85,7 @@ export class ResearchSessionStore {
     await fs.mkdir(path.dirname(filePath), { recursive: true });
     const temp = filePath + ".tmp";
     await fs.writeFile(temp, JSON.stringify(library, null, 2), "utf8");
-    await fs.rename(temp, filePath);
+    await atomicRename(temp, filePath);
   }
 
   private libraryPath(): string {

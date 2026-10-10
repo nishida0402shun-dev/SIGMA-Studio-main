@@ -27,6 +27,7 @@ jobs:
           node-version: "24"
           cache: npm
       - run: npm ci
+      - run: npm run dependencies:check
       - run: npm run audit:production
       - run: npm run version:check
       - run: npm run test:scripts
@@ -35,13 +36,62 @@ jobs:
       - run: npm run lint
       # Source-graph scans and real filesystem tests exceed 5s on shared runners.
       - run: npm --workspace @sigma-studio/desktop run test -- --maxWorkers=2 --testTimeout=30000
-      - run: npm run build
-      - run: npm run electron:build
-      # Exercise the shipped Electron runtime against a real window, not only Chromium.
-      - name: Install Electron smoke-test display server
-        run: sudo apt-get update && sudo apt-get install -y xvfb
-      - name: Run Electron smoke test
-        run: xvfb-run -a npm --workspace @sigma-studio/desktop run test:e2e:electron -- tests/electron/open-document.spec.ts
+      # The Electron smoke test loads out/index.html via file://, so build with desktop-relative asset paths.
+      - run: npm --workspace @sigma-studio/desktop run electron:prepare
+      # Exercise the shipped Electron runtime with a real Linux sandbox and keyring.
+      - name: Install Electron smoke-test dependencies
+        run: sudo apt-get update && sudo apt-get install -y xvfb gnome-keyring apparmor
+      - name: Allow the Electron binary to create its Linux sandbox
+        shell: bash
+        run: |
+          set -euo pipefail
+          electron_path_file="$RUNNER_TEMP/sigma-electron-path"
+          node -e 'require("node:fs").writeFileSync(process.argv[1], require("electron"))' "$electron_path_file"
+          electron_binary="$(cat "$electron_path_file")"
+          test -x "$electron_binary"
+          profile="$RUNNER_TEMP/sigma-electron.apparmor"
+          cat > "$profile" <<EOF
+          abi <abi/4.0>,
+          include <tunables/global>
+          profile sigma-electron-ci "$electron_binary" flags=(unconfined) {
+            userns,
+          }
+          EOF
+          sudo apparmor_parser --replace "$profile"
+      - name: Run Electron persistence smoke test
+        shell: bash
+        run: |
+          set -euo pipefail
+          xvfb-run --auto-servernum dbus-run-session -- bash -euo pipefail -c '
+            printf "%s" "sigma-ci-fixture" | gnome-keyring-daemon --daemonize --components=secrets --unlock >/dev/null
+            export XDG_CURRENT_DESKTOP=GNOME
+            npm --workspace @sigma-studio/desktop run test:e2e:electron -- tests/electron/open-document.spec.ts tests/electron/whiteboard-focus.spec.ts tests/electron/math-fraction-input.spec.ts
+          '
+
+      - name: Upload Electron smoke-test diagnostics
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: electron-smoke-diagnostics
+          path: |
+            apps/desktop/test-results/
+            apps/desktop/playwright-report/
+          if-no-files-found: ignore
+          retention-days: 7
+
+  dependency-security:
+    name: Dependency security
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: "24"
+          cache: npm
+      - run: npm ci
+      - run: npm run dependencies:check
+      - run: npm run security:audit
 
   public-packages:
     name: Public package build and contracts

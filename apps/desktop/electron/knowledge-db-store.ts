@@ -1,4 +1,5 @@
 import fs from "node:fs/promises";
+import { atomicRename } from "./atomic-rename";
 import path from "node:path";
 import { KnowledgeLearningStore } from "./knowledge-learning-store";
 import { createHash, randomUUID } from "node:crypto";
@@ -955,14 +956,14 @@ export class KnowledgeDbStore {
       await fs.access(restoredLibrary);
       const currentBackup = `${paths.root}.before-restore-${Date.now()}`;
       try {
-        await fs.rename(paths.root, currentBackup);
+        await atomicRename(paths.root, currentBackup);
       } catch (error) {
         if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
       }
       try {
-        await fs.rename(tempRoot, paths.root);
+        await atomicRename(tempRoot, paths.root);
       } catch (error) {
-        try { await fs.rename(currentBackup, paths.root); } catch {}
+        try { await atomicRename(currentBackup, paths.root); } catch {}
         throw error;
       }
       await fs.rm(currentBackup, { recursive: true, force: true });
@@ -1288,7 +1289,7 @@ export class KnowledgeDbStore {
       }
       const tmp = `${paths.libraryPath}.${randomUUID()}.tmp`;
       await fs.writeFile(tmp, serialized, "utf8");
-      await fs.rename(tmp, paths.libraryPath);
+      await atomicRename(tmp, paths.libraryPath);
       library.__fingerprint = createHash("sha256").update(serialized).digest("hex");
     } finally {
       await lock.release();
