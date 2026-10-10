@@ -108,6 +108,7 @@ export interface MathNodeOptions {
 const SINGLE_INLINE_MATH_TEXT = /^\$([^$]+)\$$/;
 type PendingInlineMathEditRequest = {
   cursorPosition: InlineMathCursorPosition;
+  placeholderIndex?: number | null;
   pendingLatexCommandTrigger?: InlineMathLatexCommandTrigger;
 };
 
