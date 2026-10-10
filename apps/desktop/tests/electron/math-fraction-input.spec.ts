@@ -124,20 +124,25 @@ async function assertCaretAboveFrame(app: ElectronApplication, page: Page, field
     const image = nativeImage.createFromBuffer(Buffer.from(base64, "base64"));
     const { width, height } = image.getSize();
     const bitmap = image.toBitmap();
-    const columns = Array.from({ length: width }, () => ({ blue: 0, red: 0 }));
+    const columns = Array.from({ length: width }, () => ({ blue: 0, red: 0, x: 0 }));
+    for (let x = 0; x < width; x++) columns[x]!.x = x;
     for (let y = 0; y < height; y++) {
       for (let x = 0; x < width; x++) {
         const offset = (y * width + x) * 4;
-        if (bitmap[offset] > 150 && bitmap[offset + 1] < 120 && bitmap[offset + 2] < 120) columns[x].blue++;
-        if (bitmap[offset + 2] > 150 && bitmap[offset] < 120 && bitmap[offset + 1] < 120) columns[x].red++;
+        if (bitmap[offset] > 150 && bitmap[offset + 1] < 120 && bitmap[offset + 2] < 120) columns[x]!.blue++;
+        if (bitmap[offset + 2] > 150 && bitmap[offset] < 120 && bitmap[offset + 1] < 120) columns[x]!.red++;
       }
     }
-    // Fractional frame coordinates can put the outline in either adjacent
-    // pixel column. Inspect the painted blue line rather than assuming x=1.
-    return columns.reduce((outline, column) => column.blue > outline.blue ? column : outline);
+    // The frame and caret can rasterize into adjacent columns at fractional
+    // coordinates. Inspect each painted line independently, then bound their gap.
+    return {
+      outline: columns.reduce((best, column) => column.blue > best.blue ? column : best),
+      caret: columns.reduce((best, column) => column.red > best.red ? column : best),
+    };
   }, png.toString("base64"));
-  expect(pixels.blue).toBeGreaterThan(3);
-  expect(pixels.red).toBeGreaterThan(3);
+  expect(pixels.outline.blue).toBeGreaterThan(3);
+  expect(pixels.caret.red).toBeGreaterThan(3);
+  expect(Math.abs(pixels.outline.x - pixels.caret.x)).toBeLessThanOrEqual(1);
 }
 
 async function fractionTex(field: Locator) {
