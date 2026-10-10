@@ -1,4 +1,5 @@
 import fs from "node:fs/promises";
+import { atomicRename } from "./atomic-rename";
 import path from "node:path";
 import { randomUUID } from "node:crypto";
 
@@ -82,6 +83,6 @@ export class LongTermMemoryStore {
     await fs.mkdir(path.dirname(this.filePath), { recursive: true });
     const temp = this.filePath + "." + process.pid + ".tmp";
     await fs.writeFile(temp, JSON.stringify(file), "utf8");
-    await fs.rename(temp, this.filePath);
+    await atomicRename(temp, this.filePath);
   }
 }
