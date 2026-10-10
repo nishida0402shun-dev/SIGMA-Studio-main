@@ -170,7 +170,7 @@ type InlineMathFieldElement = InlineMathLiveFieldElement & MathKeyboardMathfield
 export function requestInlineMathEdit(
   id: string,
   cursorPosition: InlineMathCursorPosition = "end",
-  options: { pendingLatexCommandTrigger?: InlineMathLatexCommandTrigger } = {},
+  options: { pendingLatexCommandTrigger?: InlineMathLatexCommandTrigger; placeholderIndex?: number | null } = {},
 ) {
   if (!id || typeof window === "undefined") {
     return;
@@ -178,6 +178,7 @@ export function requestInlineMathEdit(
 
   const request: PendingInlineMathEditRequest = {
     cursorPosition,
+    placeholderIndex: options.placeholderIndex,
     pendingLatexCommandTrigger: options.pendingLatexCommandTrigger,
   };
   pendingInlineMathEditRequests.set(id, request);
@@ -338,12 +339,13 @@ export function insertMathKeyboardShortcutInlineMathAtSelection(
   const selectedText = state.selection.empty
     ? ""
     : state.doc.textBetween(state.selection.from, state.selection.to, "");
+  const tex = createInlineMathTexFromMathKeyboardShortcut(shortcut, selectedText);
   const node = mathInlineType.create({
     id,
-    tex: createInlineMathTexFromMathKeyboardShortcut(shortcut, selectedText),
+    tex,
   });
   dispatch?.(state.tr.replaceSelectionWith(node).scrollIntoView());
-  requestInlineMathEdit(id);
+  requestInlineMathEdit(id, "end", { placeholderIndex: tex.includes("#?") ? 0 : null });
   return true;
 }
 
@@ -475,6 +477,7 @@ export class InlineMathNodeView implements NodeView {
       if (pending) {
         this.scheduleEditFrame(() => {
           this.beginEditing(this.tex, pending.cursorPosition ?? "end", {
+            placeholderIndex: pending.placeholderIndex,
             pendingLatexCommandTrigger: pending.pendingLatexCommandTrigger,
           });
         });
@@ -605,6 +608,7 @@ export class InlineMathNodeView implements NodeView {
       return;
     }
     this.beginEditing(this.tex, normalizeInlineMathCursorPosition(detail.cursorPosition) ?? "end", {
+      placeholderIndex: typeof detail.placeholderIndex === "number" ? detail.placeholderIndex : null,
       pendingLatexCommandTrigger: normalizeInlineMathLatexCommandTrigger(detail.pendingLatexCommandTrigger) ?? null,
     });
   };
@@ -1513,6 +1517,7 @@ function InlineMathLiveField({
     let focusFrame = 0;
     let focusTimeout = 0;
     let mathField: InlineMathFieldElement | null = null;
+    let initialFocusApplied = false;
     let initialLatexCommandApplied = false;
     const handleMathFieldInput = () => {
       if (!mathField || locked) {
@@ -1642,6 +1647,7 @@ function InlineMathLiveField({
         if (!focusInlineMathPlaceholder(mountedMathField, initialPlaceholderIndex)) {
           mountedMathField.executeCommand?.(initialCursorPosition === "start" ? "moveToMathfieldStart" : "moveToMathfieldEnd");
         }
+        initialFocusApplied = true;
         if (initialLatexCommandTrigger && !initialLatexCommandApplied) {
           initialLatexCommandApplied = true;
           rememberPendingLatexCommand(initialLatexCommandTrigger, mountedMathField);
