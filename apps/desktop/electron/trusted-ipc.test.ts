@@ -113,7 +113,7 @@ it("keeps privileged IPC behind the common boundary while isolating Web AI", () 
     }
     if (file !== "trusted-ipc.ts" && file !== "main.ts") {
       expect(source, file).not.toMatch(/\belectronIpcMain\.(?:handle|on)\s*\(/u);
-      expect(source, file).not.toMatch(/import\s*\{[^}]*\bipcMain\b[^}]*\}\s*from ["']electron["']/su);
+      expect(source, file).not.toMatch(/import\s*\{[^}]*\bipcMain\b[^}]*\}\s*from ["']electron["']/u);
     }
   }
   const main = readFileSync(path.join(root, "main.ts"), "utf8");
