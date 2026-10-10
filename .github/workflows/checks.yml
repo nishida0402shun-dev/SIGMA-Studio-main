@@ -58,6 +58,16 @@ jobs:
           }
           EOF
           sudo apparmor_parser --replace "$profile"
+      - name: Run Electron persistence smoke test
+        shell: bash
+        run: |
+          set -euo pipefail
+          xvfb-run --auto-servernum dbus-run-session -- bash -euo pipefail -c '
+            printf "%s" "sigma-ci-fixture" | gnome-keyring-daemon --daemonize --components=secrets --unlock >/dev/null
+            export XDG_CURRENT_DESKTOP=GNOME
+            npm --workspace @sigma-studio/desktop run test:e2e:electron -- tests/electron/open-document.spec.ts
+          '
+
       - name: Upload Electron smoke-test diagnostics
         if: always()
         uses: actions/upload-artifact@v6
@@ -68,16 +78,6 @@ jobs:
             apps/desktop/playwright-report/
           if-no-files-found: ignore
           retention-days: 7
-
-      - name: Run Electron persistence smoke test
-        shell: bash
-        run: |
-          set -euo pipefail
-          xvfb-run --auto-servernum dbus-run-session -- bash -euo pipefail -c '
-            printf "%s" "sigma-ci-fixture" | gnome-keyring-daemon --daemonize --components=secrets --unlock >/dev/null
-            export XDG_CURRENT_DESKTOP=GNOME
-            npm --workspace @sigma-studio/desktop run test:e2e:electron -- tests/electron/open-document.spec.ts
-          '
 
   dependency-security:
     name: Dependency security
