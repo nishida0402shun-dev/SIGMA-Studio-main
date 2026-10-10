@@ -44,7 +44,22 @@ test("opens startup/second-instance/macOS files through real storage and preserv
     app = await electron.launch({ args: [APP_ROOT, first, first, ordinary], cwd: APP_ROOT, env, chromiumSandbox: true });
     expect(await app.evaluate(({ app }) => app.commandLine.hasSwitch("no-sandbox"))).toBe(false);
     const page = await app.firstWindow();
-    await expect(page.locator(BODY).first()).toContainText("STARTUP_CONTENT", { timeout: 90_000 });
+    const rendererDiagnostics: string[] = [];
+    page.on("console", (message) => {
+      if (message.type() === "error" || message.type() === "warning") {
+        rendererDiagnostics.push(`console.${message.type()}: ${message.text()}`);
+      }
+    });
+    page.on("pageerror", (error) => rendererDiagnostics.push(`pageerror: ${error.stack ?? error.message}`));
+    try {
+      await expect(page.locator(BODY).first()).toContainText("STARTUP_CONTENT", { timeout: 90_000 });
+    } catch (error) {
+      const body = await page.locator("body").innerText().catch(() => "<body unavailable>");
+      const url = page.url();
+      throw new Error(
+        `Startup document did not render. URL: ${url}\nBody text: ${body.slice(0, 6000)}\nRenderer diagnostics:\n${rendererDiagnostics.slice(-40).join("\\n")}\nOriginal failure: ${String(error)}`,
+      );
+    }
     await expect(page.locator("[data-startup-splash]")).toHaveCount(0, { timeout: 30_000 });
     const filesBefore = await page.evaluate(() => window.desktopAPI!.storage.listFiles());
     expect(filesBefore.filter((file) => file.title === "起動 数学")).toHaveLength(1);
