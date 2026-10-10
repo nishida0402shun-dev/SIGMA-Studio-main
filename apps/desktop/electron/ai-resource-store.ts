@@ -1,5 +1,6 @@
 import crypto from "node:crypto";
 import fs from "node:fs/promises";
+import { atomicRename } from "./atomic-rename";
 import path from "node:path";
 
 import { composeSkillFile, parseSkillFile } from "@/lib/ai/skill-frontmatter";
@@ -634,7 +635,7 @@ export class LocalAiResourceStore {
     await fs.mkdir(this.sourceRoot, { recursive: true });
     const tmpPath = `${this.syncManifestPath}.tmp`;
     await fs.writeFile(tmpPath, JSON.stringify(manifest), "utf8");
-    await fs.rename(tmpPath, this.syncManifestPath);
+    await atomicRename(tmpPath, this.syncManifestPath);
   }
 
   /**
@@ -906,7 +907,7 @@ export class LocalAiResourceStore {
     await fs.mkdir(this.sourceRoot, { recursive: true });
     const tmpPath = `${this.manifestPath}.tmp`;
     await fs.writeFile(tmpPath, `${JSON.stringify(normalizeManifest(manifest), null, 2)}\n`, "utf8");
-    await fs.rename(tmpPath, this.manifestPath);
+    await atomicRename(tmpPath, this.manifestPath);
   }
 
   private resolveSourcePath(relativePath: string): string {
