@@ -1,5 +1,6 @@
 import { app, BrowserWindow, ipcMain as electronIpcMain, Menu, nativeImage, shell } from "electron";
 import { authorizePreviewSender, configureTrustedIpc, ipcMain } from "./trusted-ipc";
+import { isTrustedWebAiFrame, isAllowedWebAiOrigin } from "./web-ai-ipc-security";
 import crypto from "node:crypto";
 import { createInterface } from "node:readline";
 import { resolveDevServerUrl, isDevServerNavigation } from "./dev-server";
@@ -116,14 +117,7 @@ if (!hasSingleInstanceLock) {
 }
 let mainWindow: BrowserWindow | null = null;
 configureTrustedIpc({ getMainWebContents: () => mainWindow?.webContents ?? null, rendererDirectory: DIST_RENDERER_DIR, devServerUrl: DEV_SERVER_URL });
-const WEB_AI_ALLOWED_HOSTS = new Set([
-  "chatgpt.com",
-  "chat.openai.com",
-  "claude.ai",
-  "gemini.google.com",
-  "aistudio.google.com",
-  "www.aistudio.google.com",
-]);
+
 
 electronIpcMain.handle("web-ai:get-preload-url", (event) => {
   if (event.sender !== mainWindow?.webContents) {
@@ -133,24 +127,12 @@ electronIpcMain.handle("web-ai:get-preload-url", (event) => {
 });
 
 electronIpcMain.handle("web-ai:get-conversation-capture-setting", (event) => {
-  const frameUrl = event.senderFrame?.url ?? "";
-  let hostname = "";
-  try { hostname = new URL(frameUrl).hostname; } catch { throw new Error("invalid Web AI frame origin"); }
-  const allowed = [...WEB_AI_ALLOWED_HOSTS].some((host) => hostname === host || hostname.endsWith("." + host));
-  if (!allowed) throw new Error("conversation capture setting is not available for this origin");
+  if (!isTrustedWebAiFrame(event)) throw new Error("conversation capture setting is not available for this origin");
   return readDesktopSettingsSync(SIGMA_STUDIO_DATA_PATH).webAiConversationCaptureEnabled !== false;
 });
 
 electronIpcMain.handle("web-ai:get-bridge-info", (event) => {
-  const url = event.senderFrame?.url ?? "";
-  let hostname = "";
-  try {
-    hostname = new URL(url).hostname;
-  } catch {
-    throw new Error("invalid Web AI frame origin");
-  }
-  const allowed = [...WEB_AI_ALLOWED_HOSTS].some((host) => hostname === host || hostname.endsWith(`.${host}`));
-  if (!allowed || !webAiBridgeInfo) {
+  if (!isTrustedWebAiFrame(event) || !webAiBridgeInfo) {
     throw new Error("Web AI bridge is unavailable for this origin");
   }
   return {
@@ -160,22 +142,7 @@ electronIpcMain.handle("web-ai:get-bridge-info", (event) => {
 });
 
 electronIpcMain.handle("web-ai:capture-conversation", async (event, payload: unknown) => {
-  const frameUrl = event.senderFrame?.url ?? "";
-  let origin: string;
-  try {
-    origin = new URL(frameUrl).origin;
-  } catch {
-    throw new Error("invalid Web AI frame origin");
-  }
-  const allowed = [...WEB_AI_ALLOWED_HOSTS].some((host) => {
-    try {
-      const hostname = new URL(origin).hostname;
-      return hostname === host || hostname.endsWith("." + host);
-    } catch {
-      return false;
-    }
-  });
-  if (!allowed) throw new Error("conversation capture is not allowed for this origin");
+  if (!isTrustedWebAiFrame(event)) throw new Error("conversation capture is not allowed for this origin");
   if (!payload || typeof payload !== "object" || Array.isArray(payload)) throw new Error("invalid conversation capture payload");
   const input = payload as Record<string, unknown>;
   const conversationId = typeof input.conversationId === "string" ? input.conversationId.trim() : "";
@@ -620,15 +587,8 @@ function createWindow() {
     const expectedPreloadPath = path.join(__dirname, "web-ai-preload.cjs");
     const expectedPreloadUrl = pathToFileURL(expectedPreloadPath).toString();
     const requestedPreload = webPreferences.preload ?? "";
-    let hostname = "";
-    try {
-      hostname = new URL(params.src).hostname;
-    } catch {
-      event.preventDefault();
-      return;
-    }
-    const allowed = [...WEB_AI_ALLOWED_HOSTS].some((host) => hostname === host || hostname.endsWith(`.${host}`));
-    if (requestedPreload !== expectedPreloadPath && requestedPreload !== expectedPreloadUrl || !allowed) {
+    const allowed = isAllowedWebAiOrigin(params.src);
+    if ((requestedPreload !== expectedPreloadPath && requestedPreload !== expectedPreloadUrl) || !allowed) {
       event.preventDefault();
       return;
     }
