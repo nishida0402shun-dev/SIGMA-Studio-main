@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { readdirSync, readFileSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import type { IpcMainInvokeEvent, WebContents } from "electron";
@@ -96,7 +96,7 @@ describe("privileged IPC sender boundary", () => {
 
 it("keeps privileged IPC behind the common boundary while isolating Web AI", () => {
   const root = fileURLToPath(new URL("./", import.meta.url));
-  const files = ["main.ts", "cli-bin-ipc.ts", ...["ipc", "collaboration"].flatMap(dir => readdirSync(path.join(root, dir)).filter(name => name.endsWith(".ts") && !name.endsWith(".test.ts")).map(name => `${dir}/${name}`))];
+  const files = ["main.ts", "cli-bin-ipc.ts", ...["ipc", "collaboration"].flatMap(dir => existsSync(path.join(root, dir)) ? readdirSync(path.join(root, dir)).filter(name => name.endsWith(".ts") && !name.endsWith(".test.ts")).map(name => `${dir}/${name}`) : [])];
   for (const file of files) {
     const source = readFileSync(path.join(root, file), "utf8");
     if (/ipcMain\.(?:handle|on)\(/u.test(source)) expect(source, file).toMatch(/import \{[^\n]*ipcMain[^\n]*\} from "\.\.?\/trusted-ipc"/u);
