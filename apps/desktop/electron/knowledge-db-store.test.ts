@@ -80,15 +80,16 @@ function seedLibrary(dataDir: string, fixture: { version?: number; sources: Fixt
          structure_json, analysis_json, updated_at)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
-    for (const source of fixture.sources) {
-      insertSource.run(source.id, source.name ?? source.display_name ?? source.id,
+    for (const [sourceIndex, source] of fixture.sources.entries()) {
+      const sourceId = source.id ?? `fixture-source-${sourceIndex}`;
+      insertSource.run(sourceId, source.name ?? source.display_name ?? sourceId,
         source.originalPath ?? "", source.storedPath ?? "", source.mimeType ?? "text/plain",
         source.sizeBytes ?? 0, source.contentHash ?? "", source.pageCount ?? source.pages?.length ?? 0,
         source.extractionStatus ?? "complete", source.importedAt ?? new Date().toISOString(),
         source.updatedAt ?? new Date().toISOString(),
         JSON.stringify({ indexedAt: source.indexedAt, indexError: source.indexError }));
       for (const page of source.pages ?? []) {
-        insertPage.run(page.id, source.id, page.pageNumber, page.semanticType ?? "unknown",
+        insertPage.run(page.id ?? `${sourceId}-page-${page.pageNumber ?? 1}`, sourceId, page.pageNumber ?? 1, page.semanticType ?? "unknown",
           page.title ?? null, page.text ?? "", page.extractionStatus ?? (page.text ? "text" : "empty"),
           JSON.stringify(page.structureBlocks ?? []), JSON.stringify(page),
           source.updatedAt ?? new Date().toISOString());
