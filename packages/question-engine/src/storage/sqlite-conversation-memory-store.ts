@@ -88,8 +88,8 @@ export class SqliteConversationMemoryStore {
     if (ftsQuery) {
       try {
         const sql = conversationId
-          ? "SELECT e.* FROM qe_conversation_entries e JOIN qe_conversation_entries_fts f ON f.entry_id = e.id WHERE qe_conversation_entries_fts MATCH ? AND e.conversation_id = ? ORDER BY e.created_at DESC LIMIT 500"
-          : "SELECT e.* FROM qe_conversation_entries e JOIN qe_conversation_entries_fts f ON f.entry_id = e.id WHERE qe_conversation_entries_fts MATCH ? ORDER BY e.created_at DESC LIMIT 500";
+          ? "SELECT e.* FROM qe_conversation_entries e JOIN qe_conversation_entries_fts ON qe_conversation_entries_fts.entry_id = e.id WHERE qe_conversation_entries_fts MATCH ? AND e.conversation_id = ? ORDER BY e.created_at DESC LIMIT 500"
+          : "SELECT e.* FROM qe_conversation_entries e JOIN qe_conversation_entries_fts ON qe_conversation_entries_fts.entry_id = e.id WHERE qe_conversation_entries_fts MATCH ? ORDER BY e.created_at DESC LIMIT 500";
         rows = (conversationId
           ? this.db.prepare(sql).all(ftsQuery, conversationId)
           : this.db.prepare(sql).all(ftsQuery)) as EntryRow[];
