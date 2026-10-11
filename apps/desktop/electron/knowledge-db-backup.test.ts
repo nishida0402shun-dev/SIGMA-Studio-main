@@ -3,6 +3,7 @@ import os from "node:os";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
 import { openSigmaCoreDatabase } from "../../../packages/sigma-core/src/index";
+import { SqliteQuestionRepository } from "../../../packages/sigma-core/src/storage/sqlite-question-repository";
 import { KnowledgeDbStore } from "./knowledge-db-store";
 
 describe("Knowledge DB backup/restore", () => {
@@ -18,6 +19,12 @@ describe("Knowledge DB backup/restore", () => {
       await fs.writeFile(path.join(sourceDir, "note.md"), "三角関数の定理", "utf8");
       await store.addFiles([path.join(sourceDir, "note.md")]);
       await store.search("三角関数", 2);
+      const questionRepository = new SqliteQuestionRepository(sourceDatabase.raw);
+      await questionRepository.create({
+        title: "平方完成の確認",
+        body: { format: "plain-text", content: "二次関数を平方完成して頂点を求める。" },
+        reviewStatus: "approved",
+      });
 
       const backupPath = path.join(backupDir, "knowledge-db.zip");
       const created = await store.createBackup(backupPath);
@@ -31,6 +38,10 @@ describe("Knowledge DB backup/restore", () => {
       expect(restored.fileCount).toBeGreaterThan(0);
       const sources = await restoredStore.listSources();
       expect(sources).toHaveLength(1);
+      const restoredQuestions = new SqliteQuestionRepository(restoredDatabase.raw);
+      expect((await restoredQuestions.search({ text: "平方完成" })).items).toHaveLength(1);
+      const indexedQuestions = restoredDatabase.raw.prepare("SELECT COUNT(*) AS count FROM sigma_core_questions_fts").get() as { count: number };
+      expect(indexedQuestions.count).toBeGreaterThan(0);
       expect(sources[0]?.pages[0]?.text).toContain("三角関数");
       expect(await fs.stat(sources[0]!.storedPath)).toBeTruthy();
       restoredDatabase.close();
