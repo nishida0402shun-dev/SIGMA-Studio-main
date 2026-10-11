@@ -2,7 +2,7 @@
 
 SIGMA Studio 専用の問題・知識・会話データ基盤を再構築するための新しいライブラリ境界です。
 
-> Status: partial SQLite cutover. Desktop knowledge metadata, vectors, conversation memory, long-term memory, and PDF staging now use the shared database API. Build and test results have not yet been verified.
+> Status: partial SQLite cutover. Desktop knowledge metadata, vectors, conversation memory, long-term memory, research sessions, learning feedback, and PDF staging now use the shared database API. Build and test results have not yet been verified.
 
 ## Goals
 
@@ -16,9 +16,9 @@ SIGMA Studio 専用の問題・知識・会話データ基盤を再構築する�
 
 - The disconnected legacy Question Bank package was removed from this branch.
 - A provider-neutral domain model, application ports, and initial SQLite schema have been added.
-- The schema currently covers question records, sources, tags, import proposals, knowledge pages, vector records, conversation entries, and long-term memories.
-- Electron now opens one shared SQLite database under `data/knowledge-db/sigma-studio.sqlite` and injects that connection into knowledge, vector, conversation-memory, and long-term-memory stores.
-- The former JSON-backed conversation, long-term memory, learning-feedback, knowledge metadata, vector index, and PDF staging stores have been replaced by SQLite tables; source documents and derived page previews remain ordinary files. A transactional question repository now provides CRUD, optimistic version checks, tags, provenance, history, and filtered search.
+- The schema currently covers question records, sources, tags, import proposals, knowledge pages, vector records, conversation entries, long-term memories, and research sessions.
+- Electron now opens one shared SQLite database under `data/knowledge-db/sigma-studio.sqlite` and injects that connection into knowledge, vector, conversation-memory, long-term-memory, and research-session stores.
+- The former JSON-backed conversation, long-term memory, research-session, learning-feedback, knowledge metadata, vector index, and PDF staging stores have been replaced by SQLite tables; source documents and derived page previews remain ordinary files. A transactional question repository now provides CRUD, optimistic version checks, tags, provenance, history, and filtered search.
 - The `KnowledgeDbStore` API is retained to avoid rewriting its IPC/UI callers, but its persistence implementation now reads/writes the SQLite tables.
 - Existing JSON data files are no longer read by the new stores. They are not automatically deleted from user directories by the code changes.
 
@@ -52,8 +52,8 @@ The application-facing `KnowledgeDbStore` and `LocalVectorIndex` names remain as
 
 ## Next steps
 
-1. Implement and test the storage adapter and FTS synchronization.
-2. Inventory all live consumers of Knowledge DB, vector index, conversation memory, and long-term memory.
-3. Move those consumers behind the new library API.
-4. Add a tested one-time data migration/backup flow.
-5. Remove the remaining old store modules only after the app builds and regression tests pass.
+1. Confirm the active CI run and fix any typecheck, test, lint, build, or packaging failures.
+2. Add focused tests for schema upgrades, repository constraints, search edge cases, and backup/restore round trips.
+3. Move remaining persistence consumers behind the shared library API where they are part of the unified data layer.
+4. Verify packaging on each supported Electron target and document data reset behavior.
+5. Remove remaining compatibility facades only after all call sites are migrated and regression checks pass.
