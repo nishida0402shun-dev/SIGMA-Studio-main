@@ -27,6 +27,11 @@ interface StoredVectorRow {
  * are stored as JSON and ranked with cosine similarity. This portable baseline
  * intentionally avoids native extensions so it can ship with Electron.
  */
+export interface ScoredVectorRecord {
+  record: VectorRecord;
+  score: number;
+}
+
 export class SqliteVectorIndex implements VectorIndex {
   constructor(private readonly db: SigmaSqliteDatabase) {
     this.db.exec(`
@@ -91,6 +96,10 @@ export class SqliteVectorIndex implements VectorIndex {
   }
 
   async search(request: VectorSearchRequest): Promise<readonly VectorRecord[]> {
+    return (await this.searchWithScores(request)).map(({ record }) => record);
+  }
+
+  async searchWithScores(request: VectorSearchRequest): Promise<readonly ScoredVectorRecord[]> {
     throwIfAborted(request.signal);
     if (!Number.isInteger(request.limit) || request.limit < 1) {
       throw new Error("limit must be a positive integer");
@@ -125,7 +134,17 @@ export class SqliteVectorIndex implements VectorIndex {
       });
     }
     ranked.sort((left, right) => right.score - left.score || left.record.id.localeCompare(right.record.id));
-    return ranked.slice(0, request.limit).map(({ record }) => record);
+    return ranked.slice(0, request.limit);
+  }
+
+  async hasSource(sourceId: string): Promise<boolean> {
+    const row = this.db.prepare("SELECT 1 AS found FROM sigma_core_vector_records WHERE source_id = ? LIMIT 1").get(sourceId) as { found?: number } | undefined;
+    return Boolean(row?.found);
+  }
+
+  async hasRecords(): Promise<boolean> {
+    const row = this.db.prepare("SELECT 1 AS found FROM sigma_core_vector_records LIMIT 1").get() as { found?: number } | undefined;
+    return Boolean(row?.found);
   }
 
   async removeSource(sourceId: string, signal?: AbortSignal): Promise<void> {
