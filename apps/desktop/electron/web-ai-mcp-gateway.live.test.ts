@@ -71,20 +71,6 @@ describe("Web AI MCP gateway live server path", () => {
 
     expect(names.has("list_local_documents")).toBe(true);
     expect(names.has("read_local_document")).toBe(true);
-    expect(names.has("knowledge_db_search")).toBe(true);
-    expect(names.has("knowledge_db_get_context")).toBe(true);
-    expect(names.has("knowledge_db_list_classification_reviews")).toBe(true);
-    expect(names.has("knowledge_db_get_classification_review_context")).toBe(true);
-    expect(names.has("knowledge_db_submit_classification_review")).toBe(true);
-    expect(names.has("knowledge_db_pdf_import_preview")).toBe(true);
-    expect(names.has("knowledge_db_pdf_import_staging_list")).toBe(true);
-    expect(names.has("knowledge_db_pdf_import_staging_get")).toBe(true);
-    expect(names.has("knowledge_db_pdf_import_staging_update")).toBe(true);
-    expect(names.has("knowledge_db_pdf_import_approve")).toBe(true);
-    expect(names.has("knowledge_db_pdf_import_reject")).toBe(true);
-    const reviewTool = tools.find((tool) => tool.name === "knowledge_db_submit_classification_review");
-    expect(reviewTool?.annotations?.readOnlyHint).toBe(false);
-    expect(reviewTool?.annotations?.destructiveHint).toBe(false);
     expect(names.has("create_local_document")).toBe(true);
     expect(names.has("list_ai_resources")).toBe(true);
     expect(names.has("get_ai_resource")).toBe(true);
@@ -94,14 +80,6 @@ describe("Web AI MCP gateway live server path", () => {
 
     const globalTools = await gateway.listTools(null);
     const globalNames = new Set(globalTools.map((tool) => tool.name));
-    expect(globalNames.has("knowledge_db_search")).toBe(true);
-    expect(globalNames.has("knowledge_db_get_context")).toBe(true);
-    expect(globalNames.has("knowledge_db_list_classification_reviews")).toBe(true);
-    expect(globalNames.has("knowledge_db_get_classification_review_context")).toBe(true);
-    expect(globalNames.has("knowledge_db_submit_classification_review")).toBe(true);
-    expect(globalNames.has("knowledge_db_pdf_import_preview")).toBe(true);
-    expect(globalNames.has("knowledge_db_pdf_import_staging_list")).toBe(true);
-    expect(globalNames.has("knowledge_db_pdf_import_staging_get")).toBe(true);
     expect(globalNames.has("list_local_documents")).toBe(false);
     expect(globalNames.has("list_ai_resources")).toBe(true);
     expect(globalNames.has("get_ai_resource")).toBe(true);
@@ -111,15 +89,6 @@ describe("Web AI MCP gateway live server path", () => {
     const skillList = await gateway.callTool("list_ai_resources", { kind: "skill" }, null);
     expect(skillList.isError).not.toBe(true);
     expect(skillList.content).toBeTruthy();
-  });
-
-  it("allows the classification review workflow without a selected Workspace", async () => {
-    await expect(
-      gateway.callTool("knowledge_db_list_classification_reviews", { status: "pending", limit: 1 }, null),
-    ).resolves.toBeTruthy();
-    await expect(
-      gateway.callTool("knowledge_db_get_classification_review_context", { sourceId: "missing", pageNumber: 1 }, null),
-    ).resolves.toMatchObject({ isError: true });
   });
 
   it("routes a real HTTP Bridge request into the real MCP server", async () => {
@@ -169,24 +138,8 @@ describe("Web AI MCP gateway live server path", () => {
     expect(toolsResponse.status).toBe(200);
     const toolsBody = await toolsResponse.json();
     expect(toolsBody.ok).toBe(true);
-    expect(toolsBody.tools.some((tool: { name?: string }) => tool.name === "knowledge_db_search")).toBe(true);
+    expect(toolsBody.tools.some((tool: { name?: string }) => tool.name?.startsWith("knowledge_db_"))).toBe(false);
 
-    const callResponse = await fetch(`${bridgeBase}/v1/mcp/call`, {
-      method: "POST",
-      headers: {
-        Authorization: "Bearer live-test-token",
-        Origin: "https://chatgpt.com",
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        name: "knowledge_db_search",
-        arguments: { query: "SIGMA live bridge connectivity", limit: 1 },
-      }),
-    });
-    expect(callResponse.status).toBe(200);
-    const callBody = await callResponse.json();
-    expect(callBody.ok).toBe(true);
-    expect(callBody.result).toBeTruthy();
   });
 
   it("requires approval for a writable global Knowledge DB operation", async () => {
