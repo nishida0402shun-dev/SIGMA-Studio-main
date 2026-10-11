@@ -1,7 +1,7 @@
 /**
- * Canonical local database schema for Question Engine.
+ * Canonical relational schema owned by SIGMA Core.
  *
- * The adapter is deliberately structural so the domain package does not import
+ * The adapter is deliberately structural so Core does not import
  * a concrete SQLite driver. The Electron composition root will inject the
  * approved driver. This module never opens a file or chooses a user-data path.
  */
@@ -16,7 +16,7 @@ export interface SqliteSchemaDriver {
   transaction<T extends (...args: never[]) => unknown>(operation: T): T;
 }
 
-export const QUESTION_ENGINE_SCHEMA_VERSION = 6;
+export const SIGMA_CORE_SCHEMA_VERSION = 6;
 
 const MIGRATION_TABLE = `
   CREATE TABLE IF NOT EXISTS sigma_core_schema_migrations (
@@ -201,7 +201,21 @@ const CORE_SCHEMA = `
     text_content
   );
 
-  -- Vector persistence is owned by @sigma-studio/sigma-core (sigma_core_vector_records).
+
+  CREATE TABLE IF NOT EXISTS sigma_core_vector_records (
+    id TEXT PRIMARY KEY,
+    source_id TEXT NOT NULL,
+    text_content TEXT NOT NULL,
+    source_json TEXT NOT NULL,
+    embedding_model TEXT NOT NULL,
+    dimensions INTEGER NOT NULL CHECK (dimensions > 0),
+    vector_json TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+  );
+
+  CREATE INDEX IF NOT EXISTS sigma_core_vector_source_idx ON sigma_core_vector_records(source_id);
+  CREATE INDEX IF NOT EXISTS sigma_core_vector_model_idx ON sigma_core_vector_records(embedding_model, dimensions);
+
 
   CREATE TABLE IF NOT EXISTS sigma_core_conversation_entries (
     id TEXT PRIMARY KEY,
@@ -305,10 +319,10 @@ export function initializeSigmaCoreSchema(db: SqliteSchemaDriver, now = new Date
     | { version?: number | null }
     | undefined;
   const version = Number(current?.version ?? 0);
-  if (version > QUESTION_ENGINE_SCHEMA_VERSION) {
-    throw new Error(`SIGMA Core DB schema version ${version} is newer than this application supports (${QUESTION_ENGINE_SCHEMA_VERSION})`);
+  if (version > SIGMA_CORE_SCHEMA_VERSION) {
+    throw new Error(`SIGMA Core DB schema version ${version} is newer than this application supports (${SIGMA_CORE_SCHEMA_VERSION})`);
   }
-  if (version === QUESTION_ENGINE_SCHEMA_VERSION) return;
+  if (version === SIGMA_CORE_SCHEMA_VERSION) return;
 
   const apply = () => {
     db.exec(CORE_SCHEMA);
@@ -344,7 +358,7 @@ export function initializeSigmaCoreSchema(db: SqliteSchemaDriver, now = new Date
     }
 
     db.prepare("INSERT INTO sigma_core_schema_migrations(version, applied_at) VALUES (?, ?)").run(
-      QUESTION_ENGINE_SCHEMA_VERSION,
+      SIGMA_CORE_SCHEMA_VERSION,
       now,
     );
   };
