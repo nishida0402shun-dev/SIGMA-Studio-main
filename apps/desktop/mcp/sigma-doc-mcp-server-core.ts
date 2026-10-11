@@ -3017,7 +3017,8 @@ const { registerTool, bodyImplementations } = createMcpToolRegistrar(server, {
   visualSessionRunId: (sessionId) => visualEditSessions.peek(sessionId)?.runId ?? undefined,
 });
 
-,
+registerTool(
+  "conversation_memory_save",
   {
     title: "会話を記憶へ保存",
     description: "現在の会話から、後でAIが参照すべき発言・要約・重要な判断をSIGMAの永続Conversation Memoryへ保存します。Workspaceには依存しません。",
@@ -3077,7 +3078,8 @@ registerTool(
   })),
 );
 
-,
+registerTool(
+  "get_local_app_status",
   {
     title: "ローカルアプリ保存先を確認",
     description: "Sigma Studio デスクトップ版のローカル保存ディレクトリを返します。環境変数 SIGMA_STUDIO_USER_DATA_DIR で上書きできます。",
