@@ -4,3 +4,4 @@ export * from "./knowledge/contracts.js";
 export * from "./knowledge/chunker.js";
 export * from "./knowledge/document-indexer.js";
 export * from "./storage/sqlite-vector-index.js";
+export * from "./storage/sqlite-knowledge-library-repository.js";
