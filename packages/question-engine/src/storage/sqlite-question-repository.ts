@@ -50,7 +50,7 @@ export class SqliteQuestionRepository implements QuestionRepository {
     this.validateRecord(record);
     this.inTransaction(() => {
       this.db.prepare(`
-        INSERT INTO qe_questions
+        INSERT INTO sigma_core_questions
           (id, title, body_format, body_json, answer_json, difficulty, review_status, version, created_at, updated_at)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `).run(record.id, record.title, record.body.format, JSON.stringify(record.body),
@@ -87,7 +87,7 @@ export class SqliteQuestionRepository implements QuestionRepository {
       };
       this.validateRecord(updated);
       this.db.prepare(`
-        UPDATE qe_questions SET title = ?, body_format = ?, body_json = ?, answer_json = ?,
+        UPDATE sigma_core_questions SET title = ?, body_format = ?, body_json = ?, answer_json = ?,
           difficulty = ?, review_status = ?, version = ?, updated_at = ? WHERE id = ?
       `).run(updated.title, updated.body.format, JSON.stringify(updated.body),
         updated.answer ? JSON.stringify(updated.answer) : null, updated.difficulty ?? null,
@@ -99,9 +99,9 @@ export class SqliteQuestionRepository implements QuestionRepository {
   }
 
   async delete(id: string): Promise<void> {
-    const existing = this.db.prepare("SELECT id FROM qe_questions WHERE id = ?").get(id);
+    const existing = this.db.prepare("SELECT id FROM sigma_core_questions WHERE id = ?").get(id);
     if (!existing) return;
-    this.db.prepare("DELETE FROM qe_questions WHERE id = ?").run(id);
+    this.db.prepare("DELETE FROM sigma_core_questions WHERE id = ?").run(id);
   }
 
   async search(query: QuestionSearchQuery): Promise<QuestionSearchResult> {
@@ -114,8 +114,8 @@ export class SqliteQuestionRepository implements QuestionRepository {
         .map((token) => '"' + token.replace(/"/gu, '""') + '"').join(" OR ");
       where.push(fts
         ? `(q.title LIKE ? OR q.body_json LIKE ? OR EXISTS (
-            SELECT 1 FROM qe_questions_fts f
-            WHERE f.question_id = q.id AND qe_questions_fts MATCH ?
+            SELECT 1 FROM sigma_core_questions_fts f
+            WHERE f.question_id = q.id AND sigma_core_questions_fts MATCH ?
           ))`
         : "(q.title LIKE ? OR q.body_json LIKE ?)");
       params.push("%" + text + "%", "%" + text + "%");
@@ -128,32 +128,32 @@ export class SqliteQuestionRepository implements QuestionRepository {
       params.push(...query.reviewStatuses);
     }
     if (query.tagIds?.length) {
-      where.push("EXISTS (SELECT 1 FROM qe_question_tags qt WHERE qt.question_id = q.id AND qt.tag_id IN (" + query.tagIds.map(() => "?").join(",") + "))");
+      where.push("EXISTS (SELECT 1 FROM sigma_core_question_tags qt WHERE qt.question_id = q.id AND qt.tag_id IN (" + query.tagIds.map(() => "?").join(",") + "))");
       params.push(...query.tagIds);
     }
     if (query.sourceIds?.length) {
-      where.push("EXISTS (SELECT 1 FROM qe_question_sources qs WHERE qs.question_id = q.id AND qs.source_id IN (" + query.sourceIds.map(() => "?").join(",") + "))");
+      where.push("EXISTS (SELECT 1 FROM sigma_core_question_sources qs WHERE qs.question_id = q.id AND qs.source_id IN (" + query.sourceIds.map(() => "?").join(",") + "))");
       params.push(...query.sourceIds);
     }
     const clause = where.length ? " WHERE " + where.join(" AND ") : "";
-    const countRow = this.db.prepare("SELECT COUNT(*) AS total FROM qe_questions q" + clause).get(...params) as { total: number };
+    const countRow = this.db.prepare("SELECT COUNT(*) AS total FROM sigma_core_questions q" + clause).get(...params) as { total: number };
     const limit = Math.max(1, Math.min(Math.trunc(query.limit ?? 50) || 1, 200));
     const offset = Math.max(0, Math.trunc(query.offset ?? 0) || 0);
-    const rows = this.db.prepare("SELECT q.* FROM qe_questions q" + clause + " ORDER BY q.updated_at DESC, q.rowid DESC LIMIT ? OFFSET ?")
+    const rows = this.db.prepare("SELECT q.* FROM sigma_core_questions q" + clause + " ORDER BY q.updated_at DESC, q.rowid DESC LIMIT ? OFFSET ?")
       .all(...params, limit, offset) as QuestionRow[];
     return { items: rows.map((row) => this.loadRecord(row.id)!).filter(Boolean), total: countRow.total };
   }
 
   private loadRecord(id: string): QuestionRecord | null {
-    const row = this.db.prepare("SELECT * FROM qe_questions WHERE id = ?").get(id) as QuestionRow | undefined;
+    const row = this.db.prepare("SELECT * FROM sigma_core_questions WHERE id = ?").get(id) as QuestionRow | undefined;
     if (!row) return null;
     const tags = this.db.prepare(`
-      SELECT t.id, t.label, t.taxonomy_path_json FROM qe_question_tags qt
-      JOIN qe_tags t ON t.id = qt.tag_id WHERE qt.question_id = ? ORDER BY t.label
+      SELECT t.id, t.label, t.taxonomy_path_json FROM sigma_core_question_tags qt
+      JOIN sigma_core_tags t ON t.id = qt.tag_id WHERE qt.question_id = ? ORDER BY t.label
     `).all(id) as Array<{ id: string; label: string; taxonomy_path_json: string }>;
     const sources = this.db.prepare(`
       SELECT s.id, s.display_name, s.content_hash, s.original_uri, qs.page_number, qs.region_json
-      FROM qe_question_sources qs JOIN qe_sources s ON s.id = qs.source_id
+      FROM sigma_core_question_sources qs JOIN sigma_core_sources s ON s.id = qs.source_id
       WHERE qs.question_id = ? ORDER BY s.display_name, qs.page_number
     `).all(id) as Array<{
       id: string; display_name: string; content_hash: string; original_uri: string | null;
@@ -188,11 +188,11 @@ export class SqliteQuestionRepository implements QuestionRepository {
   }
 
   private writeRelations(record: QuestionRecord): void {
-    this.db.prepare("DELETE FROM qe_question_tags WHERE question_id = ?").run(record.id);
-    this.db.prepare("DELETE FROM qe_question_sources WHERE question_id = ?").run(record.id);
-    const insertTag = this.db.prepare("INSERT INTO qe_tags(id, label, taxonomy_path_json) VALUES (?, ?, ?) ON CONFLICT(id) DO UPDATE SET label = excluded.label, taxonomy_path_json = excluded.taxonomy_path_json");
-    const findTag = this.db.prepare("SELECT id FROM qe_tags WHERE label = ? AND taxonomy_path_json = ?");
-    const linkTag = this.db.prepare("INSERT OR IGNORE INTO qe_question_tags(question_id, tag_id) VALUES (?, ?)");
+    this.db.prepare("DELETE FROM sigma_core_question_tags WHERE question_id = ?").run(record.id);
+    this.db.prepare("DELETE FROM sigma_core_question_sources WHERE question_id = ?").run(record.id);
+    const insertTag = this.db.prepare("INSERT INTO sigma_core_tags(id, label, taxonomy_path_json) VALUES (?, ?, ?) ON CONFLICT(id) DO UPDATE SET label = excluded.label, taxonomy_path_json = excluded.taxonomy_path_json");
+    const findTag = this.db.prepare("SELECT id FROM sigma_core_tags WHERE label = ? AND taxonomy_path_json = ?");
+    const linkTag = this.db.prepare("INSERT OR IGNORE INTO sigma_core_question_tags(question_id, tag_id) VALUES (?, ?)");
     for (const tag of record.tags) {
       const taxonomy = JSON.stringify(tag.taxonomyPath ?? []);
       const existing = findTag.get(tag.label, taxonomy) as { id: string } | undefined;
@@ -202,12 +202,12 @@ export class SqliteQuestionRepository implements QuestionRepository {
     }
 
     const insertSource = this.db.prepare(`
-      INSERT INTO qe_sources(id, display_name, mime_type, content_hash, original_uri, page_count, imported_at, metadata_json)
+      INSERT INTO sigma_core_sources(id, display_name, mime_type, content_hash, original_uri, page_count, imported_at, metadata_json)
       VALUES (?, ?, ?, ?, ?, ?, ?, '{}')
       ON CONFLICT(id) DO NOTHING
     `);
     const linkSource = this.db.prepare(`
-      INSERT OR REPLACE INTO qe_question_sources(question_id, source_id, page_number, region_json, evidence_role)
+      INSERT OR REPLACE INTO sigma_core_question_sources(question_id, source_id, page_number, region_json, evidence_role)
       VALUES (?, ?, ?, ?, 'source')
     `);
     for (const source of record.sources) {
@@ -216,20 +216,20 @@ export class SqliteQuestionRepository implements QuestionRepository {
       linkSource.run(record.id, source.id, source.pageNumber ?? null, source.region ? JSON.stringify(source.region) : null);
     }
 
-    const question = this.db.prepare("SELECT title, body_json FROM qe_questions WHERE id = ?").get(record.id) as { title: string; body_json: string };
+    const question = this.db.prepare("SELECT title, body_json FROM sigma_core_questions WHERE id = ?").get(record.id) as { title: string; body_json: string };
     const tagText = (this.db.prepare(`
       SELECT group_concat(t.label, ' ') AS labels
-      FROM qe_question_tags qt JOIN qe_tags t ON t.id = qt.tag_id
+      FROM sigma_core_question_tags qt JOIN sigma_core_tags t ON t.id = qt.tag_id
       WHERE qt.question_id = ?
     `).get(record.id) as { labels: string | null }).labels ?? "";
-    this.db.prepare("DELETE FROM qe_questions_fts WHERE question_id = ?").run(record.id);
-    this.db.prepare("INSERT INTO qe_questions_fts(question_id, title, body_text, tags_text) VALUES (?, ?, ?, ?)")
+    this.db.prepare("DELETE FROM sigma_core_questions_fts WHERE question_id = ?").run(record.id);
+    this.db.prepare("INSERT INTO sigma_core_questions_fts(question_id, title, body_text, tags_text) VALUES (?, ?, ?, ?)")
       .run(record.id, question.title, question.body_json, tagText);
   }
 
   private saveVersion(record: QuestionRecord, reason: string): void {
     this.db.prepare(`
-      INSERT INTO qe_question_versions(question_id, version, snapshot_json, changed_at, change_reason)
+      INSERT INTO sigma_core_question_versions(question_id, version, snapshot_json, changed_at, change_reason)
       VALUES (?, ?, ?, ?, ?)
     `).run(record.id, record.version, JSON.stringify(record), record.updatedAt, reason);
   }
