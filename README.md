@@ -15,7 +15,7 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/nishida0402shun-dev/SIGMA-Studio-main/releases/latest"><img src="docs/images/download.svg" alt="macOS / Windows版をダウンロード" height="48" /></a>
+  <a href="https://github.com/nishida0402shun-dev/SIGMA-Studio-main/releases/latest"><img src="docs/images/download.svg" alt="Windows版をダウンロード" height="48" /></a>
   <a href="https://chocoschools.com/sigma-studio/#try"><img src="docs/images/demo.svg" alt="公式サイトでデモを試す" height="48" /></a>
 </p>
 
@@ -46,7 +46,7 @@ AI機能は、利用するプロバイダの接続設定が必要です。
 
 ## はじめる
 
-**アプリを使う** — [最新リリース](https://github.com/nishida0402shun-dev/SIGMA-Studio-main/releases/latest)から、お使いのmacOS / Windowsに対応するアプリをダウンロードしてください。
+**アプリを使う** — [最新リリース](https://github.com/nishida0402shun-dev/SIGMA-Studio-main/releases/latest)から、Windows版アプリをダウンロードしてください。
 
 **まず触ってみる** — [公式サイトのデモ](https://chocoschools.com/sigma-studio/#try)で、編集画面を試せます。
 
