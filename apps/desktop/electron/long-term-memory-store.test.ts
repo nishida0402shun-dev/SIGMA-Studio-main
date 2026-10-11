@@ -2,7 +2,7 @@ import { mkdtemp, rm } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
-import { openQuestionEngineDatabase, SqliteLongTermMemoryStore } from "../../packages/question-engine/src/index";
+import { openQuestionEngineDatabase, SqliteLongTermMemoryStore } from "../../../packages/question-engine/src/index";
 
 describe("SqliteLongTermMemoryStore", () => {
   let dir: string | undefined;
