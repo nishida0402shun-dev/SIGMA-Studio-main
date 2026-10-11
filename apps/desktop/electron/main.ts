@@ -280,7 +280,7 @@ const questionEngineDatabase = openQuestionEngineDatabase({ dataDir: path.join(S
 const knowledgeDbStore = new KnowledgeDbStore(SIGMA_STUDIO_DATA_PATH, questionEngineDatabase.raw);
 const conversationMemoryStore = new SqliteConversationMemoryStore(questionEngineDatabase.raw);
 const longTermMemoryStore = new SqliteLongTermMemoryStore(questionEngineDatabase.raw);
-const researchSessionStore = new ResearchSessionStore(SIGMA_STUDIO_DATA_PATH);
+const researchSessionStore = new ResearchSessionStore(questionEngineDatabase.raw);
 const appUpdateController = new AppUpdateController({ releaseUrl: RELEASE_PAGE_URL });
 const desktopSettings = readDesktopSettingsSync(SIGMA_STUDIO_DATA_PATH);
 /**
