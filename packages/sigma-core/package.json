@@ -1,0 +1,16 @@
+{
+  "name": "@sigma-studio/sigma-core",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Provider-neutral integration contracts for SIGMA Studio's unified AI, knowledge, memory, tools, and learning core",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "typescript": "^5.9.3"
+  }
+}
