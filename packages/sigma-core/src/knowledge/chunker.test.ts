@@ -11,6 +11,19 @@ describe("chunkKnowledgePage", () => {
     expect(chunks.map((chunk) => chunk.text).join("")).toContain("😀");
   });
 
+  it("uses the actual sentence boundary as the next window origin without skipping text", () => {
+    const text = "12345678。abcdefgh。ABCDEFGH。uvwxyz0123456789";
+    const chunks = chunkKnowledgePage({ sourceId: "doc", displayName: "text", pageNumber: 1, text }, { chunkSize: 12, chunkOverlap: 3 });
+    expect(chunks.length).toBeGreaterThan(2);
+    for (let index = 1; index < chunks.length; index += 1) {
+      const previous = chunks[index - 1]!;
+      const current = chunks[index]!;
+      expect(current.source.startOffset).toBeLessThan(previous.source.endOffset);
+      expect(current.source.startOffset).toBeGreaterThan(previous.source.startOffset);
+    }
+    expect(chunks.map((chunk) => chunk.text).join("")).toContain("uvwxyz0123456789");
+  });
+
   it("returns no chunks for empty text and validates chunk settings", () => {
     expect(chunkKnowledgePage({ sourceId: "doc", displayName: "empty", pageNumber: 1, text: "" })).toEqual([]);
     expect(() => chunkKnowledgePage({ sourceId: "doc", displayName: "x", pageNumber: 1, text: "x" }, { chunkSize: 5, chunkOverlap: 5 })).toThrow("chunkOverlap");
