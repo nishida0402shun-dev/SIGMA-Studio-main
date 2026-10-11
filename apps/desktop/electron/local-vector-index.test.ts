@@ -2,12 +2,12 @@ import { mkdtemp, rm } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
-import { openQuestionEngineDatabase, type QuestionEngineDatabase } from "../../../packages/question-engine/src/index";
+import { openSigmaCoreDatabase, type SigmaCoreDatabase } from "../../../packages/sigma-core/src/index";
 import { LocalVectorIndex, embed } from "./local-vector-index";
 
 describe("LocalVectorIndex", () => {
   const tempDirs: string[] = [];
-  const databases: QuestionEngineDatabase[] = [];
+  const databases: SigmaCoreDatabase[] = [];
 
   afterEach(async () => {
     for (const database of databases.splice(0)) database.close();
@@ -17,18 +17,8 @@ describe("LocalVectorIndex", () => {
   async function createIndex(sourceIds: string[]) {
     const root = await mkdtemp(path.join(os.tmpdir(), "sigma-vector-"));
     tempDirs.push(root);
-    const database = openQuestionEngineDatabase({ dataDir: root });
+    const database = openSigmaCoreDatabase({ dataDir: root });
     databases.push(database);
-    const now = new Date().toISOString();
-    const insert = database.raw.prepare(`
-      INSERT INTO qe_knowledge_sources
-        (id, display_name, original_uri, stored_uri, mime_type, size_bytes, content_hash,
-         page_count, extraction_status, imported_at, updated_at, metadata_json)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `);
-    for (const sourceId of sourceIds) {
-      insert.run(sourceId, sourceId, "", "", "text/plain", 0, "", 1, "complete", now, now, "{}");
-    }
     return { root, database, index: new LocalVectorIndex(database.raw) };
   }
 
