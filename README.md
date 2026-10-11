@@ -63,7 +63,6 @@ React向けのEditor・Viewerを公開しています。編集機能や教材の
 | **Editor** | 教材を編集する | [Editor README](packages/editor/README.md) |
 | **Viewer** | 教材を表示する | [Viewer README](packages/viewer/README.md) |
 
-ホスト側の状態管理や組み込み方は、[組み込みガイド](docs/embedding-guide.md)を参照してください。
 
 <details>
 <summary><strong>ローカルで開発する</strong> — セットアップと関連ドキュメント</summary>
@@ -79,7 +78,6 @@ Electronアプリの開発起動は `npm run electron:dev` です。
 
 - [開発・検証手順](CONTRIBUTING.md)
 - [アーキテクチャ](docs/architecture.md)
-- [組み込みガイド](docs/embedding-guide.md)
 
 文書の正本はSigmaDoc JSONです。
 
@@ -111,22 +109,3 @@ Electronアプリの開発起動は `npm run electron:dev` です。
 ## ライセンス
 
 [MIT License](LICENSE)。同梱する第三者コンポーネントのライセンスも適用されます。掲載素材については[画像の出典](docs/images/README.md)を参照してください。
-
-
-## Knowledge DB local decision reranking
-
-Knowledge DB uses **EmbeddingGemma 2** (256-dimensional normalized embeddings) for the primary semantic retrieval path. Document text is indexed with title/text prefixes, while queries use the search-task prefix. For PDFs and image sources, SIGMA can additionally use **PaddleOCR PP-StructureV3** for OCR and document-structure extraction (tables, figures, formulas, titles, captions, and bounding boxes). When Ollama is available locally, SIGMA additionally uses **Tev1** as a Jev-style evidence judge to rerank the top candidates. The decision layer is local-only and automatically falls back to the normal hybrid RAG path when Ollama is unavailable.
-
-Install Ollama and pull the default decision model:
-
-```bash
-ollama pull tev1:4b
-```
-
-The default endpoint is `http://127.0.0.1:11434/v1/systemone`. Optional environment variables:
-
-- `SIGMA_KNOWLEDGE_DECISION_ENABLED=false` — disable the local decision layer.
-- `SIGMA_KNOWLEDGE_DECISION_MODEL=auto` — default; uses Tev1 0.8B when system RAM is below 16GB and Tev1 4B when system RAM is at least 16GB. Set `tev1:0.8b` or `tev1:4b` to force a model.
-- `SIGMA_KNOWLEDGE_DECISION_URL=http://127.0.0.1:11434/v1/systemone` — override the local endpoint.
-
-The decision model never replaces EmbeddingGemma 2 retrieval; it only judges the relevance of the highest-ranked local candidates. On memory-constrained machines, SIGMA can fall back to Tev1 0.8B and keeps it warm for only 60 seconds; it uses Tev1 4B when enough memory is available.
