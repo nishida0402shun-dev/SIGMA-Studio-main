@@ -21,6 +21,34 @@ describe("SqliteQuestionRepository", () => {
     return new SqliteQuestionRepository(database.raw);
   }
 
+  it("drops the retired Question Engine vector table during schema migration", async () => {
+    await createRepository();
+    database!.raw.exec(`
+      CREATE TABLE qe_vector_records (
+        id TEXT PRIMARY KEY,
+        source_id TEXT NOT NULL,
+        text_content TEXT NOT NULL
+      );
+      INSERT INTO qe_vector_records (id, source_id, text_content)
+      VALUES ('legacy-vector', 'legacy-source', 'obsolete');
+      DELETE FROM qe_schema_migrations;
+      INSERT INTO qe_schema_migrations(version, applied_at)
+      VALUES (5, '2026-10-11T00:00:00.000Z');
+    `);
+    database!.close();
+    database = undefined;
+
+    database = openQuestionEngineDatabase({ dataDir: dir! });
+    const legacyTable = database.raw.prepare(
+      "SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'qe_vector_records'",
+    ).get();
+    expect(legacyTable).toBeUndefined();
+    const migration = database.raw.prepare(
+      "SELECT MAX(version) AS version FROM qe_schema_migrations",
+    ).get() as { version: number };
+    expect(migration.version).toBe(6);
+  });
+
   it("creates, searches, updates with optimistic locking, and deletes questions", async () => {
     const repository = await createRepository();
     const created = await repository.create({

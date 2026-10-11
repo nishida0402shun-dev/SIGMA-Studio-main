@@ -16,7 +16,7 @@ export interface SqliteSchemaDriver {
   transaction<T extends (...args: never[]) => unknown>(operation: T): T;
 }
 
-export const QUESTION_ENGINE_SCHEMA_VERSION = 5;
+export const QUESTION_ENGINE_SCHEMA_VERSION = 6;
 
 const MIGRATION_TABLE = `
   CREATE TABLE IF NOT EXISTS qe_schema_migrations (
@@ -201,20 +201,7 @@ const CORE_SCHEMA = `
     text_content
   );
 
-  CREATE TABLE IF NOT EXISTS qe_vector_records (
-    id TEXT PRIMARY KEY,
-    source_id TEXT NOT NULL REFERENCES qe_knowledge_sources(id) ON DELETE CASCADE,
-    page_number INTEGER NOT NULL CHECK (page_number > 0),
-    chunk_index INTEGER NOT NULL CHECK (chunk_index >= 0),
-    model TEXT NOT NULL,
-    dimensions INTEGER NOT NULL CHECK (dimensions > 0),
-    vector_json TEXT NOT NULL,
-    text_content TEXT NOT NULL,
-    updated_at TEXT NOT NULL,
-    UNIQUE(source_id, page_number, chunk_index, model)
-  );
-
-  CREATE INDEX IF NOT EXISTS qe_vector_records_source_idx ON qe_vector_records(source_id, page_number);
+  -- Vector persistence is owned by @sigma-studio/sigma-core (sigma_core_vector_records).
 
   CREATE TABLE IF NOT EXISTS qe_conversation_entries (
     id TEXT PRIMARY KEY,
@@ -325,6 +312,9 @@ export function initializeQuestionEngineSchema(db: SqliteSchemaDriver, now = new
 
   const apply = () => {
     db.exec(CORE_SCHEMA);
+    // The legacy Question Engine vector table is retired; SIGMA Core owns vector persistence.
+    // This intentionally drops only obsolete vector rows, not knowledge pages or source metadata.
+    db.exec("DROP TABLE IF EXISTS qe_vector_records;");
     db.prepare("INSERT INTO qe_schema_migrations(version, applied_at) VALUES (?, ?)").run(
       QUESTION_ENGINE_SCHEMA_VERSION,
       now,

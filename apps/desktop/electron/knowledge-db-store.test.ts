@@ -37,7 +37,7 @@ async function readLibraryFixture(dataDir: string): Promise<{ version: 3; source
   return internal.readLibrary();
 }
 
-function seedLibrary(dataDir: string, fixture: { sources: Array<Record<string, any>> }): void {
+function seedLibrary(dataDir: string, fixture: { version?: number; sources: Array<Record<string, any>> }): void {
   const db = getDatabase(dataDir).raw;
   db.exec("BEGIN IMMEDIATE");
   try {

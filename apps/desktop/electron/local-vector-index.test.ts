@@ -47,7 +47,7 @@ describe("LocalVectorIndex", () => {
       index.upsert({ id: "page-a", sourceId: "source-a", pageNumber: 1, chunkIndex: 0, text: "二次関数の頂点" }),
       second.upsert({ id: "page-b", sourceId: "source-b", pageNumber: 1, chunkIndex: 0, text: "英語の長文読解" }),
     ]);
-    const persisted = database.raw.prepare("SELECT id FROM qe_vector_records ORDER BY id").all() as Array<{ id: string }>;
+    const persisted = database.raw.prepare("SELECT id FROM sigma_core_vector_records ORDER BY id").all() as Array<{ id: string }>;
     expect(persisted.map((row) => row.id)).toEqual(["page-a", "page-b"]);
   });
 
@@ -65,10 +65,10 @@ describe("LocalVectorIndex", () => {
     expect(results[0]?.id).toBe("page-a");
     expect(results[0]?.chunkIndex).toBe(0);
     const persisted = database.raw.prepare(
-      "SELECT model, dimensions, vector_json FROM qe_vector_records ORDER BY id",
-    ).all() as Array<{ model: string; dimensions: number; vector_json: string }>;
+      "SELECT embedding_model, dimensions, vector_json FROM sigma_core_vector_records ORDER BY id",
+    ).all() as Array<{ embedding_model: string; dimensions: number; vector_json: string }>;
     expect(persisted[0]?.dimensions).toBe(256);
-    expect(persisted[0]?.model).toBe("embeddinggemma-2-text");
+    expect(persisted[0]?.embedding_model).toBe("embeddinggemma-2-text");
     expect(JSON.parse(persisted[0]!.vector_json)).toHaveLength(256);
     expect(await index.hasRecords()).toBe(true);
     expect(await index.hasSource("source-a")).toBe(true);
