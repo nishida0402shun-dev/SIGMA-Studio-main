@@ -1,7 +1,7 @@
 import fs from "node:fs/promises";
 import { DatabaseSync } from "node:sqlite";
 import path from "node:path";
-import { KnowledgeLearningStore } from "./knowledge-learning-store";
+import { KnowledgeLearningStore } from "../../../packages/sigma-core/src/storage/sqlite-knowledge-learning-store";
 import { createHash, randomUUID } from "node:crypto";
 import { PDFDocument } from "pdf-lib";
 import JSZip from "jszip";
