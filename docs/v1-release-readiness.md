@@ -1,8 +1,8 @@
 # SIGMA Studio v1.0 Release Readiness
 
-Phase 0–1: runtime stability and preload/IPC/event parity; Knowledge DB structure-parser bridge; installer launch smoke.
+Phase 0–1: runtime stability, preload/IPC/event parity, and installer launch smoke.
 
-Phase 2–3: global Knowledge DB, page extraction/citations, vector+lexical+metadata+exact/cross-source retrieval, deterministic page analysis, cross-document concept graph, semantic disagreement detection.
+Phase 2–3: document and Workspace boundaries, retrieval architecture planning, and persistence design review.
 
 Phase 4–6: AI run context/provider abstraction, MCP/SIGMA Tools, Web AI bridge, Workspace/file boundary, read/write/consequential permission gate.
 

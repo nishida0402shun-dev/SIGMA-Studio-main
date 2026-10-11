@@ -337,9 +337,6 @@ export function registerAiEditIpc(deps: RegisterAiEditIpcDeps): void {
           localMcpProposalStore.completeProposalRunSnapshot(proposalSnapshotId);
         }
       }
-      if (result.status !== "cancelled") {
-        await appendKnowledgeDbSourceReferences(localMcpProposalStore, runId, payload);
-      }
       // Web検索はMCPツールではないためMCPサーバー側の参照台帳に載らない。run のイベント列
       // だけが「何を検索したか」を知っているので、ここで提案へ後付けする (URLはCodexから
       // 取得できないため検索語のまま出典にする)。
@@ -460,36 +457,3 @@ export async function appendWebSearchSourceReferences(
   }
 }
 
-/** Attach the exact Knowledge DB pages supplied by the renderer to proposals from this run. */
-async function appendKnowledgeDbSourceReferences(
-  localMcpProposalStore: LocalMcpEditProposalStore,
-  runId: string,
-  payload: unknown,
-): Promise<void> {
-  if (typeof payload !== "object" || payload === null) return;
-  const raw = (payload as Record<string, unknown>).knowledgeDbSourceReferences;
-  if (!Array.isArray(raw)) return;
-  const references = raw.flatMap((value) => {
-    if (typeof value !== "object" || value === null) return [];
-    const record = value as Record<string, unknown>;
-    if (
-      typeof record.sourceId !== "string"
-      || typeof record.sourceName !== "string"
-      || typeof record.pageNumber !== "number"
-      || !Number.isInteger(record.pageNumber)
-      || record.pageNumber < 1
-    ) return [];
-    return [{
-      type: "knowledgeDb" as const,
-      sourceId: record.sourceId.trim(),
-      sourceName: record.sourceName.trim(),
-      pageNumber: record.pageNumber,
-    }];
-  }).filter((reference) => reference.sourceId && reference.sourceName).slice(0, 6);
-  if (references.length === 0) return;
-  try {
-    await localMcpProposalStore.appendSourceReferencesForRun(runId, references);
-  } catch (error) {
-    console.warn("Knowledge DB source references could not be attached to the AI run.", error);
-  }
-}

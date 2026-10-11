@@ -49,25 +49,6 @@ The application menu exposes ChatGPT Web, Claude Web, Gemini Web, and Google AI 
 WebMCP availability is browser/provider dependent. The local API remains the deterministic integration surface even when a provider does not expose WebMCP.
 
 
-## Knowledge DB RAG
-
-- Web AI exposes `sigma_knowledge_rag`, backed by the canonical `knowledge_db_rag_query` MCP tool.
-- The canonical pipeline performs retrieval routing, hybrid ranking, diverse context selection, and citation-region preservation in one call.
-- `sigma_knowledge_search` and `sigma_knowledge_context` remain available for granular/manual workflows, but grounded Web AI answers should prefer `sigma_knowledge_rag`.
-- The Knowledge DB is global and does not require a Workspace selection.
-
-## Knowledge DB PDF staging
-
-Web AI can use the same global Knowledge DB MCP surface as the desktop AI. PDF registration is intentionally staged:
-
-1. `knowledge_db_pdf_import_preview` reads the selected local PDF, analyzes pages, proposes split segments and taxonomy classification, and creates a staging record. The original PDF is **not** registered yet.
-2. `knowledge_db_pdf_import_staging_get` / `knowledge_db_pdf_import_staging_list` inspect pending proposals.
-3. `knowledge_db_pdf_import_staging_update` lets the AI revise selected segments, page ranges, names, taxonomy paths, confidence, and reasons before approval.
-4. `knowledge_db_pdf_import_approve` registers the original PDF and materializes the selected child PDFs. The source hash is rechecked so a changed file cannot be approved accidentally.
-5. `knowledge_db_pdf_import_reject` discards the pending import without registering the PDF.
-
-The preview, update, approve, and reject operations are consequential Web AI tools and are routed through SIGMA Studio's existing user-approval gate. Workspace selection is not required because the Knowledge DB is global.
-
 ## Conversation DB / Long-term Memory
 
 Embedded Web AI conversations can be captured into SIGMA's local Conversation DB. The Web AI panel exposes a REC/OFF toggle; capture is enabled by default and can be disabled at any time. Explicit user preferences such as requests to remember a rule or preference are automatically distilled into the separate long-term memory store. External Chrome/Edge browser capture is intentionally not part of the supported architecture.

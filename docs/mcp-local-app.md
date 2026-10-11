@@ -63,21 +63,6 @@ MCPからの書き込み系ツールは、既定では教材ファイルを直�
 - `get_blocks` - 複数ブロックを最大10件までIDでまとめて読みます。既定では `{id, type, text}` の軽量ビューのみを返し、`includeFull: true` を指定した場合のみ各ブロックの完全なJSONも含めます。
 - `search_document` - 本文テキスト、TeX、表セル、overlayテキスト図形を横断してクエリ文字列を検索します。`get_document_outline` より対象を絞り込みたい時に使います。
 - `search_library` - 今開いている教材だけでなく、ユーザーの過去教材ライブラリ全体から類似の問題・記述を検索します。
-- `knowledge_db_get_analysis_status` - グローバルKnowledge DBの解析・分類状態を取得します。
-- `knowledge_db_reanalyze` - グローバルKnowledge DBの解析を再実行します。
-- `knowledge_db_list_classification_reviews` - AI分類の確認待ちページ一覧を取得します。
-- `knowledge_db_get_classification_review_context` - 分類確認に必要な本文・OCR・構造情報を取得します。
-- `knowledge_db_submit_classification_review` - AI分類の確認結果を承認ゲート経由で反映します。
-- `knowledge_db_get_context` - グローバルKnowledge DBからAI用コンテキストを取得します。
-- `knowledge_db_rag_query` - Knowledge DB参照要否の判定からハイブリッド検索、重複除去、関連資料選定、citation領域付きContext Pack生成までを一度に実行します。
-- `knowledge_db_get_related_sources` - 関連するKnowledge DBソースを取得します。
-- `knowledge_db_route_query` - クエリをKnowledge DB検索経路へ振り分けます。`query`(必須)、`scope`(`"all"` 既定 / `"problems"`)、`limit`(既定8、上限20)、`excludeFileId`(結果から除外するfileId。通常は現在編集中の教材)を受け取ります。`scope: "problems"` にすると問題ブロック単位でヒットし、prompt本文とtagsを含む詳しい抜粋を返すため、類題を探す用途に向きます。
-- `knowledge_db_pdf_import_preview` - PDFをKnowledge DBへ登録せずにAI分割・分類のプレビューを作成します。
-- `knowledge_db_pdf_import_staging_list` - PDF取り込みプレビューの保留中ステージング一覧を取得します。
-- `knowledge_db_pdf_import_staging_get` - PDF取り込みステージングの詳細を取得します。
-- `knowledge_db_pdf_import_staging_update` - PDF取り込みステージングの分割範囲・名称・分類候補などを更新します。
-- `knowledge_db_pdf_import_approve` - 承認済みPDFをKnowledge DBへ登録し、確定した分割結果を生成します。
-- `knowledge_db_pdf_import_reject` - PDF取り込みステージングを却下します。
 - `validate_local_document` - SigmaDoc と MathLive TeX を検証します。
 - `list_edit_proposals` - 現在のrun/チャットに帰属するMCP編集提案の軽量な一覧を返します。`draft`、変更後教材全体、内部proposal IDは含みません。
 - `get_edit_proposal` - `fileId`/`runId`から現在の作業案を読みます。既定の `detail:"summary"` は要約のみ、`detail:"full"` は再適用可能な `draft` を含みますが、内部の教材スナップショットとproposal IDは返しません。
@@ -136,6 +121,9 @@ MCPからの書き込み系ツールは、既定では教材ファイルを直�
 
 以上6つのアプリ実行時コンテキストtoolに加えて、`read_local_document` / `get_document_outline` / `get_block` / `get_blocks` / `search_document` / `search_library` も任意の `runId` 引数を受け取ります(後者は参照元の自動記録に使われます — 「Agentic RAG」節参照)。これらのtoolは、任意の `runId` 引数を受け取ります。プロンプトはエージェントに自分のrunIdを伝え、毎回のtool呼び出しで渡すよう指示します。Codex (app-server) とAntigravityは全runで1つのMCPサーバープロセスを共有するため、`runId` を渡すことで並行実行中の複数run分の実行コンテキストファイル(`<provider>-<runId>.run-context.json`)から自分のものを解決できます。省略した場合は、起動時にMCP設定へ焼き込まれた provider 単位の静的な実行コンテキストファイル(`<provider>.run-context.json`)にフォールバックします(単発実行や、runIdを渡し忘れた場合の互換用)。Claudeは1turnごとに `--mcp-config` を渡すため元々runId別ファイルですが、同じ命名規則で解決されるため `runId` を渡しても矛盾なく動作します。添付がある場合は `get_attached_media` に `runId` を渡してimage/resource contentを取得します。特にAntigravityの画像は `@` ファイル参照だけに依存しません。
 
+- `conversation_memory_save` - 会話の重要な発言や要約を永続メモリへ保存します。
+- `conversation_memory_search` - 保存済みの会話メモリを検索します。
+- `conversation_memory_recent` - 最近保存された会話メモリを取得します。
 ## アプリ内AI向けの本文ツール
 
 アプリが起動するMCPには `SIGMA_STUDIO_MCP_TOOL_PROFILE=app` を渡します。このprofileでは本文編集の8入口を以下の4入口へ置き換え、`tools/list` にも新しい入口だけを公開します。環境変数を指定しない外部MCPは、上の「公開ツール」の名前・入力・説明を維持します。図形・表・グラフ・ライブラリなどの入口は共通です。
@@ -326,11 +314,10 @@ Electron側が判定する未完了セッションは `operationCount > 0` か�
 
 ## Conversation Memory
 
-SIGMA also exposes persistent conversation memory, separate from the global Knowledge DB:
+SIGMA also exposes persistent conversation memory for later reference:
 
 - `conversation_memory_save` — save an important conversation entry or durable summary.
 - `conversation_memory_search` — retrieve relevant prior conversation entries.
 - `conversation_memory_recent` — retrieve recent saved entries.
-- `knowledge_db_record_feedback` — record positive, negative, or corrective feedback for RAG results in the Learning DB.
 
 The Web AI providers expose the same capability as `sigma_memory_save`, `sigma_memory_search`, and `sigma_memory_recent`. Memory is stored locally under SIGMA's data directory and is not automatically inserted into a Workspace. WebView conversation capture can also extract explicit durable preferences into the separate long-term memory store. Web AI can read saved memory through these tools, while memory writes remain a consequential operation subject to the existing SIGMA permission gate.

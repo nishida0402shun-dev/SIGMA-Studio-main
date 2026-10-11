@@ -32,8 +32,6 @@ interface RunSourceLedger {
   readFileIds: Set<string>;
   /** ユーザーがメンションした fileId → title。 */
   mentioned: Map<string, string | undefined>;
-  /** Knowledge DBで実際に参照した sourceId/pageNumber → sourceName。 */
-  knowledgeDbPages: Map<string, { sourceId: string; sourceName: string; pageNumber: number }>;
 }
 
 export interface SourceLedgerDocument {
@@ -73,7 +71,6 @@ function getOrCreateLedger(runId: string | undefined): RunSourceLedger | null {
     searchHits: new Map(),
     readFileIds: new Set(),
     mentioned: new Map(),
-    knowledgeDbPages: new Map(),
   };
   ledgers.set(key, created);
   evictOldestLedgers();
@@ -148,25 +145,6 @@ export function recordMentionedDocuments(runId: string | undefined, documents: S
  * この run で「実際に使った」と言える教材参照を返す。編集対象そのものは常に除外する
  * (自分自身を出典として挙げても意味がない)。
  */
-export function recordKnowledgeDbPageReference(
-  runId: string | undefined,
-  reference: { sourceId: string; sourceName: string; pageNumber: number },
-): void {
-  const ledger = getOrCreateLedger(runId);
-  if (!ledger || !reference.sourceId || !reference.sourceName || !Number.isInteger(reference.pageNumber) || reference.pageNumber < 1) {
-    return;
-  }
-  const key = `${reference.sourceId}:${reference.pageNumber}`;
-  if (!ledger.knowledgeDbPages.has(key) && ledger.knowledgeDbPages.size >= MCP_SOURCE_LEDGER_ENTRIES_PER_RUN_LIMIT) {
-    return;
-  }
-  ledger.knowledgeDbPages.set(key, {
-    sourceId: reference.sourceId,
-    sourceName: reference.sourceName,
-    pageNumber: reference.pageNumber,
-  });
-}
-
 export function collectUsedSourceReferences(
   runId: string | undefined,
   currentFileId: string | undefined,
@@ -194,15 +172,7 @@ export function collectUsedSourceReferences(
     fileId,
     ...(title ? { title } : {}),
   }));
-  const knowledgeDbReferences: AiSourceReference[] = ledger
-    ? Array.from(ledger.knowledgeDbPages.values(), (reference) => ({
-        type: "knowledgeDb" as const,
-        sourceId: reference.sourceId,
-        sourceName: reference.sourceName,
-        pageNumber: reference.pageNumber,
-      }))
-    : [];
-  return [...documentReferences, ...knowledgeDbReferences];
+  return documentReferences;
 }
 
 /** run 終了時に台帳を捨てる。呼ばれなくても LRU で追い出されるので必須ではない。 */

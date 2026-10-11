@@ -37,8 +37,6 @@ import  {
 import { APP_READY_EVENT } from "@/components/StartupSplash";
 import { AiEditPanel } from "@/components/editor/AiEditPanel";
 import { type AiWebProvider } from "@/components/editor/AiWebProviderPanel";
-import { KnowledgeDbWorkspace } from "@/components/editor/KnowledgeDbWorkspace";
-import type { KnowledgeDbAiContext } from "@/types/knowledge-db";
 import { AiSettingsDialog } from "@/components/editor/AiSettingsDialog";
 import { AiTaskDock } from "@/components/editor/AiTaskDock";
 import { ChartSettingsPanel } from "@/components/editor/ChartSettingsPanel";
@@ -911,8 +909,6 @@ function EditorShellBody({ embeddedHost, editorStore }: EditorShellProps & { edi
     reconcileTextRanges: reconcileAiEditPinnedReferenceTextRanges,
   } = useAiPinnedReferences();
   const [aiSidebarOpen, setAiSidebarOpen] = useState(false);
-  const [knowledgeDbOpen, setKnowledgeDbOpen] = useState(false);
-  const [pendingKnowledgeDbContext, setPendingKnowledgeDbContext] = useState<KnowledgeDbAiContext[] | null>(null);
   const [versionHistoryOpen, setVersionHistoryOpen] = useState(false);
   const [versionHistoryPreviewState, setVersionHistoryPreviewState] = useState<{
     fileId: string;
@@ -5654,12 +5650,6 @@ function EditorShellBody({ embeddedHost, editorStore }: EditorShellProps & { edi
     setAiInlineOpen(next.aiInlineOpen);
   }, [setAiDisplayMode, setAiSidebarOpen, setAiInlineOpen]);
 
-  const openKnowledgeDb = useCallback(() => {
-    if (!isDesktopApp) return;
-    setVersionHistoryOpen(false);
-    setKnowledgeDbOpen(true);
-  }, [isDesktopApp, setKnowledgeDbOpen, setVersionHistoryOpen]);
-
   const openAiInline = useCallback((anchor: { left: number; top: number } | null) => {
     // Web版にAIチャット面は無い (AI面はキャンバス左上のAiTaskDock一本)。⌘Kや
     // コマンドパレットからこの経路に入っても、空のパネルを開かせない。
@@ -5676,16 +5666,15 @@ function EditorShellBody({ embeddedHost, editorStore }: EditorShellProps & { edi
     applyAiSurface(openInline());
   }, [applyAiSurface, isDesktopApp, setVersionHistoryOpen]);
 
-  const promoteAiToSidebar = useCallback((knowledgeContext?: KnowledgeDbAiContext[]) => {
+  const promoteAiToSidebar = useCallback(() => {
     if (!isDesktopApp) {
       return;
     }
-    setPendingKnowledgeDbContext(knowledgeContext?.length ? knowledgeContext : null);
     setVersionHistoryOpen(false);
     setAiInlineRunAnchor(null);
     setAiInlineRunAnchorCanvas(null);
     applyAiSurface(promoteToSidebar());
-  }, [applyAiSurface, isDesktopApp, setAiInlineRunAnchor, setAiInlineRunAnchorCanvas, setPendingKnowledgeDbContext, setVersionHistoryOpen]);
+  }, [applyAiSurface, isDesktopApp, setAiInlineRunAnchor, setAiInlineRunAnchorCanvas, setVersionHistoryOpen]);
 
   const openVersionHistory = () => {
     if (versionHistoryRestoring) return;
@@ -6435,7 +6424,7 @@ function EditorShellBody({ embeddedHost, editorStore }: EditorShellProps & { edi
       newDocButtonRef, newDocMenuOpen, openCommandSettings, openDocumentInWorkspace,
       openDocumentListDialog, openDocumentTabs, openImportDialog, openNewDocMenu, openOtherImportDialog,
       openPrintPreview, openTextImportDialog, otherImportInputRef,
-      openVersionHistory, openWorkspaceScreen, promoteAiToSidebar, openKnowledgeDb, reportIssue, requestOverlayImages,
+      openVersionHistory, openWorkspaceScreen, promoteAiToSidebar, reportIssue, requestOverlayImages,
       resolvedDocumentTitle, scheduleCloseNewDocMenu,
       setAiSettingsOpen, setDesktopSettingsOpen: openDesktopSettingsFromChrome, setExportMenuOpen, setNewDocMenuOpen,
       setOutlineDialogOpen, setOverlayEditing, setPageSettingsOpen, setTemplateGalleryOpen,
@@ -6539,12 +6528,6 @@ function EditorShellBody({ embeddedHost, editorStore }: EditorShellProps & { edi
           リボンの中で葉が購読するので、ここで saveState を読む必要はない。 */}
       {renderEditorChrome(chrome)}
 
-      <KnowledgeDbWorkspace
-        open={knowledgeDbOpen}
-        onClose={() => setKnowledgeDbOpen(false)}
-        onOpenAi={promoteAiToSidebar}
-        t={t}
-      />
 
       <main
         className={workspaceClassName}
@@ -6870,8 +6853,6 @@ function EditorShellBody({ embeddedHost, editorStore }: EditorShellProps & { edi
             onPromoteToSidebar={promoteAiToSidebar}
             onInlineRunAnchorChange={handleInlineRunAnchorChange}
             focusRoomRequest={aiFocusRoomRequest}
-            initialKnowledgeDbContext={pendingKnowledgeDbContext}
-            onKnowledgeDbContextConsumed={() => setPendingKnowledgeDbContext(null)}
           />
         </AiEditorHost>
         {versionHistoryOpen && (

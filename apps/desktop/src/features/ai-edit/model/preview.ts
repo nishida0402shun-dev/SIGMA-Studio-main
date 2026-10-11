@@ -323,9 +323,7 @@ export function dedupeAiSourceReferences(references: DesktopAiSourceReference[])
           ? `web:${reference.url}`
           : reference.type === "webSearch"
             ? `webSearch:${reference.query}`
-            : reference.type === "material"
-              ? `material:${reference.materialId}`
-              : `knowledgeDb:${reference.sourceId}:${reference.pageNumber}`;
+            : `material:${reference.materialId}`;
     if (seen.has(key)) {
       continue;
     }

@@ -107,7 +107,6 @@ export interface DesktopSettingsAPI {
     hasCustomCommands?: boolean;
     aiAutoApplyVerifiedProposals?: boolean;
     aiWebSearchEnabled?: boolean;
-    knowledgeDecisionEnabled?: boolean;
     webAiConversationCaptureEnabled?: boolean;
     /** UIの表示言語。settings.jsonが正本。未設定はnullで、レンダラ側のOSロケール検出に委ねる。 */
     uiLocale?: "ja" | "en" | null;
@@ -122,7 +121,6 @@ export interface DesktopSettingsAPI {
   setAiAutoApplyVerifiedProposals?(value: boolean): Promise<DesktopStorageResult>;
   /** AIエージェント (Codex/Claude/Antigravity) にWeb検索を許可する。既定true (未設定は有効扱い)。 */
   setAiWebSearchEnabled?(value: boolean): Promise<DesktopStorageResult>;
-  setKnowledgeDecisionEnabled?(value: boolean): Promise<DesktopStorageResult>;
   setWebAiConversationCaptureEnabled?(value: boolean): Promise<DesktopStorageResult>;
   /** UIの表示言語。既定(ja)を渡すとキーごと削除される。 */
   setUiLocale?(value: "ja" | "en"): Promise<DesktopStorageResult>;
@@ -621,7 +619,7 @@ export type DesktopAiSourceReference =
   | { type: "web"; url: string; title?: string }
   | { type: "webSearch"; query: string }
   | { type: "material"; materialId: string; name?: string }
-  | { type: "knowledgeDb"; sourceId: string; sourceName: string; pageNumber: number };
+;
 
 export interface DesktopMcpEditProposalSummary {
   proposalId: string;
@@ -888,43 +886,6 @@ export interface DesktopResearchSessionsAPI {
   delete(payload: { id: string }): Promise<{ ok: boolean }>;
 }
 
-export interface DesktopKnowledgeDbAPI {
-  backup(): Promise<{ filePath: string; fileCount: number; bytes: number } | null>;
-  restore(): Promise<{ filePath: string; fileCount: number } | null>;
-  chooseFiles(): Promise<{ paths: string[] } | null>;
-  chooseFolder(): Promise<{ paths: string[] } | null>;
-  chooseSources(): Promise<{ paths: string[] } | null>;
-  list(): Promise<unknown[]>;
-  getIndexStatus(): Promise<unknown>;
-  getAnalysisStatus(): Promise<unknown>;
-  reanalyze(sourceIds?: string[]): Promise<unknown>;
-  getStructureParserStatus(): Promise<unknown>;
-  startIndexing(): Promise<unknown>;
-  search(payload: { query: string; limit?: number }): Promise<unknown[]>;
-  recordFeedback(payload: { query: string; sourceId?: string; pageNumber?: number; label: "positive" | "negative" | "correction"; correction?: string }): Promise<unknown>;
-  related(payload: { sourceId: string; limit?: number }): Promise<unknown[]>;
-  importSources(payload: { paths: string[] }): Promise<unknown[]>;
-  previewPdfImport(filePath: string): Promise<unknown>;
-  getPdfImportStaging(stagingId: string): Promise<unknown>;
-  listPdfImportStaging(): Promise<unknown[]>;
-  updatePdfImportStaging(payload: { stagingId: string; segments: unknown[] }): Promise<unknown>;
-  approvePdfImportStaging(stagingId: string): Promise<unknown>;
-  rejectPdfImportStaging(stagingId: string): Promise<unknown>;
-  extractPages(payload: {
-    sourceId?: string;
-    pageNumbers?: number[];
-    selections?: Array<{ sourceId: string; pageNumbers: number[] }>;
-  }): Promise<{ filePath: string; pageCount: number } | null>;
-  setPageType(payload: { sourceId: string; pageNumber: number; semanticType: string; title?: string }): Promise<unknown>;
-  previewSmartSplit(payload: { sourceId: string }): Promise<unknown>;
-  materializeSmartSplit(payload: { sourceId: string; segments: Array<{ startPage: number; endPage: number; name?: string }> }): Promise<unknown[]>;
-  applyClassificationReview(payload: { sourceId: string; pageNumber: number; paths: string[][]; confidence: number; reason?: string; evidence?: string[] }): Promise<unknown>;
-  deleteSource(payload: { sourceId: string }): Promise<{ ok: boolean }>;
-  openPage(payload: { sourceId: string; pageNumber: number }): Promise<{ ok: boolean; error?: string; filePath?: string }>;
-  getPagePdf(payload: { sourceId: string; pageNumber: number }): Promise<{ dataBase64: string; width: number; height: number } | null>;
-  extractRegion(payload: { sourceId: string; pageNumber: number; rect: { x: number; y: number; width: number; height: number } }): Promise<{ ok: boolean; error?: string; filePath?: string }>;
-}
-
 export interface DesktopAPI {
   isDesktop: true;
   platform: NodeJS.Platform;
@@ -948,7 +909,6 @@ export interface DesktopAPI {
   materials: DesktopMaterialsAPI;
   templates: DesktopTemplatesAPI;
   storage: DesktopStorageAPI;
-  knowledgeDb?: DesktopKnowledgeDbAPI;
   researchSessions?: DesktopResearchSessionsAPI;
   workspacePreview?: DesktopWorkspacePreviewAPI;
   onMenuAction(handler: (action: string) => void): () => void;
