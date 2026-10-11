@@ -4,6 +4,7 @@ import { FileText, Globe, Package, Search } from "lucide-react";
 
 import type { Translate } from "@/lib/i18n";
 import { useT } from "@/lib/i18n/react";
+import { getDesktopBridge } from "@/lib/desktop-bridge";
 import type { DesktopAiSourceReference } from "@/types/desktop";
 
 // Phase 1: Agentic RAG。1件の参照から表示ラベルを決める。
