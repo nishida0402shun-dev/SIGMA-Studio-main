@@ -1,4 +1,5 @@
 import fs from "node:fs/promises";
+import type { DatabaseSync } from "node:sqlite";
 import path from "node:path";
 import { KnowledgeLearningStore } from "./knowledge-learning-store";
 import { createHash, randomUUID } from "node:crypto";
@@ -140,13 +141,15 @@ export interface KnowledgeIndexStatus {
 
 export class KnowledgeDbStore {
   private readonly dataDir: string;
+  private readonly db: DatabaseSync;
   private indexPromise: Promise<void> | null = null;
   private indexStatus: KnowledgeIndexStatus = { state: "idle", total: 0, completed: 0 };
   private readonly structureParser = new KnowledgeStructureParser();
   private structureParserStatusPromise: Promise<StructureParserStatus> | null = null;
 
-  constructor(dataDir: string) {
+  constructor(dataDir: string, db: DatabaseSync) {
     this.dataDir = dataDir;
+    this.db = db;
   }
 
   async recordLearningFeedback(input: { query: string; sourceId?: string; pageNumber?: number; label: "positive" | "negative" | "correction"; correction?: string }): Promise<unknown> {
@@ -1190,108 +1193,137 @@ export class KnowledgeDbStore {
   }
 
   private async readLibrary(): Promise<KnowledgeLibrary> {
-    const paths = this.paths();
-    await fs.mkdir(paths.root, { recursive: true });
-    try {
-      const raw = await fs.readFile(paths.libraryPath, "utf8");
-      const parsed = JSON.parse(raw) as Partial<KnowledgeLibrary>;
-      if (parsed.version === 3 && Array.isArray(parsed.sources)) {
-        const sources = parsed.sources.map((source) => {
-          const globalSource = { ...(source as KnowledgeSource & { workspaceId?: unknown }) };
-          delete globalSource.workspaceId;
-          return globalSource as KnowledgeSource;
-        });
-        const library: KnowledgeLibrary = { version: 3, sources };
-        Object.defineProperty(library, "__fingerprint", { value: createHash("sha256").update(raw).digest("hex"), enumerable: false, writable: true });
-        return library;
-      }
-    } catch {}
-    const library: KnowledgeLibrary = { version: 3, sources: [] };
-    const legacyRoot = path.join(this.dataDir, "knowledge-db", "workspaces");
-    const entries = await fs.readdir(legacyRoot, { withFileTypes: true }).catch(() => []);
-    type LegacySource = {
-      id: string;
-      storedPath: string;
-      contentHash?: string;
-      name?: unknown;
-      originalPath?: unknown;
-      sizeBytes?: unknown;
-      pageCount?: unknown;
-      importedAt?: unknown;
-      updatedAt?: unknown;
-      pages: KnowledgePage[];
-    };
-    await fs.mkdir(paths.sourcesDir, { recursive: true });
-    for (const entry of entries) {
-      if (!entry.isDirectory()) continue;
-      let parsed: { sources?: LegacySource[] };
-      try { parsed = JSON.parse(await fs.readFile(path.join(legacyRoot, entry.name, "library.json"), "utf8")) as { sources?: LegacySource[] }; } catch { continue; }
-      if (!Array.isArray(parsed.sources)) continue;
-      for (const legacy of parsed.sources) {
-        let bytes: Uint8Array;
-        try { bytes = await fs.readFile(legacy.storedPath); } catch { continue; }
-        const hash = legacy.contentHash || createHash("sha256").update(bytes).digest("hex");
-        if (library.sources.some((source) => source.contentHash === hash)) continue;
-        const id = library.sources.some((source) => source.id === legacy.id) ? `src_${randomUUID()}` : legacy.id;
-        const storedPath = path.join(paths.sourcesDir, id + ".pdf");
-        await fs.copyFile(legacy.storedPath, storedPath);
-        library.sources.push({
-          id,
-          name: String(legacy.name ?? "Imported PDF"),
-          originalPath: String(legacy.originalPath ?? ""),
-          storedPath,
-          mimeType: "application/pdf",
-          sizeBytes: Number(legacy.sizeBytes ?? bytes.byteLength),
-          pageCount: Number(legacy.pageCount ?? legacy.pages.length),
-          importedAt: String(legacy.importedAt ?? new Date().toISOString()),
-          updatedAt: String(legacy.updatedAt ?? legacy.importedAt ?? new Date().toISOString()),
-          contentHash: hash,
-          pages: legacy.pages.map((page: KnowledgePage) => ({
-            id: id + "_p" + page.pageNumber,
-            sourceId: id,
-            pageNumber: page.pageNumber,
-            semanticType: page.semanticType ?? "unknown",
-            ...(page.title ? { title: page.title } : {}),
-            ...(page.text ? { text: page.text } : {}),
-          })),
-        });
-      }
+    const sourceRows = this.db.prepare(`
+      SELECT id, display_name, mime_type, content_hash, original_uri, stored_uri,
+        page_count, imported_at, updated_at, size_bytes, extraction_status, metadata_json
+      FROM qe_knowledge_sources
+      ORDER BY imported_at DESC, rowid DESC
+    `).all() as Array<{
+      id: string; display_name: string; mime_type: string; content_hash: string;
+      original_uri: string; stored_uri: string; page_count: number; imported_at: string;
+      updated_at: string; size_bytes: number; extraction_status: KnowledgeSource["extractionStatus"];
+      metadata_json: string;
+    }>;
+    const pageRows = this.db.prepare(`
+      SELECT id, source_id, page_number, semantic_type, title, text_content,
+        extraction_status, structure_json, analysis_json
+      FROM qe_knowledge_pages ORDER BY source_id, page_number
+    `).all() as Array<{
+      id: string; source_id: string; page_number: number; semantic_type: KnowledgeSemanticType;
+      title: string | null; text_content: string; extraction_status: KnowledgePage["extractionStatus"];
+      structure_json: string; analysis_json: string;
+    }>;
+    const pagesBySource = new Map<string, KnowledgePage[]>();
+    for (const row of pageRows) {
+      let extra: Partial<KnowledgePage> = {};
+      try { extra = JSON.parse(row.analysis_json) as Partial<KnowledgePage>; } catch { /* malformed optional metadata is ignored */ }
+      let structureBlocks: KnowledgeStructureBlock[] = [];
+      try { structureBlocks = JSON.parse(row.structure_json) as KnowledgeStructureBlock[]; } catch { /* malformed structure metadata is ignored */ }
+      const page: KnowledgePage = {
+        ...extra,
+        id: row.id,
+        sourceId: row.source_id,
+        pageNumber: row.page_number,
+        semanticType: row.semantic_type,
+        ...(row.title !== null ? { title: row.title } : {}),
+        ...(row.text_content || Object.prototype.hasOwnProperty.call(extra, "text") ? { text: row.text_content } : {}),
+        ...(row.extraction_status ? { extractionStatus: row.extraction_status } : {}),
+        structureBlocks,
+      };
+      const pages = pagesBySource.get(row.source_id) ?? [];
+      pages.push(page);
+      pagesBySource.set(row.source_id, pages);
     }
-    return library;
+    const sources: KnowledgeSource[] = sourceRows.map((row) => {
+      let metadata: { indexedAt?: string; indexError?: string } = {};
+      try { metadata = JSON.parse(row.metadata_json) as typeof metadata; } catch { /* optional metadata */ }
+      return {
+        id: row.id,
+        name: row.display_name,
+        originalPath: row.original_uri,
+        storedPath: row.stored_uri,
+        mimeType: row.mime_type,
+        sizeBytes: row.size_bytes,
+        pageCount: row.page_count,
+        importedAt: row.imported_at,
+        updatedAt: row.updated_at,
+        contentHash: row.content_hash || undefined,
+        pages: pagesBySource.get(row.id) ?? [],
+        extractionStatus: row.extraction_status,
+        ...(metadata.indexedAt ? { indexedAt: metadata.indexedAt } : {}),
+        ...(metadata.indexError ? { indexError: metadata.indexError } : {}),
+      };
+    });
+    return { version: 3, sources };
   }
 
   private async writeLibrary(library: KnowledgeLibrary): Promise<void> {
-    const paths = this.paths();
-    await fs.mkdir(paths.root, { recursive: true });
-    let currentFingerprint: string | null = null;
+    const sourceIds = library.sources.map((source) => source.id);
+    this.db.exec("BEGIN IMMEDIATE");
     try {
-      const currentRaw = await fs.readFile(paths.libraryPath, "utf8");
-      currentFingerprint = createHash("sha256").update(currentRaw).digest("hex");
+      if (sourceIds.length) {
+        const placeholders = sourceIds.map(() => "?").join(", ");
+        this.db.prepare(`DELETE FROM qe_knowledge_sources WHERE id NOT IN (${placeholders})`).run(...sourceIds);
+      } else {
+        this.db.exec("DELETE FROM qe_knowledge_sources");
+      }
+
+      const upsertSource = this.db.prepare(`
+        INSERT INTO qe_knowledge_sources
+          (id, display_name, original_uri, stored_uri, mime_type, size_bytes, content_hash,
+           page_count, extraction_status, imported_at, updated_at, metadata_json)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ON CONFLICT(id) DO UPDATE SET
+          display_name = excluded.display_name,
+          original_uri = excluded.original_uri,
+          stored_uri = excluded.stored_uri,
+          mime_type = excluded.mime_type,
+          size_bytes = excluded.size_bytes,
+          content_hash = excluded.content_hash,
+          page_count = excluded.page_count,
+          extraction_status = excluded.extraction_status,
+          imported_at = excluded.imported_at,
+          updated_at = excluded.updated_at,
+          metadata_json = excluded.metadata_json
+      `);
+      const insertPage = this.db.prepare(`
+        INSERT INTO qe_knowledge_pages
+          (id, source_id, page_number, semantic_type, title, text_content, extraction_status,
+           structure_json, analysis_json, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `);
+
+      for (const source of library.sources) {
+        upsertSource.run(
+          source.id, source.name, source.originalPath, source.storedPath, source.mimeType,
+          source.sizeBytes, source.contentHash ?? "", source.pageCount,
+          source.extractionStatus ?? "ocr-needed", source.importedAt, source.updatedAt,
+          JSON.stringify({ indexedAt: source.indexedAt, indexError: source.indexError }),
+        );
+        this.db.prepare("DELETE FROM qe_knowledge_pages WHERE source_id = ?").run(source.id);
+        for (const page of source.pages) {
+          const pageMetadata = {
+            ...page,
+            id: undefined,
+            sourceId: undefined,
+            pageNumber: undefined,
+            semanticType: undefined,
+            title: undefined,
+            text: undefined,
+            extractionStatus: undefined,
+            structureBlocks: undefined,
+          };
+          insertPage.run(
+            page.id, source.id, page.pageNumber, page.semanticType, page.title ?? null,
+            page.text ?? "", page.extractionStatus ?? (page.text ? "text" : "empty"),
+            JSON.stringify(page.structureBlocks ?? []), JSON.stringify(pageMetadata), source.updatedAt,
+          );
+        }
+      }
+      this.db.exec("COMMIT");
     } catch (error) {
-      if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
-    }
-    if (library.__fingerprint !== undefined && library.__fingerprint !== currentFingerprint) {
-      throw new Error("Knowledge DB changed concurrently; the operation was not written. Please retry.");
-    }
-    const serialized = JSON.stringify(library, null, 2);
-    const lock = await acquireFileLock(`${paths.libraryPath}.lock`, { op: "knowledge-library-write" });
-    try {
-      let lockedCurrentFingerprint: string | null = null;
-      try {
-        const lockedRaw = await fs.readFile(paths.libraryPath, "utf8");
-        lockedCurrentFingerprint = createHash("sha256").update(lockedRaw).digest("hex");
-      } catch (error) {
-        if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
-      }
-      if (library.__fingerprint !== undefined && library.__fingerprint !== lockedCurrentFingerprint) {
-        throw new Error("Knowledge DB changed concurrently; the operation was not written. Please retry.");
-      }
-      const tmp = `${paths.libraryPath}.${randomUUID()}.tmp`;
-      await fs.writeFile(tmp, serialized, "utf8");
-      await fs.rename(tmp, paths.libraryPath);
-      library.__fingerprint = createHash("sha256").update(serialized).digest("hex");
-    } finally {
-      await lock.release();
+      this.db.exec("ROLLBACK");
+      throw error;
     }
   }
 
@@ -1305,7 +1337,7 @@ export class KnowledgeDbStore {
   }
 
   private vectorIndex(): LocalVectorIndex {
-    return new LocalVectorIndex(path.join(this.paths().root, "vector-index"));
+    return new LocalVectorIndex(this.db);
   }
 }
 
