@@ -13,3 +13,5 @@ export * from "./storage/sqlite-conversation-memory-store.js";
 export * from "./storage/sqlite-long-term-memory-store.js";
 export * from "./storage/sqlite-question-repository.js";
 export * from "./storage/sqlite-research-session-store.js";
+
+export * from "./storage/sqlite-knowledge-learning-store.js";
