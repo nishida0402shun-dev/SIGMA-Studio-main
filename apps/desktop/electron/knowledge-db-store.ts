@@ -1,5 +1,5 @@
 import fs from "node:fs/promises";
-import type { DatabaseSync } from "node:sqlite";
+import { DatabaseSync } from "node:sqlite";
 import path from "node:path";
 import { KnowledgeLearningStore } from "./knowledge-learning-store";
 import { createHash, randomUUID } from "node:crypto";
@@ -893,11 +893,12 @@ export class KnowledgeDbStore {
     const paths = this.paths();
     await fs.mkdir(paths.root, { recursive: true });
     const zip = new JSZip();
+    this.db.exec("PRAGMA wal_checkpoint(TRUNCATE)");
     const files = await collectFiles(paths.root);
     let includedFileCount = 0;
     for (const filePath of files) {
       const relative = path.relative(paths.root, filePath).split(path.sep).join("/");
-      if (!relative || relative.endsWith(".tmp")) continue;
+      if (!relative || relative.endsWith(".tmp") || relative.endsWith("-wal") || relative.endsWith("-shm")) continue;
       zip.file(relative, await fs.readFile(filePath));
       includedFileCount += 1;
     }
@@ -954,21 +955,61 @@ export class KnowledgeDbStore {
         await fs.writeFile(target, await entry.async("nodebuffer"));
         fileCount += 1;
       }
-      const restoredLibrary = path.join(tempRoot, "library.json");
-      await fs.access(restoredLibrary);
-      const currentBackup = `${paths.root}.before-restore-${Date.now()}`;
-      try {
-        await fs.rename(paths.root, currentBackup);
-      } catch (error) {
-        if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
+      const restoredDatabasePath = path.join(tempRoot, "sigma-studio.sqlite");
+      try { await fs.access(restoredDatabasePath); } catch {
+        throw new Error("Invalid Knowledge DB backup: SQLite database missing");
       }
+
+      // Import the snapshot into the already-open shared connection. Replacing the
+      // database file on disk would leave this process attached to the old inode.
+      this.db.exec("PRAGMA wal_checkpoint(TRUNCATE)");
+      const snapshot = new DatabaseSync(restoredDatabasePath);
+      snapshot.close();
+      this.db.prepare("ATTACH DATABASE ? AS restore_db").run(restoredDatabasePath);
       try {
-        await fs.rename(tempRoot, paths.root);
-      } catch (error) {
-        try { await fs.rename(currentBackup, paths.root); } catch {}
-        throw error;
+        const tableRows = this.db.prepare(`
+          SELECT name, sql FROM restore_db.sqlite_master
+          WHERE type = 'table' AND name NOT LIKE 'sqlite_%'
+          ORDER BY name
+        `).all() as Array<{ name: string; sql: string | null }>;
+        const regularTables = tableRows.filter((table) => !/^CREATE VIRTUAL TABLE/iu.test(table.sql ?? ""));
+        const quote = (identifier: string) => '"' + identifier.replace(/"/gu, '""') + '"';
+
+        this.db.exec("PRAGMA foreign_keys = OFF");
+        this.db.exec("BEGIN IMMEDIATE");
+        try {
+          for (const table of [...regularTables].reverse()) this.db.exec(`DELETE FROM main.${quote(table.name)}`);
+          for (const table of tableRows.filter((item) => !regularTables.includes(item))) {
+            this.db.exec(`DELETE FROM main.${quote(table.name)}`);
+          }
+          for (const table of regularTables) {
+            const columns = this.db.prepare(`PRAGMA restore_db.table_info(${quote(table.name)})`).all() as Array<{ name: string }>;
+            const names = columns.map((column) => quote(column.name)).join(", ");
+            if (!names) continue;
+            this.db.exec(`INSERT INTO main.${quote(table.name)} (${names}) SELECT ${names} FROM restore_db.${quote(table.name)}`);
+          }
+          this.db.exec("COMMIT");
+        } catch (error) {
+          this.db.exec("ROLLBACK");
+          throw error;
+        } finally {
+          this.db.exec("PRAGMA foreign_keys = ON");
+        }
+        const violations = this.db.prepare("PRAGMA foreign_key_check").all();
+        if (violations.length) throw new Error("Invalid Knowledge DB backup: foreign key integrity check failed");
+      } finally {
+        this.db.exec("DETACH DATABASE restore_db");
       }
-      await fs.rm(currentBackup, { recursive: true, force: true });
+
+      // Restore source documents and staging assets, but keep the live SQLite file
+      // in place so the shared connection remains valid.
+      for (const entry of await fs.readdir(tempRoot, { withFileTypes: true })) {
+        if (entry.name === "sigma-studio.sqlite") continue;
+        const sourcePath = path.join(tempRoot, entry.name);
+        const targetPath = path.join(paths.root, entry.name);
+        await fs.rm(targetPath, { recursive: true, force: true });
+        await fs.cp(sourcePath, targetPath, { recursive: true, force: true });
+      }
       return { filePath: destination, fileCount };
     } catch (error) {
       await fs.rm(tempRoot, { recursive: true, force: true });
