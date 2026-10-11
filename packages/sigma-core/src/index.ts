@@ -10,6 +10,7 @@ export * from "./storage/sqlite-knowledge-import-repository.js";
 export * from "./storage/sqlite-schema.js";
 
 export * from "./storage/sqlite-database.js";
+export * from "./storage/sqlite-backup-restore.js";
 export * from "./storage/sqlite-conversation-memory-store.js";
 export * from "./storage/sqlite-long-term-memory-store.js";
 export * from "./storage/sqlite-question-repository.js";
