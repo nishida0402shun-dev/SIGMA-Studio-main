@@ -41,15 +41,15 @@ export class KnowledgeLearningStore {
       createdAt: new Date().toISOString(),
     };
     this.db.prepare(`
-      INSERT INTO qe_knowledge_learning_feedback
+      INSERT INTO sigma_core_knowledge_learning_feedback
         (id, query_text, source_id, page_number, label, correction, created_at, metadata_json)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?)
     `).run(entry.id, entry.query, entry.sourceId ?? null, entry.pageNumber ?? null, entry.label,
       entry.correction ?? null, entry.createdAt, JSON.stringify(entry.metadata ?? {}));
     this.db.prepare(`
-      DELETE FROM qe_knowledge_learning_feedback
+      DELETE FROM sigma_core_knowledge_learning_feedback
       WHERE id IN (
-        SELECT id FROM qe_knowledge_learning_feedback
+        SELECT id FROM sigma_core_knowledge_learning_feedback
         ORDER BY created_at DESC, rowid DESC
         LIMIT -1 OFFSET ?
       )
@@ -60,7 +60,7 @@ export class KnowledgeLearningStore {
   async list(limit = 100): Promise<KnowledgeLearningFeedback[]> {
     const safeLimit = Math.max(1, Math.min(Math.trunc(limit) || 1, 500));
     return (this.db.prepare(`
-      SELECT * FROM qe_knowledge_learning_feedback
+      SELECT * FROM sigma_core_knowledge_learning_feedback
       ORDER BY created_at DESC, rowid DESC LIMIT ?
     `).all(safeLimit) as FeedbackRow[]).map(fromRow);
   }
@@ -68,7 +68,7 @@ export class KnowledgeLearningStore {
   async getBoost(query: string, sourceId?: string, pageNumber?: number): Promise<number> {
     const normalized = query.normalize("NFKC").toLocaleLowerCase().trim();
     if (!normalized) return 0;
-    const rows = this.db.prepare("SELECT * FROM qe_knowledge_learning_feedback").all() as FeedbackRow[];
+    const rows = this.db.prepare("SELECT * FROM sigma_core_knowledge_learning_feedback").all() as FeedbackRow[];
     let boost = 0;
     for (const row of rows) {
       const item = fromRow(row);
