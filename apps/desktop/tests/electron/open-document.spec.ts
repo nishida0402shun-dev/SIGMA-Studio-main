@@ -59,7 +59,7 @@ test("opens startup/second-instance/macOS files through real storage and preserv
     // A real second process exercises Electron's lock and additionalData transport.
     const executable = app.process().spawnfile;
     await new Promise<void>((resolve, reject) => {
-      const child = spawn(executable, [APP_ROOT, second, third], {
+      const child = spawn(executable, [...(process.platform === "linux" ? ["--no-sandbox"] : []), APP_ROOT, second, third], {
         cwd: root, env: { ...env, NODE_ENV: process.env.NODE_ENV }, stdio: ["ignore", "pipe", "pipe"],
       });
       let childOutput = "";
