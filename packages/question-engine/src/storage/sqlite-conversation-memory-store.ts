@@ -50,7 +50,7 @@ export class SqliteConversationMemoryStore {
     const captureKey = input.captureKey.trim();
     if (!captureKey) throw new Error("conversation capture key is empty");
     const existing = this.db.prepare(
-      "SELECT id FROM qe_conversation_entries WHERE json_extract(metadata_json, '$.captureKey') = ? LIMIT 1",
+      "SELECT id FROM sigma_core_conversation_entries WHERE json_extract(metadata_json, '$.captureKey') = ? LIMIT 1",
     ).get(captureKey);
     if (existing) return null;
     const { captureKey: _captureKey, ...entryInput } = input;
@@ -72,8 +72,8 @@ export class SqliteConversationMemoryStore {
   async recent(conversationId?: string, limit = 20): Promise<ConversationMemoryEntry[]> {
     const safeLimit = Math.max(1, Math.min(Math.trunc(limit) || 1, 100));
     const rows = conversationId
-      ? this.db.prepare("SELECT * FROM qe_conversation_entries WHERE conversation_id = ? ORDER BY created_at DESC, rowid DESC LIMIT ?").all(conversationId, safeLimit)
-      : this.db.prepare("SELECT * FROM qe_conversation_entries ORDER BY created_at DESC, rowid DESC LIMIT ?").all(safeLimit);
+      ? this.db.prepare("SELECT * FROM sigma_core_conversation_entries WHERE conversation_id = ? ORDER BY created_at DESC, rowid DESC LIMIT ?").all(conversationId, safeLimit)
+      : this.db.prepare("SELECT * FROM sigma_core_conversation_entries ORDER BY created_at DESC, rowid DESC LIMIT ?").all(safeLimit);
     return (rows as EntryRow[]).map(fromRow);
   }
 
@@ -88,8 +88,8 @@ export class SqliteConversationMemoryStore {
     if (ftsQuery) {
       try {
         const sql = conversationId
-          ? "SELECT e.* FROM qe_conversation_entries e JOIN qe_conversation_entries_fts ON qe_conversation_entries_fts.entry_id = e.id WHERE qe_conversation_entries_fts MATCH ? AND e.conversation_id = ? ORDER BY e.created_at DESC LIMIT 500"
-          : "SELECT e.* FROM qe_conversation_entries e JOIN qe_conversation_entries_fts ON qe_conversation_entries_fts.entry_id = e.id WHERE qe_conversation_entries_fts MATCH ? ORDER BY e.created_at DESC LIMIT 500";
+          ? "SELECT e.* FROM sigma_core_conversation_entries e JOIN sigma_core_conversation_entries_fts ON sigma_core_conversation_entries_fts.entry_id = e.id WHERE sigma_core_conversation_entries_fts MATCH ? AND e.conversation_id = ? ORDER BY e.created_at DESC LIMIT 500"
+          : "SELECT e.* FROM sigma_core_conversation_entries e JOIN sigma_core_conversation_entries_fts ON sigma_core_conversation_entries_fts.entry_id = e.id WHERE sigma_core_conversation_entries_fts MATCH ? ORDER BY e.created_at DESC LIMIT 500";
         rows = (conversationId
           ? this.db.prepare(sql).all(ftsQuery, conversationId)
           : this.db.prepare(sql).all(ftsQuery)) as EntryRow[];
@@ -103,8 +103,8 @@ export class SqliteConversationMemoryStore {
     if (likeTokens.length) {
       const predicate = likeTokens.map(() => "content LIKE ? ESCAPE '\\'").join(" OR ");
       const sql = conversationId
-        ? `SELECT * FROM qe_conversation_entries WHERE conversation_id = ? AND (${predicate}) ORDER BY created_at DESC LIMIT 500`
-        : `SELECT * FROM qe_conversation_entries WHERE ${predicate} ORDER BY created_at DESC LIMIT 500`;
+        ? `SELECT * FROM sigma_core_conversation_entries WHERE conversation_id = ? AND (${predicate}) ORDER BY created_at DESC LIMIT 500`
+        : `SELECT * FROM sigma_core_conversation_entries WHERE ${predicate} ORDER BY created_at DESC LIMIT 500`;
       const parameters = likeTokens.map((token) => "%" + escapeLike(token) + "%");
       const likeRows = (conversationId
         ? this.db.prepare(sql).all(conversationId, ...parameters)
@@ -129,7 +129,7 @@ export class SqliteConversationMemoryStore {
 
   private insert(entry: ConversationMemoryEntry): void {
     this.db.prepare(`
-      INSERT INTO qe_conversation_entries
+      INSERT INTO sigma_core_conversation_entries
         (id, conversation_id, role, content, provider, created_at, metadata_json)
       VALUES (?, ?, ?, ?, ?, ?, ?)
     `).run(
@@ -145,9 +145,9 @@ export class SqliteConversationMemoryStore {
 
   private prune(): void {
     this.db.prepare(`
-      DELETE FROM qe_conversation_entries
+      DELETE FROM sigma_core_conversation_entries
       WHERE id IN (
-        SELECT id FROM qe_conversation_entries
+        SELECT id FROM sigma_core_conversation_entries
         ORDER BY created_at DESC, rowid DESC
         LIMIT -1 OFFSET ?
       )
