@@ -6,7 +6,7 @@ import { createInterface } from "node:readline";
 import { resolveDevServerUrl, isDevServerNavigation } from "./dev-server";
 import http from "node:http";
 import path from "node:path";
-import { existsSync, readFileSync, watch, type FSWatcher } from "node:fs";
+import { existsSync, readFileSync, rmSync, watch, type FSWatcher } from "node:fs";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
 import { LocalAiEditChatRoomStore } from "./ai-edit-chat-room-store";
@@ -276,11 +276,16 @@ const localAiEditRunLogStore = new LocalAiEditRunLogStore(USER_DATA_PATH);
 const localAiEditChatRoomStore = new LocalAiEditChatRoomStore(USER_DATA_PATH);
 const localAiResourceStore = new LocalAiResourceStore(USER_DATA_PATH);
 const SIGMA_STUDIO_DATA_PATH = path.join(USER_DATA_PATH, "data");
-const questionEngineDatabase = openSigmaCoreDatabase({ dataDir: path.join(SIGMA_STUDIO_DATA_PATH, "knowledge-db") });
-const knowledgeDbStore = new KnowledgeDbStore(SIGMA_STUDIO_DATA_PATH, questionEngineDatabase.raw);
-const conversationMemoryStore = new SqliteConversationMemoryStore(questionEngineDatabase.raw);
-const longTermMemoryStore = new SqliteLongTermMemoryStore(questionEngineDatabase.raw);
-const researchSessionStore = new ResearchSessionStore(questionEngineDatabase.raw);
+const knowledgeDbDir = path.join(SIGMA_STUDIO_DATA_PATH, "knowledge-db");
+// The legacy SQLite file is intentionally retired; SIGMA Core starts with a fresh database.
+for (const suffix of ["", "-wal", "-shm"]) {
+  rmSync(path.join(knowledgeDbDir, `sigma-studio.sqlite${suffix}`), { force: true });
+}
+const sigmaCoreDatabase = openSigmaCoreDatabase({ dataDir: knowledgeDbDir });
+const knowledgeDbStore = new KnowledgeDbStore(SIGMA_STUDIO_DATA_PATH, sigmaCoreDatabase.raw);
+const conversationMemoryStore = new SqliteConversationMemoryStore(sigmaCoreDatabase.raw);
+const longTermMemoryStore = new SqliteLongTermMemoryStore(sigmaCoreDatabase.raw);
+const researchSessionStore = new ResearchSessionStore(sigmaCoreDatabase.raw);
 const appUpdateController = new AppUpdateController({ releaseUrl: RELEASE_PAGE_URL });
 const desktopSettings = readDesktopSettingsSync(SIGMA_STUDIO_DATA_PATH);
 /**
