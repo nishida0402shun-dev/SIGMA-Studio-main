@@ -1,6 +1,6 @@
 import { type BrowserWindow } from "electron";
 import { ipcMain } from "../trusted-ipc";
-import { ResearchSessionStore, type ResearchSourceReference } from "../research-session-store";
+import { SqliteResearchSessionStore as ResearchSessionStore, type ResearchSourceReference } from "../../../../packages/sigma-core/src/storage/sqlite-research-session-store";
 
 export interface RegisterResearchSessionIpcDeps {
   getMainWindow: () => BrowserWindow | null;
