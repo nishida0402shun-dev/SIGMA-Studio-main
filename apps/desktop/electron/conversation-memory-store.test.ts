@@ -2,11 +2,11 @@ import { mkdtemp, rm } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
-import { openQuestionEngineDatabase, SqliteConversationMemoryStore } from "../../../packages/question-engine/src/index";
+import { openSigmaCoreDatabase, SqliteConversationMemoryStore } from "../../../packages/sigma-core/src/index";
 
 describe("SqliteConversationMemoryStore", () => {
   let dir: string | undefined;
-  let database: ReturnType<typeof openQuestionEngineDatabase> | undefined;
+  let database: ReturnType<typeof openSigmaCoreDatabase> | undefined;
 
   afterEach(async () => {
     database?.close();
@@ -17,7 +17,7 @@ describe("SqliteConversationMemoryStore", () => {
 
   async function createStore() {
     dir = await mkdtemp(path.join(os.tmpdir(), "sigma-conversation-memory-"));
-    database = openQuestionEngineDatabase({ dataDir: dir });
+    database = openSigmaCoreDatabase({ dataDir: dir });
     return new SqliteConversationMemoryStore(database.raw);
   }
 
