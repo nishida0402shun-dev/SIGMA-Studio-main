@@ -1,6 +1,6 @@
 # SIGMA Core architecture and integration status
 
-Status: **foundation implemented; production readiness not yet verified**. This document distinguishes committed code from checks that still need evidence.
+Status: **Core foundation implemented; CI passed at code commit `043c9bbe2301d2ee2c6b50d17e978a5abec4a630`.** Existing user installations and local-file cleanup are not independently verified.
 
 ## Objective and invariants
 
@@ -12,7 +12,7 @@ SIGMA Core is the shared owner of contracts and persistence for knowledge, retri
 - Retrieval preserves source/page/chunk provenance.
 - CLI AI, Web AI, MCP, and Skills should use shared contracts, but discovery does not grant execution permission.
 - Legacy local database data is not migrated. The user explicitly authorized local DB data loss for this rebuild.
-- No claim of completion is valid until current CI passes and remaining persistence boundaries are audited.
+- CI verification is recorded below. Final completion still requires review of remaining persistence boundaries and confirmation of intended runtime cleanup behavior.
 
 ## Current package boundaries
 
@@ -44,15 +44,24 @@ The archive backup/restore orchestration still lives in `apps/desktop/electron/k
 
 ## Verification evidence
 
-CI run `38115382853` passed the isolated SIGMA Core typecheck and 17 Core tests, but the overall desktop job failed at typecheck because some call sites still imported removed Question Engine SQLite exports. Those call sites were updated afterward. The latest branch CI must be inspected again before the foundation can be marked green.
+[GitHub Actions run 38120761778](https://github.com/nishida0402shun-dev/SIGMA-Studio-main/actions/runs/38120761778) passed at code commit `043c9bbe2301d2ee2c6b50d17e978a5abec4a630`.
+
+Verified in that run:
+- SIGMA Core typecheck and tests.
+- Desktop typecheck, lint, and test suite.
+- Production renderer build, Electron build, and Electron smoke test.
+- Public package build/contracts.
+- File-locking checks on Ubuntu, macOS, and Windows.
+
+This verifies the tested commit; it does not prove old files have already been deleted from every user's machine.
 
 ## Remaining acceptance criteria
 
-1. Current CI passes desktop and Core typecheck, lint, tests, production build, Electron packaging/smoke test, and cross-platform file-locking checks.
-2. A migration test proves `qe_*` tables are dropped and only the new Core schema is used.
-3. Backup/restore round-trip passes with `sigma-core.sqlite`, validates foreign keys, and relocates stored source paths correctly.
-4. A complete tracked-source scan finds no active use of removed Question Engine SQLite exports or stale database filenames outside intentional legacy cleanup.
-5. The new schema receives an explicit data-model review; changing table prefixes alone is not sufficient evidence of a ground-up redesign.
-6. Existing UI, Skills, MCP, and other non-database features pass regression checks before merge.
+1. **Passed at code commit `043c9bbe`** in CI run 38120761778: Core/Desktop typecheck, lint, tests, production build, Electron packaging/smoke test, and cross-platform file-locking checks.
+2. **Implemented and tested:** migration tests verify `qe_*` retirement, reset of the pre-v8 prototype schema, and creation of the normalized Core model.
+3. **Implemented and tested:** backup/restore round-trip validates foreign keys, relocates stored source paths, and rebuilds the derived question FTS index.
+4. The tracked tree has no standalone Question Bank package, Question Engine storage directory, or deleted Electron compatibility modules. CI typecheck confirms no unresolved imports; continue auditing direct persistence boundaries during review.
+5. The schema now separates question content/answers, conversation sequence/capture identity, long-term memory identity, research references, and learning ranking deltas. Review these model decisions before merging.
+6. Desktop UI, Skills, MCP, and other regressions passed the current CI test/build/smoke gates.
 
-The draft PR remains unmerged until the checks above are supported by evidence.
+The draft PR remains unmerged pending final review.
