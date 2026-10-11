@@ -721,7 +721,7 @@ export class KnowledgeDbStore {
   }
 
   async listPdfImportStaging(): Promise<KnowledgePdfImportStaging[]> {
-    const rows = this.db.prepare("SELECT * FROM qe_knowledge_staging ORDER BY updated_at DESC, rowid DESC").all() as StagingRow[];
+    const rows = this.db.prepare("SELECT * FROM qe_knowledge_staging ORDER BY updated_at DESC, rowid DESC").all() as unknown as StagingRow[];
     return rows.map(stagingFromRow);
   }
 
