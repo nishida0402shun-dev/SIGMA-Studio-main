@@ -307,9 +307,6 @@ function normalizeDesktopSettings(value: unknown): DesktopSettings {
   if (!aiWebSearchEnabled) {
     next.aiWebSearchEnabled = false;
   }
-  if (!knowledgeDecisionEnabled) {
-    next.knowledgeDecisionEnabled = false;
-  }
   if (!webAiConversationCaptureEnabled) {
     next.webAiConversationCaptureEnabled = false;
   }
