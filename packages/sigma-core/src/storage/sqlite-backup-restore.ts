@@ -11,8 +11,6 @@ export function checkpointSigmaCoreDatabase(db: DatabaseSync): void {
  */
 export function restoreSigmaCoreSnapshot(db: DatabaseSync, snapshotPath: string): void {
   checkpointSigmaCoreDatabase(db);
-  const snapshot = db.constructor === Object ? null : null;
-  void snapshot;
   db.prepare("ATTACH DATABASE ? AS restore_db").run(snapshotPath);
   try {
     const tables = db.prepare(`
