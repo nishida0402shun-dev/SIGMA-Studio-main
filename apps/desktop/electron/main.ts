@@ -64,10 +64,10 @@ import { registerAiResourcesIpc } from "./ipc/ai-resources";
 import { registerFileIpc } from "./ipc/file";
 import { KnowledgeDbStore } from "./knowledge-db-store";
 import {
-  openQuestionEngineDatabase,
+  openSigmaCoreDatabase,
   SqliteConversationMemoryStore,
   SqliteLongTermMemoryStore,
-} from "../../../packages/question-engine/src/index";
+} from "../../../packages/sigma-core/src/index";
 import { registerKnowledgeDbIpc } from "./ipc/knowledge-db";
 import { ResearchSessionStore } from "./research-session-store";
 import { registerResearchSessionIpc } from "./ipc/research-session";
@@ -276,7 +276,7 @@ const localAiEditRunLogStore = new LocalAiEditRunLogStore(USER_DATA_PATH);
 const localAiEditChatRoomStore = new LocalAiEditChatRoomStore(USER_DATA_PATH);
 const localAiResourceStore = new LocalAiResourceStore(USER_DATA_PATH);
 const SIGMA_STUDIO_DATA_PATH = path.join(USER_DATA_PATH, "data");
-const questionEngineDatabase = openQuestionEngineDatabase({ dataDir: path.join(SIGMA_STUDIO_DATA_PATH, "knowledge-db") });
+const questionEngineDatabase = openSigmaCoreDatabase({ dataDir: path.join(SIGMA_STUDIO_DATA_PATH, "knowledge-db") });
 const knowledgeDbStore = new KnowledgeDbStore(SIGMA_STUDIO_DATA_PATH, questionEngineDatabase.raw);
 const conversationMemoryStore = new SqliteConversationMemoryStore(questionEngineDatabase.raw);
 const longTermMemoryStore = new SqliteLongTermMemoryStore(questionEngineDatabase.raw);
