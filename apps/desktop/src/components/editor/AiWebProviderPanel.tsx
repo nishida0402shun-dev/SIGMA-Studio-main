@@ -51,7 +51,6 @@ export function AiWebProviderPanel({
   const [bridgeAvailable, setBridgeAvailable] = useState<boolean | null>(null);
   const [webMcpAvailable, setWebMcpAvailable] = useState<boolean | null>(null);
   const [webviewReady, setWebviewReady] = useState(false);
-  const [conversationCaptureEnabled, setConversationCaptureEnabled] = useState(true);
   useEffect(() => {
     let cancelled = false;
     const promise = getDesktopBridge()?.webAi?.getPreloadUrl();
@@ -63,15 +62,6 @@ export function AiWebProviderPanel({
     };
   }, []);
 
-  useEffect(() => {
-    let cancelled = false;
-    void getDesktopBridge()?.settings?.get().then((value) => {
-      if (!cancelled && typeof value?.webAiConversationCaptureEnabled === "boolean") {
-        setConversationCaptureEnabled(value.webAiConversationCaptureEnabled);
-      }
-    }).catch(() => undefined);
-    return () => { cancelled = true; };
-  }, []);
 
   const selected = useMemo(
     () => PROVIDERS.find((item) => item.id === provider) ?? PROVIDERS[0],
@@ -195,13 +185,6 @@ export function AiWebProviderPanel({
           </label>
         )}
         <div className="ai-web-provider-actions">
-          <button type="button" className="ai-web-provider-icon-button" onClick={() => {
-            const next = !conversationCaptureEnabled;
-            setConversationCaptureEnabled(next);
-            void getDesktopBridge()?.settings?.setWebAiConversationCaptureEnabled?.(next);
-          }} title={conversationCaptureEnabled ? "Conversation capture: ON" : "Conversation capture: OFF"} aria-label="Conversation capture">
-            {conversationCaptureEnabled ? "REC" : "OFF"}
-          </button>
           <button type="button" className="ai-web-provider-icon-button" onClick={reload} title="Reload" aria-label="Reload">
             <RefreshCw size={13} />
           </button>
