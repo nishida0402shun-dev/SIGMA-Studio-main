@@ -60,10 +60,8 @@ import { registerCodexIpc } from "./ipc/codex";
 import { registerAiEditIpc } from "./ipc/ai-edit";
 import { registerAiResourcesIpc } from "./ipc/ai-resources";
 import { registerFileIpc } from "./ipc/file";
-import { KnowledgeDbStore } from "./knowledge-db-store";
 import { ConversationMemoryStore } from "./conversation-memory-store";
 import { LongTermMemoryStore } from "./long-term-memory-store";
-import { registerKnowledgeDbIpc } from "./ipc/knowledge-db";
 import { ResearchSessionStore } from "./research-session-store";
 import { registerResearchSessionIpc } from "./ipc/research-session";
 import { documentPathsFromArgv, ExternalDocumentOpenQueue } from "./external-document-open";
@@ -307,7 +305,6 @@ const localAiEditRunLogStore = new LocalAiEditRunLogStore(USER_DATA_PATH);
 const localAiEditChatRoomStore = new LocalAiEditChatRoomStore(USER_DATA_PATH);
 const localAiResourceStore = new LocalAiResourceStore(USER_DATA_PATH);
 const SIGMA_STUDIO_DATA_PATH = path.join(USER_DATA_PATH, "data");
-const knowledgeDbStore = new KnowledgeDbStore(SIGMA_STUDIO_DATA_PATH);
 const conversationMemoryStore = new ConversationMemoryStore(SIGMA_STUDIO_DATA_PATH);
 const longTermMemoryStore = new LongTermMemoryStore(SIGMA_STUDIO_DATA_PATH);
 const researchSessionStore = new ResearchSessionStore(SIGMA_STUDIO_DATA_PATH);
@@ -1737,17 +1734,10 @@ function registerIpc() {
     externalDocumentOpenQueue,
   });
 
-  registerKnowledgeDbIpc({
-    getMainWindow: () => mainWindow,
-    store: knowledgeDbStore,
-  });
-
   registerResearchSessionIpc({
     getMainWindow: () => mainWindow,
     store: researchSessionStore,
   });
-
-  knowledgeDbStore.startBackgroundIndexing();
 
   registerMaterialsIpc({
     localMaterialStore,
