@@ -969,10 +969,10 @@ export class KnowledgeDbStore {
       try {
         const tableRows = this.db.prepare(`
           SELECT name, sql FROM restore_db.sqlite_master
-          WHERE type = 'table' AND name NOT LIKE 'sqlite_%'
+          WHERE type = 'table' AND name NOT LIKE 'sqlite_%' AND name NOT LIKE '%_fts%'
           ORDER BY name
         `).all() as Array<{ name: string; sql: string | null }>;
-        const regularTables = tableRows.filter((table) => !/^CREATE VIRTUAL TABLE/iu.test(table.sql ?? ""));
+        const regularTables = tableRows;
         const quote = (identifier: string) => '"' + identifier.replace(/"/gu, '""') + '"';
 
         this.db.exec("PRAGMA foreign_keys = OFF");
@@ -1009,6 +1009,17 @@ export class KnowledgeDbStore {
         const targetPath = path.join(paths.root, entry.name);
         await fs.rm(targetPath, { recursive: true, force: true });
         await fs.cp(sourcePath, targetPath, { recursive: true, force: true });
+      }
+      const sourceRows = this.db.prepare("SELECT id, stored_uri FROM qe_knowledge_sources").all() as Array<{ id: string; stored_uri: string }>;
+      const updateStoredPath = this.db.prepare("UPDATE qe_knowledge_sources SET stored_uri = ? WHERE id = ?");
+      for (const source of sourceRows) {
+        const filename = path.basename(source.stored_uri);
+        if (!filename || filename === "." || filename === path.sep) continue;
+        const relocated = path.join(paths.sourcesDir, filename);
+        try {
+          await fs.access(relocated);
+          updateStoredPath.run(relocated, source.id);
+        } catch { /* non-file fixtures and externally managed sources keep their stored URI */ }
       }
       return { filePath: destination, fileCount };
     } catch (error) {
