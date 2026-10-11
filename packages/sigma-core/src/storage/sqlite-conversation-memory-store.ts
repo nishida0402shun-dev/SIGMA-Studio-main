@@ -79,7 +79,7 @@ export class SqliteConversationMemoryStore {
     const terms = [...new Set([normalized, ...tokens])].slice(0, 65);
     const conditions = terms.map(() => "content LIKE ? ESCAPE '\\'").join(" OR ");
     const scope = conversationId ? "conversation_id = ? AND " : "";
-    const parameters = terms.map((term) => `%${escapeLike(term)}%`);
+    const parameters = terms;
     if (conversationId) parameters.unshift(conversationId);
 
     const rows = this.database.prepare(
