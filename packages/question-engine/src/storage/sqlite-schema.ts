@@ -201,20 +201,7 @@ const CORE_SCHEMA = `
     text_content
   );
 
-  CREATE TABLE IF NOT EXISTS qe_vector_records (
-    id TEXT PRIMARY KEY,
-    source_id TEXT NOT NULL REFERENCES qe_knowledge_sources(id) ON DELETE CASCADE,
-    page_number INTEGER NOT NULL CHECK (page_number > 0),
-    chunk_index INTEGER NOT NULL CHECK (chunk_index >= 0),
-    model TEXT NOT NULL,
-    dimensions INTEGER NOT NULL CHECK (dimensions > 0),
-    vector_json TEXT NOT NULL,
-    text_content TEXT NOT NULL,
-    updated_at TEXT NOT NULL,
-    UNIQUE(source_id, page_number, chunk_index, model)
-  );
-
-  CREATE INDEX IF NOT EXISTS qe_vector_records_source_idx ON qe_vector_records(source_id, page_number);
+  -- Vector persistence is owned by @sigma-studio/sigma-core (sigma_core_vector_records).
 
   CREATE TABLE IF NOT EXISTS qe_conversation_entries (
     id TEXT PRIMARY KEY,
