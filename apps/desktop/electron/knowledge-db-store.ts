@@ -12,7 +12,6 @@ import { analyzeKnowledgePage, KNOWLEDGE_ANALYSIS_VERSION } from "./knowledge-an
 import { classifyKnowledgeTaxonomy, KNOWLEDGE_TAXONOMY_VERSION } from "./knowledge-taxonomy";
 import { buildKnowledgeIndexedPage } from "./knowledge-page-indexer";
 import { analyzeKnowledgeVisualPage } from "./knowledge-multimodal";
-import { acquireFileLock } from "./file-lock";
 import { extractKnowledgeFilePageTexts, extractPdfPageTexts } from "./knowledge-db-extractor";
 import { buildDocumentFrequency, exactPhraseScore, lexicalScore, metadataScore, retrievalMatchReasons, searchTokenVariants, selectCitationRegions, selectDiverseContextResults, semanticQueryScore, tokenizeForSearch } from "./knowledge-db-search-utils";
 
@@ -1345,13 +1344,21 @@ export class KnowledgeDbStore {
         ...(metadata.indexError ? { indexError: metadata.indexError } : {}),
       };
     });
-    return { version: 3, sources };
+    const library: KnowledgeLibrary = { version: 3, sources };
+    const revisionRow = this.db.prepare("SELECT revision FROM qe_knowledge_state WHERE id = 1").get() as { revision: number };
+    Object.defineProperty(library, "__fingerprint", { value: String(revisionRow.revision), enumerable: false, writable: true });
+    return library;
   }
 
   private async writeLibrary(library: KnowledgeLibrary): Promise<void> {
     const sourceIds = library.sources.map((source) => source.id);
     this.db.exec("BEGIN IMMEDIATE");
     try {
+      const revisionRow = this.db.prepare("SELECT revision FROM qe_knowledge_state WHERE id = 1").get() as { revision: number };
+      const currentRevision = Number(revisionRow.revision);
+      if (library.__fingerprint !== undefined && Number(library.__fingerprint) !== currentRevision) {
+        throw new Error("Knowledge DB changed concurrently; the operation was not written. Please retry.");
+      }
       if (sourceIds.length) {
         const placeholders = sourceIds.map(() => "?").join(", ");
         this.db.prepare(`DELETE FROM qe_knowledge_sources WHERE id NOT IN (${placeholders})`).run(...sourceIds);
@@ -1411,7 +1418,10 @@ export class KnowledgeDbStore {
           );
         }
       }
+      const nextRevision = currentRevision + 1;
+      this.db.prepare("UPDATE qe_knowledge_state SET revision = ? WHERE id = 1").run(nextRevision);
       this.db.exec("COMMIT");
+      library.__fingerprint = String(nextRevision);
     } catch (error) {
       this.db.exec("ROLLBACK");
       throw error;
