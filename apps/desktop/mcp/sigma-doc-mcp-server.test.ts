@@ -54,32 +54,6 @@ import { parseSigmaDocument } from "@/lib/sigma-doc-schema";
 import type { DesktopMcpEditProposalSummary } from "@/types/desktop";
 import type { SigmaBlock, SigmaDocument } from "@/types/sigma-doc";
 
-const DOCUMENTED_KNOWLEDGE_DB_TOOL_NAMES = [
-  "knowledge_db_get_analysis_status",
-  "knowledge_db_reanalyze",
-  "knowledge_db_list_classification_reviews",
-  "knowledge_db_get_classification_review_context",
-  "knowledge_db_submit_classification_review",
-  "knowledge_db_get_context",
-  "knowledge_db_rag_query",
-  "knowledge_db_record_feedback",
-  "knowledge_db_get_related_sources",
-  "knowledge_db_route_query",
-  "knowledge_db_get_page",
-  "knowledge_db_get_region",
-  "knowledge_db_list_sources",
-  "knowledge_db_search",
-  "knowledge_db_pdf_import_preview",
-  "knowledge_db_pdf_import_staging_list",
-  "knowledge_db_pdf_import_staging_get",
-  "knowledge_db_pdf_import_staging_update",
-  "knowledge_db_pdf_import_approve",
-  "knowledge_db_pdf_import_reject",
-  "conversation_memory_save",
-  "conversation_memory_search",
-  "conversation_memory_recent",
-] as const;
-
 const ENV_KEYS = [
   "SIGMA_STUDIO_DATA_DIR",
   "SIGMA_STUDIO_USER_DATA_DIR",
@@ -624,14 +598,13 @@ describe("sigma-doc-mcp-server integration", () => {
   it("exposes exactly the documented public tool set", async () => {
     const tools = await client.listTools();
     const toolNames = tools.tools.map((tool) => tool.name).sort();
-    expect(toolNames).toEqual([...DOCUMENTED_TOOL_NAMES, ...DOCUMENTED_KNOWLEDGE_DB_TOOL_NAMES].sort());
+    expect(toolNames).toEqual([...DOCUMENTED_TOOL_NAMES].sort());
   });
 
   it("categorizes every documented public tool exactly once", () => {
     const categorizedNames = MCP_TOOL_CATEGORIES.flatMap((category) => MCP_TOOL_CATEGORY_MAP[category]);
     const documentedPublicToolNames = [
       ...DOCUMENTED_TOOL_NAMES,
-      ...DOCUMENTED_KNOWLEDGE_DB_TOOL_NAMES,
     ];
 
     for (const name of documentedPublicToolNames) {
@@ -676,7 +649,7 @@ describe("sigma-doc-mcp-server integration", () => {
 
     // Set-equality both ways so a tool added/removed on either side (server or docs)
     // fails CI instead of silently drifting.
-    expect(new Set(toolNames)).toEqual(new Set([...toolsFromDocs, ...DOCUMENTED_KNOWLEDGE_DB_TOOL_NAMES]));
+    expect(new Set(toolNames)).toEqual(new Set(toolsFromDocs));
   });
 
   it("exposes an optional runId parameter on every app-context tool's inputSchema", async () => {
