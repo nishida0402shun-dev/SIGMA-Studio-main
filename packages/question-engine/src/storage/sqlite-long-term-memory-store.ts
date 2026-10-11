@@ -30,14 +30,14 @@ export class SqliteLongTermMemoryStore {
     const content = input.content.normalize("NFKC").trim().replace(/\\s+/gu, " ").slice(0, 4000);
     if (content.length < 4) return null;
     const existingRow = this.db.prepare(
-      "SELECT * FROM qe_long_term_memories WHERE content = ? AND conversation_id = ? LIMIT 1",
+      "SELECT * FROM sigma_core_long_term_memories WHERE content = ? AND conversation_id = ? LIMIT 1",
     ).get(content, input.conversationId) as MemoryRow | undefined;
     const now = new Date().toISOString();
     if (existingRow) {
       this.db.prepare(
-        "UPDATE qe_long_term_memories SET updated_at = ?, confidence = MAX(confidence, ?) WHERE id = ?",
+        "UPDATE sigma_core_long_term_memories SET updated_at = ?, confidence = MAX(confidence, ?) WHERE id = ?",
       ).run(now, clampConfidence(input.confidence), existingRow.id);
-      return fromRow(this.db.prepare("SELECT * FROM qe_long_term_memories WHERE id = ?").get(existingRow.id) as MemoryRow);
+      return fromRow(this.db.prepare("SELECT * FROM sigma_core_long_term_memories WHERE id = ?").get(existingRow.id) as MemoryRow);
     }
 
     const entry: LongTermMemory = {
@@ -49,7 +49,7 @@ export class SqliteLongTermMemoryStore {
       updatedAt: now,
     };
     this.db.prepare(`
-      INSERT INTO qe_long_term_memories
+      INSERT INTO sigma_core_long_term_memories
         (id, content, conversation_id, source_entry_id, provider, confidence, created_at, updated_at)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?)
     `).run(entry.id, entry.content, entry.conversationId, entry.sourceEntryId, entry.provider ?? null,
@@ -60,7 +60,7 @@ export class SqliteLongTermMemoryStore {
 
   async recent(limit = 50): Promise<LongTermMemory[]> {
     const safeLimit = Math.max(1, Math.min(Math.trunc(limit) || 1, 200));
-    return (this.db.prepare("SELECT * FROM qe_long_term_memories ORDER BY updated_at DESC, rowid DESC LIMIT ?")
+    return (this.db.prepare("SELECT * FROM sigma_core_long_term_memories ORDER BY updated_at DESC, rowid DESC LIMIT ?")
       .all(safeLimit) as MemoryRow[]).map(fromRow);
   }
 
@@ -68,7 +68,7 @@ export class SqliteLongTermMemoryStore {
     const normalized = query.normalize("NFKC").toLocaleLowerCase().trim();
     if (!normalized) return [];
     const tokens = normalized.match(/[a-z0-9]+|[ぁ-んァ-ヶ一-龯]{2,}/giu) ?? [];
-    const rows = this.db.prepare("SELECT * FROM qe_long_term_memories ORDER BY updated_at DESC LIMIT 10000").all() as MemoryRow[];
+    const rows = this.db.prepare("SELECT * FROM sigma_core_long_term_memories ORDER BY updated_at DESC LIMIT 10000").all() as MemoryRow[];
     return rows.map((row) => {
       const entry = fromRow(row);
       const text = entry.content.normalize("NFKC").toLocaleLowerCase();
@@ -80,9 +80,9 @@ export class SqliteLongTermMemoryStore {
 
   private prune(): void {
     this.db.prepare(`
-      DELETE FROM qe_long_term_memories
+      DELETE FROM sigma_core_long_term_memories
       WHERE id IN (
-        SELECT id FROM qe_long_term_memories
+        SELECT id FROM sigma_core_long_term_memories
         ORDER BY updated_at DESC, rowid DESC
         LIMIT -1 OFFSET 10000
       )
