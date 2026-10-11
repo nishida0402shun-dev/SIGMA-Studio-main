@@ -168,7 +168,9 @@ describe("Web AI MCP gateway live server path", () => {
         title: "Legacy removal test",
         body: "Temporary integration-test skill",
       }, null),
-    ).resolves.toMatchObject({ isError: false });
+    ).resolves.toMatchObject({
+      structuredContent: { ok: true },
+    });
     expect(requestedWrites).toContain("save_ai_resource");
   });
 
