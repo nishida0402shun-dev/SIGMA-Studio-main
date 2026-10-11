@@ -345,38 +345,6 @@ const RETIRED_QUESTION_ENGINE_TABLES = [
   "qe_schema_migrations",
 ] as const;
 
-function dropRetiredQuestionEngineTables(db: SqliteSchemaDriver): void {
-  // These records belong to the explicitly retired implementation and are not migrated.
-  for (const table of RETIRED_QUESTION_ENGINE_TABLES) {
-    db.exec(`DROP TABLE IF EXISTS ${table};`);
-  }
-}
-
-const RETIRED_QUESTION_ENGINE_TABLES = [
-  "qe_vector_records",
-  "qe_knowledge_pages_fts",
-  "qe_conversation_entries_fts",
-  "qe_questions_fts",
-  "qe_question_tags",
-  "qe_question_sources",
-  "qe_question_versions",
-  "qe_import_proposals",
-  "qe_question_attempts",
-  "qe_knowledge_pages",
-  "qe_knowledge_sources",
-  "qe_knowledge_staging",
-  "qe_knowledge_learning_feedback",
-  "qe_conversation_entries",
-  "qe_long_term_memories",
-  "qe_research_sessions",
-  "qe_questions",
-  "qe_sources",
-  "qe_tags",
-  "qe_import_jobs",
-  "qe_knowledge_state",
-  "qe_schema_migrations",
-] as const;
-
 const REBUILT_SIGMA_CORE_TABLES = [
   "sigma_core_questions_fts",
   "sigma_core_conversation_entries_fts",
