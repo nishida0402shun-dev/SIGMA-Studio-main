@@ -9,10 +9,10 @@ This is a source-code inventory, not a claim that runtime data locations or test
 | Area | Previous implementation | Format / role | Current status |
 |---|---|---|---|
 | Standalone Question Bank | `packages/sigma_studio_question_bank_package/packages/question-bank/src/db/` | SQLite via `better-sqlite3`; questions, taxonomy, FTS5, PDF staging | **Removed from this branch**. Its schema/repository should not be reused as the new storage implementation. |
-| Knowledge DB | `apps/desktop/electron/knowledge-db-store.ts` | File-backed knowledge library with source/page metadata, extraction/classification and retrieval | Still present and referenced by Electron main/IPC/UI. Must be replaced behind the new library API before deletion. |
-| Local vector index | `apps/desktop/electron/local-vector-index.ts` | Versioned file-backed vectors and local embedding model integration | Still present and coupled to Knowledge DB. New schema includes vector records, but adapter/model behavior is not migrated yet. |
-| Conversation memory | `apps/desktop/electron/conversation-memory-store.ts` | JSON file-backed conversation entries and search | Still present and referenced by Electron IPC/preload. New schema includes conversation entries, but API consumers are not migrated yet. |
-| Long-term memory | `apps/desktop/electron/long-term-memory-store.ts` | JSON file-backed extracted memory entries | Still present and referenced by Electron IPC/preload. New schema includes long-term memories, but API consumers are not migrated yet. |
+| Knowledge DB | `apps/desktop/electron/knowledge-db-store.ts` | Extraction/classification/retrieval logic; source/page metadata | Metadata persistence now uses `qe_knowledge_sources` and `qe_knowledge_pages` in SQLite. Source files remain on disk. The façade is retained for existing IPC/UI callers. |
+| Local vector index | `apps/desktop/electron/local-vector-index.ts` | Local embedding model and vector retrieval | Vector records now persist in `qe_vector_records` in the shared SQLite database. Embedding model logic remains in this adapter. |
+| Conversation memory | `apps/desktop/electron/conversation-memory-store.ts` | JSON file-backed conversation entries and search | **Old module removed**. Electron IPC now uses `SqliteConversationMemoryStore`; FTS and LIKE-assisted search are implemented in the new adapter. |
+| Long-term memory | `apps/desktop/electron/long-term-memory-store.ts` | JSON file-backed extracted memory entries | **Old module removed**. Electron IPC now uses `SqliteLongTermMemoryStore`. |
 | Browser runtime stores | `apps/desktop/src/lib/runtime/browser/idb-backend.ts`, `memory-backend.ts` | Browser persistence abstractions | Separate browser-runtime layer. Audit callers before deciding whether it should share the same storage API or remain an adapter. |
 
 ## Rebuild changes already made
