@@ -305,8 +305,9 @@ export class SqliteQuestionRepository implements QuestionRepository {
        VALUES (?, ?, ?, ?, 'source')`,
     );
     for (const source of record.sources) {
+      // A citation page is not the document's total page count; unknown stays zero.
       sourceInsert.run(source.id, source.name, source.contentHash ?? "", source.uri ?? null,
-        source.pageNumber ?? 0, new Date().toISOString());
+        0, new Date().toISOString());
       sourceLink.run(record.id, source.id, source.pageNumber ?? null,
         source.region ? JSON.stringify(source.region) : null);
     }
