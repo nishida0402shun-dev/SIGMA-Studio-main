@@ -5650,7 +5650,7 @@ function EditorShellBody({ embeddedHost, editorStore }: EditorShellProps & { edi
     setAiInlineOpen(next.aiInlineOpen);
   }, [setAiDisplayMode, setAiSidebarOpen, setAiInlineOpen]);
 
- = useCallback((anchor: { left: number; top: number } | null) => {
+  const openAiInline = useCallback((anchor: { left: number; top: number } | null) => {
     // Web版にAIチャット面は無い (AI面はキャンバス左上のAiTaskDock一本)。⌘Kや
     // コマンドパレットからこの経路に入っても、空のパネルを開かせない。
     if (!isDesktopApp) {
