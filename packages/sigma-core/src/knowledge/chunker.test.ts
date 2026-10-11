@@ -18,8 +18,8 @@ describe("chunkKnowledgePage", () => {
     for (let index = 1; index < chunks.length; index += 1) {
       const previous = chunks[index - 1]!;
       const current = chunks[index]!;
-      expect(current.source.startOffset).toBeLessThan(previous.source.endOffset);
-      expect(current.source.startOffset).toBeGreaterThan(previous.source.startOffset);
+      expect(current.source.startOffset!).toBeLessThan(previous.source.endOffset!);
+      expect(current.source.startOffset!).toBeGreaterThan(previous.source.startOffset!);
     }
     expect(chunks.map((chunk) => chunk.text).join("")).toContain("uvwxyz0123456789");
   });
