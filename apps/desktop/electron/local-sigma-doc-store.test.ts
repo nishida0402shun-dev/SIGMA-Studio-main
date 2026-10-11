@@ -1005,12 +1005,17 @@ describe("LocalSigmaDocStore optimistic locking / runExclusive / block-hash side
     const gate = new Promise<void>((resolve) => {
       release = resolve;
     });
+    let markApproveRead!: () => void;
+    const approveRead = new Promise<void>((resolve) => {
+      markApproveRead = resolve;
+    });
 
     // 承認フロー相当: ロック保持中に読み込んだrevisionを前提に、停止後に保存する
     // (この内側のsaveDocumentは同一連鎖からの再入なのでデッドロックしないこと)。
     const approveLike = store.runExclusive(file.fileId, async () => {
       const current = (await store.listFiles()).find((item) => item.fileId === file.fileId)!;
       order.push("approve-read");
+      markApproveRead();
       await gate;
       const result = await store.saveDocument(
         file.fileId,
@@ -1021,7 +1026,7 @@ describe("LocalSigmaDocStore optimistic locking / runExclusive / block-hash side
       return result;
     });
 
-    await new Promise((resolve) => setTimeout(resolve, 10));
+    await approveRead;
     expect(order).toEqual(["approve-read"]);
 
     // 別連鎖からの人間autosave相当。承認フローの区間が終わるまで実行されないこと。
