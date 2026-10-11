@@ -63,6 +63,7 @@ import { registerAiEditIpc } from "./ipc/ai-edit";
 import { registerAiResourcesIpc } from "./ipc/ai-resources";
 import { registerFileIpc } from "./ipc/file";
 import { KnowledgeDbStore } from "./knowledge-db-store";
+import { migrateLegacyVectorRecords, openLocalVectorDatabase } from "./local-vector-index";
 import {
   openQuestionEngineDatabase,
   SqliteConversationMemoryStore,
@@ -276,8 +277,11 @@ const localAiEditRunLogStore = new LocalAiEditRunLogStore(USER_DATA_PATH);
 const localAiEditChatRoomStore = new LocalAiEditChatRoomStore(USER_DATA_PATH);
 const localAiResourceStore = new LocalAiResourceStore(USER_DATA_PATH);
 const SIGMA_STUDIO_DATA_PATH = path.join(USER_DATA_PATH, "data");
-const questionEngineDatabase = openQuestionEngineDatabase({ dataDir: path.join(SIGMA_STUDIO_DATA_PATH, "knowledge-db") });
-const knowledgeDbStore = new KnowledgeDbStore(SIGMA_STUDIO_DATA_PATH, questionEngineDatabase.raw);
+const knowledgeDatabasePath = path.join(SIGMA_STUDIO_DATA_PATH, "knowledge-db");
+const questionEngineDatabase = openQuestionEngineDatabase({ dataDir: knowledgeDatabasePath });
+const vectorDatabase = openLocalVectorDatabase(knowledgeDatabasePath);
+migrateLegacyVectorRecords(questionEngineDatabase.raw, vectorDatabase);
+const knowledgeDbStore = new KnowledgeDbStore(SIGMA_STUDIO_DATA_PATH, questionEngineDatabase.raw, vectorDatabase);
 const conversationMemoryStore = new SqliteConversationMemoryStore(questionEngineDatabase.raw);
 const longTermMemoryStore = new SqliteLongTermMemoryStore(questionEngineDatabase.raw);
 const researchSessionStore = new ResearchSessionStore(questionEngineDatabase.raw);
@@ -1795,6 +1799,8 @@ app.on("before-quit", (event) => {
   }
   codexAppServerClient.dispose();
   claudeStreamClient.dispose();
+  vectorDatabase.close();
+  questionEngineDatabase.close();
   stopLocalStoreWatch?.();
   stopLocalStoreWatch = null;
   stopLocalProposalWatch?.();
