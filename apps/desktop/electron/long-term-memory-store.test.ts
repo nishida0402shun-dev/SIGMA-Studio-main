@@ -2,11 +2,11 @@ import { mkdtemp, rm } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
-import { openQuestionEngineDatabase, SqliteLongTermMemoryStore } from "../../../packages/question-engine/src/index";
+import { openSigmaCoreDatabase, SqliteLongTermMemoryStore } from "../../../packages/sigma-core/src/index";
 
 describe("SqliteLongTermMemoryStore", () => {
   let dir: string | undefined;
-  let database: ReturnType<typeof openQuestionEngineDatabase> | undefined;
+  let database: ReturnType<typeof openSigmaCoreDatabase> | undefined;
 
   afterEach(async () => {
     database?.close();
@@ -17,7 +17,7 @@ describe("SqliteLongTermMemoryStore", () => {
 
   it("deduplicates durable memories and searches them", async () => {
     dir = await mkdtemp(path.join(os.tmpdir(), "sigma-ltm-"));
-    database = openQuestionEngineDatabase({ dataDir: dir });
+    database = openSigmaCoreDatabase({ dataDir: dir });
     const store = new SqliteLongTermMemoryStore(database.raw);
     const input = {
       content: "数学の教材ではページ番号を必ず引用する",
