@@ -16,7 +16,7 @@ export interface SqliteSchemaDriver {
   transaction<T extends (...args: never[]) => unknown>(operation: T): T;
 }
 
-export const SIGMA_CORE_SCHEMA_VERSION = 6;
+export const SIGMA_CORE_SCHEMA_VERSION = 7;
 
 const MIGRATION_TABLE = `
   CREATE TABLE IF NOT EXISTS sigma_core_schema_migrations (
