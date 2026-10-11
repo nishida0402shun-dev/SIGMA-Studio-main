@@ -63,7 +63,7 @@ import { registerAiEditIpc } from "./ipc/ai-edit";
 import { registerAiResourcesIpc } from "./ipc/ai-resources";
 import { registerFileIpc } from "./ipc/file";
 import { KnowledgeDbStore } from "./knowledge-db-store";
-import { migrateLegacyVectorRecords, openLocalVectorDatabase } from "./local-vector-index";
+import { LocalVectorIndex, migrateLegacyVectorRecords, openLocalVectorDatabase } from "./local-vector-index";
 import {
   openQuestionEngineDatabase,
   SqliteConversationMemoryStore,
@@ -281,7 +281,8 @@ const knowledgeDatabasePath = path.join(SIGMA_STUDIO_DATA_PATH, "knowledge-db");
 const questionEngineDatabase = openQuestionEngineDatabase({ dataDir: knowledgeDatabasePath });
 const vectorDatabase = openLocalVectorDatabase(knowledgeDatabasePath);
 migrateLegacyVectorRecords(questionEngineDatabase.raw, vectorDatabase);
-const knowledgeDbStore = new KnowledgeDbStore(SIGMA_STUDIO_DATA_PATH, questionEngineDatabase.raw, vectorDatabase);
+const vectorStore = new LocalVectorIndex(vectorDatabase);
+const knowledgeDbStore = new KnowledgeDbStore(SIGMA_STUDIO_DATA_PATH, questionEngineDatabase.raw, vectorStore);
 const conversationMemoryStore = new SqliteConversationMemoryStore(questionEngineDatabase.raw);
 const longTermMemoryStore = new SqliteLongTermMemoryStore(questionEngineDatabase.raw);
 const researchSessionStore = new ResearchSessionStore(questionEngineDatabase.raw);
