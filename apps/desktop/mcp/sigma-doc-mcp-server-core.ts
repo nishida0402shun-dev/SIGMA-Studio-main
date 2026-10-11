@@ -934,6 +934,7 @@ const SourceReferenceSchema = z.discriminatedUnion("type", [
     materialId: z.string().min(1),
     name: z.string().optional(),
   }),
+]);
 
 /** 1提案に載せる参照元の上限。入力スキーマと、台帳マージ後の永続化の両方で守る。 */
 const MAX_PERSISTED_SOURCE_REFERENCES = 10;
