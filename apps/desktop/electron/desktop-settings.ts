@@ -136,7 +136,8 @@ async function writeDesktopSettingsNow(dataDir: string, settings: DesktopSetting
       // 既定値 (true) はキーごと削除して設定ファイルを簡潔に保つ。
       delete next.aiWebSearchEnabled;
     }
-  }  if ("webAiConversationCaptureEnabled" in settings) {
+  }
+  if ("webAiConversationCaptureEnabled" in settings) {
     if (settings.webAiConversationCaptureEnabled === false) next.webAiConversationCaptureEnabled = false;
     else delete next.webAiConversationCaptureEnabled;
   }
