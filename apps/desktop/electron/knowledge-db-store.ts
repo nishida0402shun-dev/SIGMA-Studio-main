@@ -1000,15 +1000,14 @@ export class KnowledgeDbStore {
         await fs.rm(targetPath, { recursive: true, force: true });
         await fs.cp(sourcePath, targetPath, { recursive: true, force: true });
       }
-      const sourceRows = this.db.prepare("SELECT id, stored_uri FROM sigma_core_knowledge_sources").all() as Array<{ id: string; stored_uri: string }>;
-      const updateStoredPath = this.db.prepare("UPDATE sigma_core_knowledge_sources SET stored_uri = ? WHERE id = ?");
+      const sourceRows = this.knowledgeRepository.load().sources;
       for (const source of sourceRows) {
         const filename = path.basename(source.stored_uri);
         if (!filename || filename === "." || filename === path.sep) continue;
         const relocated = path.join(paths.sourcesDir, filename);
         try {
           await fs.access(relocated);
-          updateStoredPath.run(relocated, source.id);
+          this.knowledgeRepository.updateStoredUri(source.id, relocated);
         } catch { /* non-file fixtures and externally managed sources keep their stored URI */ }
       }
       return { filePath: destination, fileCount };
