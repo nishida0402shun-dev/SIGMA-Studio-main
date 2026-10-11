@@ -4,19 +4,19 @@ import path from "node:path";
 import { PDFDocument } from "pdf-lib";
 import { afterEach, describe, expect, it } from "vitest";
 import { KnowledgeDbStore, type KnowledgePage, type KnowledgeSource } from "./knowledge-db-store";
-import { openQuestionEngineDatabase, type QuestionEngineDatabase } from "../../../packages/question-engine/src/index";
+import { openSigmaCoreDatabase, type SigmaCoreDatabase } from "../../../packages/sigma-core/src/index";
 import { LocalVectorIndex } from "./local-vector-index";
 import { KNOWLEDGE_ANALYSIS_VERSION } from "./knowledge-analysis-engine";
 import { KNOWLEDGE_TAXONOMY_VERSION } from "./knowledge-taxonomy";
 
 const tempDirs: string[] = [];
-const databases: QuestionEngineDatabase[] = [];
-const databasesByDir = new Map<string, QuestionEngineDatabase>();
+const databases: SigmaCoreDatabase[] = [];
+const databasesByDir = new Map<string, SigmaCoreDatabase>();
 
-function getDatabase(dataDir: string): QuestionEngineDatabase {
+function getDatabase(dataDir: string): SigmaCoreDatabase {
   const existing = databasesByDir.get(dataDir);
   if (existing) return existing;
-  const database = openQuestionEngineDatabase({ dataDir: path.join(dataDir, "knowledge-db") });
+  const database = openSigmaCoreDatabase({ dataDir: path.join(dataDir, "knowledge-db") });
   databases.push(database);
   databasesByDir.set(dataDir, database);
   return database;
