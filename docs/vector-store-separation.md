@@ -10,6 +10,7 @@ Keep SQLite as the authoritative relational database and move embedding vectors 
 - The vector store owns embeddings, vector-search indexes, and vector-search execution.
 - Workspace selection does not choose a database. All workspaces use the same application-level stores.
 - Electron main is the only process that opens either store. Renderer, Web AI, CLI integrations, and MCP tools use validated application APIs rather than direct database access.
+- Retrieval callers depend on the application-owned `VectorStore` contract, so the SQLite-backed implementation can be replaced by LanceDB without rewriting `KnowledgeDbStore`.
 - A vector-store failure must not corrupt or silently reset SQLite data.
 
 ## Library candidate
