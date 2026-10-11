@@ -65,6 +65,10 @@ export class SqliteKnowledgeLibraryRepository {
     };
   }
 
+  updateStoredUri(sourceId: string, storedUri: string): void {
+    this.db.prepare("UPDATE sigma_core_knowledge_sources SET stored_uri = ? WHERE id = ?").run(storedUri, sourceId);
+  }
+
   save(sources: readonly (KnowledgeSourceRow & { pages: readonly KnowledgePageRow[] })[], expectedRevision?: number): number {
     this.db.exec("BEGIN IMMEDIATE");
     try {
