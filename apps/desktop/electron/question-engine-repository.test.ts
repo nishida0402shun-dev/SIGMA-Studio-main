@@ -2,11 +2,11 @@ import { mkdtemp, rm } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
-import { openQuestionEngineDatabase, SqliteQuestionRepository, type QuestionEngineDatabase } from "../../../packages/question-engine/src/index";
+import { openSigmaCoreDatabase, SqliteQuestionRepository, type SigmaCoreDatabase } from "../../../packages/sigma-core/src/index";
 
 describe("SqliteQuestionRepository", () => {
   let dir: string | undefined;
-  let database: QuestionEngineDatabase | undefined;
+  let database: SigmaCoreDatabase | undefined;
 
   afterEach(async () => {
     database?.close();
@@ -17,19 +17,19 @@ describe("SqliteQuestionRepository", () => {
 
   async function createRepository() {
     dir = await mkdtemp(path.join(os.tmpdir(), "sigma-question-repository-"));
-    database = openQuestionEngineDatabase({ dataDir: dir });
+    database = openSigmaCoreDatabase({ dataDir: dir });
     return new SqliteQuestionRepository(database.raw);
   }
 
-  it("drops the retired Question Engine vector table during schema migration", async () => {
+  it("drops the retired legacy vector table during schema migration", async () => {
     await createRepository();
     database!.raw.exec(`
-      CREATE TABLE sigma_core_vector_records (
+      CREATE TABLE qe_vector_records (
         id TEXT PRIMARY KEY,
         source_id TEXT NOT NULL,
         text_content TEXT NOT NULL
       );
-      INSERT INTO sigma_core_vector_records (id, source_id, text_content)
+      INSERT INTO qe_vector_records (id, source_id, text_content)
       VALUES ('legacy-vector', 'legacy-source', 'obsolete');
       DELETE FROM sigma_core_schema_migrations;
       INSERT INTO sigma_core_schema_migrations(version, applied_at)
@@ -38,9 +38,9 @@ describe("SqliteQuestionRepository", () => {
     database!.close();
     database = undefined;
 
-    database = openQuestionEngineDatabase({ dataDir: dir! });
+    database = openSigmaCoreDatabase({ dataDir: dir! });
     const legacyTable = database.raw.prepare(
-      "SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'sigma_core_vector_records'",
+      "SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'qe_vector_records'",
     ).get();
     expect(legacyTable).toBeUndefined();
     const migration = database.raw.prepare(
