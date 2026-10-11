@@ -180,15 +180,20 @@ const CORE_SCHEMA = `
   CREATE TABLE IF NOT EXISTS sigma_core_knowledge_learning_feedback (
     id TEXT PRIMARY KEY,
     query_text TEXT NOT NULL,
+    normalized_query TEXT NOT NULL,
     source_id TEXT,
     page_number INTEGER CHECK (page_number IS NULL OR page_number > 0),
     label TEXT NOT NULL CHECK (label IN ('positive', 'negative', 'correction')),
+    score_delta REAL NOT NULL CHECK (score_delta BETWEEN -0.2 AND 0.2),
     correction TEXT,
     created_at TEXT NOT NULL,
     metadata_json TEXT NOT NULL DEFAULT '{}'
   );
 
-  CREATE INDEX IF NOT EXISTS sigma_core_learning_feedback_created_idx ON sigma_core_knowledge_learning_feedback(created_at);
+  CREATE INDEX IF NOT EXISTS sigma_core_learning_feedback_created_idx
+    ON sigma_core_knowledge_learning_feedback(created_at DESC);
+  CREATE INDEX IF NOT EXISTS sigma_core_learning_feedback_query_idx
+    ON sigma_core_knowledge_learning_feedback(normalized_query);
 
   CREATE TABLE IF NOT EXISTS sigma_core_knowledge_pages (
     id TEXT PRIMARY KEY,
@@ -374,6 +379,7 @@ const RETIRED_QUESTION_ENGINE_TABLES = [
 
 const REBUILT_SIGMA_CORE_TABLES = [
   "sigma_core_questions_fts",
+  "sigma_core_conversation_entries_fts",
   "sigma_core_knowledge_pages_fts",
   "sigma_core_question_tags",
   "sigma_core_question_sources",
