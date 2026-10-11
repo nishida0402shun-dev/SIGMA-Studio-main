@@ -16,7 +16,7 @@ export interface SqliteSchemaDriver {
   transaction<T extends (...args: never[]) => unknown>(operation: T): T;
 }
 
-export const QUESTION_ENGINE_SCHEMA_VERSION = 2;
+export const QUESTION_ENGINE_SCHEMA_VERSION = 3;
 
 const MIGRATION_TABLE = `
   CREATE TABLE IF NOT EXISTS qe_schema_migrations (
@@ -123,6 +123,13 @@ const CORE_SCHEMA = `
   );
 
   CREATE INDEX IF NOT EXISTS qe_attempts_question_time_idx ON qe_question_attempts(question_id, answered_at);
+
+  CREATE TABLE IF NOT EXISTS qe_knowledge_state (
+    id INTEGER PRIMARY KEY CHECK (id = 1),
+    revision INTEGER NOT NULL CHECK (revision >= 0)
+  );
+
+  INSERT OR IGNORE INTO qe_knowledge_state(id, revision) VALUES (1, 0);
 
   CREATE TABLE IF NOT EXISTS qe_knowledge_sources (
     id TEXT PRIMARY KEY,
