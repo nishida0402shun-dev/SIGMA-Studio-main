@@ -132,7 +132,6 @@ electronIpcMain.handle("web-ai:get-bridge-info", (event) => {
   };
 });
 
-__REMOVE_MEMORY_BLOCK_END__
 const externalDocumentOpenQueue = new ExternalDocumentOpenQueue(() => {
   if (mainWindow && !mainWindow.isDestroyed()) {
     mainWindow.webContents.send("file:open-document-available");
