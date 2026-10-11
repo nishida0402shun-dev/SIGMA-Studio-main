@@ -129,6 +129,36 @@ export interface KnowledgePdfImportStaging {
   segments: KnowledgePdfImportSegmentProposal[];
 }
 
+interface StagingRow {
+  id: string;
+  status: KnowledgePdfImportStaging["status"];
+  source_path: string;
+  source_name: string;
+  source_hash: string;
+  size_bytes: number;
+  page_count: number;
+  created_at: string;
+  updated_at: string;
+  approved_at: string | null;
+  segments_json: string;
+}
+
+function stagingFromRow(row: StagingRow): KnowledgePdfImportStaging {
+  return {
+    id: row.id,
+    status: row.status,
+    sourcePath: row.source_path,
+    sourceName: row.source_name,
+    sourceHash: row.source_hash,
+    sizeBytes: row.size_bytes,
+    pageCount: row.page_count,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+    ...(row.approved_at ? { approvedAt: row.approved_at } : {}),
+    segments: JSON.parse(row.segments_json) as KnowledgePdfImportSegmentProposal[],
+  };
+}
+
 export interface KnowledgeIndexStatus {
   state: "idle" | "running" | "completed" | "failed";
   total: number;
@@ -682,30 +712,18 @@ export class KnowledgeDbStore {
       updatedAt: new Date().toISOString(),
       segments,
     };
-    const stagingDir = this.stagingPaths().root;
-    await fs.mkdir(stagingDir, { recursive: true });
-    await fs.writeFile(path.join(stagingDir, staging.id + ".json"), JSON.stringify(staging, null, 2), "utf8");
+    this.writeStaging(staging);
     return staging;
   }
 
   async getPdfImportStaging(stagingId: string): Promise<KnowledgePdfImportStaging | null> {
-    try {
-      return JSON.parse(await fs.readFile(path.join(this.stagingPaths().root, stagingId + ".json"), "utf8")) as KnowledgePdfImportStaging;
-    } catch {
-      return null;
-    }
+    const row = this.db.prepare("SELECT * FROM qe_knowledge_staging WHERE id = ?").get(stagingId) as StagingRow | undefined;
+    return row ? stagingFromRow(row) : null;
   }
 
   async listPdfImportStaging(): Promise<KnowledgePdfImportStaging[]> {
-    const entries = await fs.readdir(this.stagingPaths().root, { withFileTypes: true }).catch(() => []);
-    const items: KnowledgePdfImportStaging[] = [];
-    for (const entry of entries) {
-      if (!entry.isFile() || !entry.name.endsWith(".json")) continue;
-      try {
-        items.push(JSON.parse(await fs.readFile(path.join(this.stagingPaths().root, entry.name), "utf8")) as KnowledgePdfImportStaging);
-      } catch {}
-    }
-    return items.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
+    const rows = this.db.prepare("SELECT * FROM qe_knowledge_staging ORDER BY updated_at DESC, rowid DESC").all() as StagingRow[];
+    return rows.map(stagingFromRow);
   }
 
   async updatePdfImportStaging(input: { stagingId: string; segments: KnowledgePdfImportSegmentProposal[] }): Promise<KnowledgePdfImportStaging> {
@@ -718,7 +736,7 @@ export class KnowledgeDbStore {
       }
     }
     const updated: KnowledgePdfImportStaging = { ...current, segments: input.segments, updatedAt: new Date().toISOString() };
-    await fs.writeFile(path.join(this.stagingPaths().root, current.id + ".json"), JSON.stringify(updated, null, 2), "utf8");
+    this.writeStaging(updated);
     return updated;
   }
 
@@ -747,7 +765,7 @@ export class KnowledgeDbStore {
       updatedAt: new Date().toISOString(),
       approvedAt: new Date().toISOString(),
     };
-    await fs.writeFile(path.join(this.stagingPaths().root, current.id + ".json"), JSON.stringify(approved, null, 2), "utf8");
+    this.writeStaging(approved);
     return { stagingId, sourceId: source.id, childSourceIds: childSources.map((child) => child.id) };
   }
 
@@ -756,7 +774,7 @@ export class KnowledgeDbStore {
     if (!current) throw new Error("PDF import staging not found");
     if (current.status !== "draft") throw new Error("Only draft PDF imports can be rejected");
     const rejected: KnowledgePdfImportStaging = { ...current, status: "rejected", updatedAt: new Date().toISOString() };
-    await fs.writeFile(path.join(this.stagingPaths().root, current.id + ".json"), JSON.stringify(rejected, null, 2), "utf8");
+    this.writeStaging(rejected);
     return { stagingId };
   }
 
@@ -1244,6 +1262,27 @@ export class KnowledgeDbStore {
     return source;
   }
 
+  private writeStaging(staging: KnowledgePdfImportStaging): void {
+    this.db.prepare(`
+      INSERT INTO qe_knowledge_staging
+        (id, status, source_path, source_name, source_hash, size_bytes, page_count,
+         created_at, updated_at, approved_at, segments_json)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ON CONFLICT(id) DO UPDATE SET
+        status = excluded.status,
+        source_path = excluded.source_path,
+        source_name = excluded.source_name,
+        source_hash = excluded.source_hash,
+        size_bytes = excluded.size_bytes,
+        page_count = excluded.page_count,
+        updated_at = excluded.updated_at,
+        approved_at = excluded.approved_at,
+        segments_json = excluded.segments_json
+    `).run(staging.id, staging.status, staging.sourcePath, staging.sourceName, staging.sourceHash,
+      staging.sizeBytes, staging.pageCount, staging.createdAt, staging.updatedAt,
+      staging.approvedAt ?? null, JSON.stringify(staging.segments));
+  }
+
   private async readLibrary(): Promise<KnowledgeLibrary> {
     const sourceRows = this.db.prepare(`
       SELECT id, display_name, mime_type, content_hash, original_uri, stored_uri,
@@ -1377,10 +1416,6 @@ export class KnowledgeDbStore {
       this.db.exec("ROLLBACK");
       throw error;
     }
-  }
-
-  private stagingPaths() {
-    return { root: path.join(this.dataDir, "knowledge-db", "staging") };
   }
 
   private paths() {
