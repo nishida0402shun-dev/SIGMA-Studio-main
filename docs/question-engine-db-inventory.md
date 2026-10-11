@@ -14,6 +14,7 @@ This is a source-code inventory, not a claim that runtime data locations or test
 | Local vector index | `apps/desktop/electron/local-vector-index.ts` | Local embedding model and vector retrieval | Vector records now persist in `qe_vector_records` in the shared SQLite database. Embedding model logic remains in this adapter. |
 | Conversation memory | `apps/desktop/electron/conversation-memory-store.ts` | JSON file-backed conversation entries and search | **Old module removed**. Electron IPC now uses `SqliteConversationMemoryStore`; FTS and LIKE-assisted search are implemented in the new adapter. |
 | Long-term memory | `apps/desktop/electron/long-term-memory-store.ts` | JSON file-backed extracted memory entries | **Old module removed**. Electron IPC now uses `SqliteLongTermMemoryStore`. |
+| Research sessions | `apps/desktop/electron/research-session-store.ts` | JSON file-backed research questions and page references | Persistence moved to `qe_research_sessions`; the Electron-facing class is a compatibility export over the shared SQLite store. Existing JSON files are not imported. |
 | Browser runtime stores | `apps/desktop/src/lib/runtime/browser/idb-backend.ts`, `memory-backend.ts` | Browser persistence abstractions | Separate browser-runtime layer. Audit callers before deciding whether it should share the same storage API or remain an adapter. |
 
 ## Rebuild changes already made
@@ -21,8 +22,9 @@ This is a source-code inventory, not a claim that runtime data locations or test
 - Created branch `feat/question-engine-rebuild`.
 - Removed 25 tracked files belonging to the disconnected standalone Question Bank package.
 - Added provider-neutral question domain types and application ports under `packages/question-engine/src/`.
-- Added an initial versioned SQLite schema covering question records, sources, tags, import proposals, knowledge pages, vector records, conversation entries, and long-term memories.
-- The new package is not yet wired into the desktop app. No build or test run has verified it.
+- Added a versioned SQLite schema covering question records, sources, tags, import proposals, knowledge pages, vector records, conversation entries, long-term memories, and research sessions.
+- The desktop main process opens one shared SQLite connection and injects it into knowledge, vector, conversation, long-term memory, and research-session stores.
+- Existing JSON-backed research-session files are no longer read by the new store; the old data is not migrated.
 
 ## Correctness issues observed in the removed Question Bank implementation
 
@@ -31,13 +33,12 @@ This is a source-code inventory, not a claim that runtime data locations or test
 
 ## Safe retirement sequence for the still-integrated stores
 
-1. Implement a SQLite adapter and automated temporary-database tests, including FTS index synchronization.
-2. Migrate Knowledge DB and vector index APIs, preserving page extraction, indexing, retrieval, backup/restore, and recovery behavior.
-3. Migrate conversation and long-term memory APIs, preserving search, deduplication, and retention semantics.
-4. Update Electron IPC/preload and UI consumers to use the new library, with sender validation intact.
-5. Verify a backup-and-restore plus round-trip migration using disposable copies of old data.
-6. Run typecheck, focused tests, full test suite, build, and CI; record exact results.
-7. Only then remove remaining legacy modules. This retires old code without silently discarding runtime user data.
+1. Confirm CI after the latest type correction and SQLite research-session cutover.
+2. Run focused tests for schema upgrades, question repository invariants, Japanese FTS/LIKE search, and research-session persistence.
+3. Audit remaining Electron and browser persistence modules; keep browser IndexedDB as a separate runtime adapter unless the consumer graph supports consolidation.
+4. Validate knowledge backup/restore, PDF source files, and derived preview paths against the SQLite database.
+5. Run typecheck, focused tests, full test suite, build, Electron packaging, and CI; record exact results.
+6. Remove compatibility facades only when all callers are migrated and checks pass.
 
 ## Unknowns
 
