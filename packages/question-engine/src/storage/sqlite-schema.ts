@@ -16,7 +16,7 @@ export interface SqliteSchemaDriver {
   transaction<T extends (...args: never[]) => unknown>(operation: T): T;
 }
 
-export const QUESTION_ENGINE_SCHEMA_VERSION = 1;
+export const QUESTION_ENGINE_SCHEMA_VERSION = 2;
 
 const MIGRATION_TABLE = `
   CREATE TABLE IF NOT EXISTS qe_schema_migrations (
@@ -140,6 +140,22 @@ const CORE_SCHEMA = `
   );
 
   CREATE INDEX IF NOT EXISTS qe_knowledge_source_hash_idx ON qe_knowledge_sources(content_hash);
+
+  CREATE TABLE IF NOT EXISTS qe_knowledge_staging (
+    id TEXT PRIMARY KEY,
+    status TEXT NOT NULL CHECK (status IN ('draft', 'approved', 'rejected')),
+    source_path TEXT NOT NULL,
+    source_name TEXT NOT NULL,
+    source_hash TEXT NOT NULL,
+    size_bytes INTEGER NOT NULL CHECK (size_bytes >= 0),
+    page_count INTEGER NOT NULL CHECK (page_count > 0),
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    approved_at TEXT,
+    segments_json TEXT NOT NULL
+  );
+
+  CREATE INDEX IF NOT EXISTS qe_knowledge_staging_status_idx ON qe_knowledge_staging(status, updated_at);
 
   CREATE TABLE IF NOT EXISTS qe_knowledge_pages (
     id TEXT PRIMARY KEY,
