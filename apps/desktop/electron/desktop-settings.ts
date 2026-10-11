@@ -278,7 +278,6 @@ function normalizeDesktopSettings(value: unknown): DesktopSettings {
   const aiWebSearchEnabled = parsed.aiWebSearchEnabled !== false;
   const uiLocale = normalizeUiLocale(parsed.uiLocale);
   const webAiConversationCaptureEnabled = parsed.webAiConversationCaptureEnabled !== false;
-  const knowledgeDecisionEnabled = parsed.knowledgeDecisionEnabled !== false;
 
   if (codexBin) {
     next.codexBin = codexBin;
