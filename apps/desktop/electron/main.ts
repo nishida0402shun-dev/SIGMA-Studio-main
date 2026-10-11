@@ -67,7 +67,7 @@ import {
   openQuestionEngineDatabase,
   SqliteConversationMemoryStore,
   SqliteLongTermMemoryStore,
-} from "../../packages/question-engine/src/index";
+} from "../../../packages/question-engine/src/index";
 import { registerKnowledgeDbIpc } from "./ipc/knowledge-db";
 import { ResearchSessionStore } from "./research-session-store";
 import { registerResearchSessionIpc } from "./ipc/research-session";
