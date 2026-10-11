@@ -3,39 +3,39 @@ import path from "node:path";
 import { DatabaseSync, type SQLInputValue } from "node:sqlite";
 import { initializeSigmaCoreSchema, type SqliteSchemaDriver } from "./sqlite-schema.js";
 
-interface StatementLike {
-  get(...params: unknown[]): unknown;
-  run(...params: unknown[]): unknown;
+interface PreparedStatement {
+  get(...parameters: unknown[]): unknown;
+  run(...parameters: unknown[]): unknown;
 }
 
-class NativeSqliteDriver implements SqliteSchemaDriver {
-  constructor(private readonly database: DatabaseSync) {}
+class SchemaConnection implements SqliteSchemaDriver {
+  constructor(private readonly connection: DatabaseSync) {}
 
   exec(sql: string): void {
-    this.database.exec(sql);
+    this.connection.exec(sql);
   }
 
-  prepare(sql: string): StatementLike {
-    const statement = this.database.prepare(sql);
+  prepare(sql: string): PreparedStatement {
+    const statement = this.connection.prepare(sql);
     return {
-      get: (...params) => statement.get(...(params as SQLInputValue[])),
-      run: (...params) => statement.run(...(params as SQLInputValue[])),
+      get: (...parameters) => statement.get(...(parameters as SQLInputValue[])),
+      run: (...parameters) => statement.run(...(parameters as SQLInputValue[])),
     };
   }
 
-  pragma(source: string): unknown {
-    return this.database.prepare("PRAGMA " + source).all();
-  }
-
-  transaction<T extends (...args: never[]) => unknown>(operation: T): T {
+  transaction<T extends (...args: never[]) => unknown>(callback: T): T {
     const wrapped = (() => {
-      this.database.exec("BEGIN IMMEDIATE");
+      this.connection.exec("BEGIN IMMEDIATE");
       try {
-        const result = operation();
-        this.database.exec("COMMIT");
+        const result = callback();
+        this.connection.exec("COMMIT");
         return result;
       } catch (error) {
-        this.database.exec("ROLLBACK");
+        try {
+          this.connection.exec("ROLLBACK");
+        } catch {
+          // Preserve the migration error if rollback itself also fails.
+        }
         throw error;
       }
     }) as T;
@@ -49,39 +49,48 @@ export interface SigmaCoreDatabase {
 }
 
 export interface OpenSigmaCoreDatabaseOptions {
-  /** Application-owned data directory. The database is shared across workspaces. */
+  /** One application-owned directory shared by every workspace. */
   dataDir: string;
-  /** Override the database filename for tests or diagnostics. */
+  /** A filename override is intended for isolated tests and diagnostics. */
   filename?: string;
 }
 
-/**
- * Opens the shared SIGMA Core SQLite database and applies schema migrations.
- * This function never deletes existing files or silently resets a failed database.
- */
-export function openSigmaCoreDatabase(
-  options: OpenSigmaCoreDatabaseOptions,
-): SigmaCoreDatabase {
-  const dataDir = path.resolve(options.dataDir);
-  mkdirSync(dataDir, { recursive: true });
-  const filename = options.filename ?? "sigma-core.sqlite";
-  if (path.basename(filename) !== filename || filename === "." || filename === "..") {
+const DEFAULT_DATABASE_FILENAME = "sigma-core.sqlite";
+
+export function openSigmaCoreDatabase(options: OpenSigmaCoreDatabaseOptions): SigmaCoreDatabase {
+  if (!options.dataDir.trim()) throw new Error("SIGMA Core data directory is required");
+
+  const directory = path.resolve(options.dataDir);
+  const filename = options.filename ?? DEFAULT_DATABASE_FILENAME;
+  if (!filename.trim() || path.basename(filename) !== filename || filename === "." || filename === "..") {
     throw new Error("SIGMA Core database filename must be a simple filename");
   }
 
-  const database = new DatabaseSync(path.join(dataDir, filename));
+  mkdirSync(directory, { recursive: true });
+  const connection = new DatabaseSync(path.join(directory, filename));
+
   try {
-    database.exec("PRAGMA foreign_keys = ON");
-    database.exec("PRAGMA journal_mode = WAL");
-    database.exec("PRAGMA busy_timeout = 5000");
-    initializeSigmaCoreSchema(new NativeSqliteDriver(database));
-  } catch (error) {
-    database.close();
-    throw error;
+    connection.exec("PRAGMA foreign_keys = ON");
+    connection.exec("PRAGMA journal_mode = WAL");
+    connection.exec("PRAGMA synchronous = NORMAL");
+    connection.exec("PRAGMA busy_timeout = 5000");
+    initializeSigmaCoreSchema(new SchemaConnection(connection));
+  } catch (initializationError) {
+    try {
+      connection.close();
+    } catch {
+      // Keep the initialization failure as the primary error.
+    }
+    throw initializationError;
   }
 
+  let closed = false;
   return {
-    raw: database,
-    close: () => database.close(),
+    raw: connection,
+    close() {
+      if (closed) return;
+      connection.close();
+      closed = true;
+    },
   };
 }
