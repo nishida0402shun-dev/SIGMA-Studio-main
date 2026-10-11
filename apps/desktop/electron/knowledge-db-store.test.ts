@@ -30,6 +30,13 @@ function createVectorIndex(dataDir: string): LocalVectorIndex {
   return new LocalVectorIndex(getDatabase(dataDir).raw);
 }
 
+async function readLibraryFixture(dataDir: string): Promise<{ version: 3; sources: KnowledgeSource[]; __fingerprint?: string }> {
+  const internal = createStore(dataDir) as unknown as {
+    readLibrary: () => Promise<{ version: 3; sources: KnowledgeSource[]; __fingerprint?: string }>;
+  };
+  return internal.readLibrary();
+}
+
 function seedLibrary(dataDir: string, fixture: { sources: Array<Record<string, any>> }): void {
   const db = getDatabase(dataDir).raw;
   db.exec("BEGIN IMMEDIATE");
@@ -428,7 +435,7 @@ describe("Knowledge DB analysis lifecycle", () => {
     const [source] = await store.addFiles([sourcePath]);
     expect(source).toBeTruthy();
     await store.search("warmup", 1);
-    const library = JSON.parse(await fs.readFile(libraryPath, "utf8")) as { sources: Array<{ pages: KnowledgePage[] }> };
+    const library = await readLibraryFixture(dataDir) as { sources: Array<{ pages: KnowledgePage[] }> };
     library.sources[0].pages[0].text = "数学Ⅱ 三角関数 定理";
     library.sources[0].pages[0].analysisStatus = "stale";
     library.sources[0].pages[0].analysisVersion = 0;
@@ -474,7 +481,7 @@ describe("Knowledge DB analysis lifecycle", () => {
     const [source] = await store.addFiles([sourcePath]);
     expect(source).toBeTruthy();
     await store.search("warmup", 1);
-    const library = JSON.parse(await fs.readFile(libraryPath, "utf8")) as {
+    const library = await readLibraryFixture(dataDir) as {
       sources: Array<{
         pages: Array<{
           text?: string;
@@ -510,7 +517,7 @@ describe("Knowledge DB analysis lifecycle", () => {
     const sources = await store.addFiles([firstPath, secondPath]);
     expect(sources).toHaveLength(2);
     await store.search("warmup", 2);
-    const library = JSON.parse(await fs.readFile(libraryPath, "utf8")) as {
+    const library = await readLibraryFixture(dataDir) as {
       sources: Array<{ id: string; pages: KnowledgePage[] }>;
     };
     library.sources[0]!.pages[0]!.text = "三角関数の定理を説明する本文。";
@@ -541,7 +548,7 @@ describe("Knowledge DB analysis lifecycle", () => {
     const [source] = await store.addFiles([sourcePath]);
     expect(source).toBeTruthy();
     await store.search("warmup", 1);
-    const library = JSON.parse(await fs.readFile(libraryPath, "utf8")) as {
+    const library = await readLibraryFixture(dataDir) as {
       sources: Array<{ pages: KnowledgePage[] }>;
     };
     library.sources[0]!.pages[0]!.text = "三角関数の定理を説明する本文。";
@@ -629,7 +636,7 @@ describe("Knowledge DB smart split", () => {
     const store = createStore(dataDir);
     const [source] = await store.addFiles([sourcePath]);
     expect(source).toBeTruthy();
-    const library = JSON.parse(await fs.readFile(libraryPath, "utf8")) as { sources: Array<{ pages: KnowledgePage[] }> };
+    const library = await readLibraryFixture(dataDir) as { sources: Array<{ pages: KnowledgePage[] }> };
     library.sources[0]!.pages.forEach((page, index) => {
       page.text = index < 2 ? "数学Ⅱ 三角関数" : "物理 力学";
       page.taxonomyPaths = index < 2 ? [["数学", "数学II", "三角関数"]] : [["理科", "物理", "力学"]];
