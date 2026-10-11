@@ -16,7 +16,7 @@ export interface SqliteSchemaDriver {
   transaction<T extends (...args: never[]) => unknown>(operation: T): T;
 }
 
-export const QUESTION_ENGINE_SCHEMA_VERSION = 4;
+export const QUESTION_ENGINE_SCHEMA_VERSION = 5;
 
 const MIGRATION_TABLE = `
   CREATE TABLE IF NOT EXISTS qe_schema_migrations (
@@ -246,6 +246,17 @@ const CORE_SCHEMA = `
   );
 
   CREATE INDEX IF NOT EXISTS qe_long_term_memories_updated_idx ON qe_long_term_memories(updated_at);
+
+  CREATE TABLE IF NOT EXISTS qe_research_sessions (
+    id TEXT PRIMARY KEY,
+    title TEXT NOT NULL,
+    query_text TEXT NOT NULL,
+    source_references_json TEXT NOT NULL DEFAULT '[]',
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+  );
+
+  CREATE INDEX IF NOT EXISTS qe_research_sessions_updated_idx ON qe_research_sessions(updated_at);
 
   CREATE VIRTUAL TABLE IF NOT EXISTS qe_questions_fts USING fts5(
     question_id UNINDEXED,
