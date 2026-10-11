@@ -7,15 +7,15 @@ function makeRepository(): SqliteKnowledgeLibraryRepository {
   const db = new DatabaseSync(":memory:");
   databases.push(db);
   db.exec(`
-    CREATE TABLE qe_knowledge_state (id INTEGER PRIMARY KEY, revision INTEGER NOT NULL);
-    INSERT INTO qe_knowledge_state(id, revision) VALUES (1, 0);
-    CREATE TABLE qe_knowledge_sources (
+    CREATE TABLE sigma_core_knowledge_state (id INTEGER PRIMARY KEY, revision INTEGER NOT NULL);
+    INSERT INTO sigma_core_knowledge_state(id, revision) VALUES (1, 0);
+    CREATE TABLE sigma_core_knowledge_sources (
       id TEXT PRIMARY KEY, display_name TEXT NOT NULL, original_uri TEXT NOT NULL,
       stored_uri TEXT NOT NULL, mime_type TEXT NOT NULL, size_bytes INTEGER NOT NULL,
       content_hash TEXT NOT NULL, page_count INTEGER NOT NULL, extraction_status TEXT NOT NULL,
       imported_at TEXT NOT NULL, updated_at TEXT NOT NULL, metadata_json TEXT NOT NULL
     );
-    CREATE TABLE qe_knowledge_pages (
+    CREATE TABLE sigma_core_knowledge_pages (
       id TEXT PRIMARY KEY, source_id TEXT NOT NULL, page_number INTEGER NOT NULL,
       semantic_type TEXT NOT NULL, title TEXT, text_content TEXT NOT NULL,
       extraction_status TEXT NOT NULL, structure_json TEXT NOT NULL, analysis_json TEXT NOT NULL,
