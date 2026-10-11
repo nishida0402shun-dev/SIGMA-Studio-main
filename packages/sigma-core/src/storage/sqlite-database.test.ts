@@ -39,7 +39,7 @@ describe("openSigmaCoreDatabase", () => {
       const migrations = database.raw.prepare(
         "SELECT version FROM sigma_core_schema_migrations ORDER BY version",
       ).all() as Array<{ version: number }>;
-      expect(migrations.map((row) => row.version)).toEqual([6, 7]);
+      expect(migrations.map((row) => row.version)).toEqual([6, 8]);
       expect(() => database.raw.prepare("SELECT * FROM qe_questions").all()).toThrow();
     } finally {
       database.close();
