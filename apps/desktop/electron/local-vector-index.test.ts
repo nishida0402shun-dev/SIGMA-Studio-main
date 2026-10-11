@@ -42,7 +42,7 @@ describe("LocalVectorIndex", () => {
   });
 
   it("persists semantic vectors and returns the closest matching page", async () => {
-    const { database, index } = await createIndex(["source-a", "source-b"]);
+    const { database, index } = await createIndex();
     await index.upsert({
       id: "page-a", sourceId: "source-a", pageNumber: 1, chunkIndex: 0,
       text: "二次関数の頂点と軸を求める問題",
