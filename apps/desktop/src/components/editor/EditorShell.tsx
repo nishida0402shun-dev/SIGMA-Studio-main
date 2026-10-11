@@ -6529,6 +6529,7 @@ function EditorShellBody({ embeddedHost, editorStore }: EditorShellProps & { edi
       {renderEditorChrome(chrome)}
 
 
+      <main
         className={workspaceClassName}
         // Backstage は本文を覆うので、覆っている間は本文を丸ごと不活性にする。
         // capture の keydown ガードだけでは Tab で裏へ抜けられ、beforeinput 経由で
