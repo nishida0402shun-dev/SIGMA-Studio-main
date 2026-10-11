@@ -1,15 +1,24 @@
 # SIGMA Question Engine
 
-SIGMA Studio 専用の問題データ基盤を再構築するための新しいライブラリ境界です。
+SIGMA Studio 専用の問題・知識・会話データ基盤を再構築するための新しいライブラリ境界です。
 
-> Status: design and migration scaffold. This package is not wired into the desktop app yet.
+> Status: initial rebuild scaffold. The new schema is not wired into the desktop app, and migration tests have not yet been run.
 
 ## Goals
 
-- Preserve existing SIGMA Studio behavior while replacing implicit database coupling with an explicit API.
-- Support local-first storage, full-text search, source/page provenance, reviewable PDF ingestion, AI-assisted classification, worksheet generation, and exercise history.
+- Replace legacy persistence implementations with a versioned local-first SQLite storage layer behind explicit APIs.
+- Support questions, knowledge documents/pages, vector records, conversation history, long-term memory, provenance, reviewable PDF ingestion, and exercise history.
 - Keep AI providers, Electron IPC, MCP adapters, and storage behind separate interfaces.
-- Make future synchronization optional; local use must not require a network service.
+- Keep all local data operations offline-capable.
+- Keep Electron and filesystem access out of the domain layer.
+
+## Current rebuild state
+
+- The disconnected legacy Question Bank package was removed from this branch.
+- A provider-neutral domain model, application ports, and initial SQLite schema have been added.
+- The schema currently covers question records, sources, tags, import proposals, knowledge pages, vector records, conversation entries, and long-term memories.
+- Existing integrated Knowledge DB and memory stores still have live application references. They are **not yet removed or replaced**; the new adapter layer must be implemented and verified before those code paths can be retired.
+- No data files are deleted by this code change. Runtime data removal is a separate operation and is not part of this branch.
 
 ## Boundaries
 
@@ -24,19 +33,11 @@ SIGMA Studio 専用の問題データ基盤を再構築するための新しい�
 - `adapters/electron` and `adapters/mcp`: explicitly authorized integration surfaces.
 - `sync`: optional future change-log synchronization; not required for initial local use.
 
-## Non-goals for the first milestone
-
-- No immediate deletion or replacement of existing databases.
-- No automatic migration of user data before schema inventory, backup, and migration tests.
-- No network service or cloud account requirement.
-- No treating AI-generated answers as source-verified answers.
-- No direct renderer access to database handles or unrestricted filesystem paths.
-
 ## Migration rule
 
-The existing question-bank package and any other SIGMA-specific databases remain intact while the new library is developed in parallel. Migration is allowed only after a database inventory, explicit mapping, backup/restore validation, and regression tests. The old path is removed only after the new path passes those checks.
+The old integrated stores are marked for retirement, but their application call sites must be migrated to the new API before deleting the old modules. Existing runtime data files are left untouched until explicit migration, backup/restore validation, and regression tests pass.
 
-## Initial acceptance criteria
+## Acceptance criteria
 
 1. Domain and application APIs can be tested without Electron.
 2. SQLite schema changes are versioned and tested against a temporary database.
@@ -44,12 +45,13 @@ The existing question-bank package and any other SIGMA-specific databases remain
 4. Import jobs support progress, cancellation/error state, and retry without duplicate registration.
 5. Extracted/AI-proposed content requires an explicit review/approval path.
 6. Electron integration goes through validated IPC and does not expose the DB handle to the renderer.
-7. Existing application tests and build/CI results are checked before any migration or removal.
+7. Existing app tests and build/CI are checked before old modules are removed.
+8. A test fixture copied from legacy stores can be migrated and queried without data loss.
 
 ## Next steps
 
-1. Inventory every database, connection factory, schema, migration, and consumer in the repository.
-2. Compare the current question-bank schema and FTS implementation against the desired domain model.
-3. Write a migration map and decide which existing tables can be reused.
-4. Implement the minimal core/application/storage layers and tests.
-5. Add PDF extraction and AI adapters only after the storage contracts are stable.
+1. Implement and test the storage adapter and FTS synchronization.
+2. Inventory all live consumers of Knowledge DB, vector index, conversation memory, and long-term memory.
+3. Move those consumers behind the new library API.
+4. Add a tested one-time data migration/backup flow.
+5. Remove the remaining old store modules only after the app builds and regression tests pass.
