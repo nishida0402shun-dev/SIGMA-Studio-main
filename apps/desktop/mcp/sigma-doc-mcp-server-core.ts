@@ -44,10 +44,10 @@ import { LocalMaterialStore } from "../electron/local-material-store";
 import { KnowledgeDbStore } from "../electron/knowledge-db-store";
 import { KnowledgeLearningStore } from "../electron/knowledge-learning-store";
 import {
-  openQuestionEngineDatabase,
+  openSigmaCoreDatabase,
   SqliteConversationMemoryStore,
   SqliteLongTermMemoryStore,
-} from "../../../packages/question-engine/src/index";
+} from "../../../packages/sigma-core/src/index";
 import { LocalAiResourceStore } from "../electron/ai-resource-store";
 import { isAiWebSearchEnabled, readDesktopSettingsSync, writeDesktopSettings } from "../electron/desktop-settings";
 import {
@@ -1105,11 +1105,11 @@ function resolveUserDataPath(): string {
   return existing ?? candidates[0];
 }
 
-function createStore(): { store: LocalSigmaDocStore; userDataPath: string; dataDir: string; database: ReturnType<typeof openQuestionEngineDatabase> } {
+function createStore(): { store: LocalSigmaDocStore; userDataPath: string; dataDir: string; database: ReturnType<typeof openSigmaCoreDatabase> } {
   const userDataPath = resolveUserDataPath();
   const store = new LocalSigmaDocStore(userDataPath);
   const dataDir = store.getDataDir();
-  const database = openQuestionEngineDatabase({ dataDir: path.join(dataDir, "knowledge-db") });
+  const database = openSigmaCoreDatabase({ dataDir: path.join(dataDir, "knowledge-db") });
   return {
     store,
     userDataPath,
