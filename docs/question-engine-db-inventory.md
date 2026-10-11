@@ -1,48 +1,43 @@
-# Question Engine migration inventory
+# SQLite retirement and SIGMA Core storage inventory
 
-Audit baseline: commit `7377554902141bba9335435394ed7bfeefbf3efe`; rebuild branch includes subsequent changes.
+Last checked: branch `feat/sigma-core-foundation`. This inventory describes tracked source files; runtime data deletion and full desktop verification require a passing CI run and an actual application launch.
 
-This is a source-code inventory, not a claim that runtime data locations or test results have been verified.
+## Legacy storage removed from the branch
 
-## Legacy implementations found at the audit baseline
+| Legacy component | Current state |
+|---|---|
+| `packages/question-engine/src/storage/` SQLite implementation | Removed. The Question Engine package retains question-domain types and application contracts only. |
+| Disconnected standalone Question Bank package | Removed from this branch; it is not used as the new storage implementation. |
+| `qe_*` database tables | Retired by the SIGMA Core schema initializer. Existing rows are intentionally not migrated. |
+| Previous `sigma-studio.sqlite` database and WAL/SHM sidecars | Electron startup now attempts to delete these files from the configured `knowledge-db` directory. This is code behavior, not evidence that a user's local files have already been deleted. |
+| JSON-backed conversation, long-term memory, and research-session persistence | Replaced by SQLite stores in SIGMA Core for the migrated Electron flows. |
 
-| Area | Previous implementation | Format / role | Current status |
-|---|---|---|---|
-| Standalone Question Bank | `packages/sigma_studio_question_bank_package/packages/question-bank/src/db/` | SQLite via `better-sqlite3`; questions, taxonomy, FTS5, PDF staging | **Removed from this branch**. Its schema/repository should not be reused as the new storage implementation. |
-| Knowledge DB | `apps/desktop/electron/knowledge-db-store.ts` | Extraction/classification/retrieval logic; source/page metadata | Metadata persistence now uses `qe_knowledge_sources` and `qe_knowledge_pages` in SQLite. Source files remain on disk. The façade is retained for existing IPC/UI callers. |
-| Learning feedback | `apps/desktop/electron/knowledge-learning-store.ts` | JSON-backed search feedback and ranking boosts | Replaced by `qe_knowledge_learning_feedback` in the shared SQLite database. |
-| Local vector index | `apps/desktop/electron/local-vector-index.ts` | Local embedding model and vector retrieval | Vector records now persist in `qe_vector_records` in the shared SQLite database. Embedding model logic remains in this adapter. |
-| Conversation memory | `apps/desktop/electron/conversation-memory-store.ts` | JSON file-backed conversation entries and search | **Old module removed**. Electron IPC now uses `SqliteConversationMemoryStore`; FTS and LIKE-assisted search are implemented in the new adapter. |
-| Long-term memory | `apps/desktop/electron/long-term-memory-store.ts` | JSON file-backed extracted memory entries | **Old module removed**. Electron IPC now uses `SqliteLongTermMemoryStore`. |
-| Research sessions | `apps/desktop/electron/research-session-store.ts` | JSON file-backed research questions and page references | Persistence moved to `qe_research_sessions`; the Electron-facing class is a compatibility export over the shared SQLite store. Existing JSON files are not imported. |
-| Browser runtime stores | `apps/desktop/src/lib/runtime/browser/idb-backend.ts`, `memory-backend.ts` | Browser persistence abstractions | Separate browser-runtime layer. Audit callers before deciding whether it should share the same storage API or remain an adapter. |
+## Current storage ownership
 
-## Rebuild changes already made
+| Area | Current owner | Notes |
+|---|---|---|
+| Shared DB opening and schema | `packages/sigma-core/src/storage/sqlite-database.ts`, `sqlite-schema.ts` | Opens `sigma-core.sqlite`; one shared database across workspaces. |
+| Knowledge source/page records | `sqlite-knowledge-library-repository.ts` | Electron still owns extraction, classification, and user-facing orchestration. |
+| PDF import staging | `sqlite-knowledge-import-repository.ts` | Added to SIGMA Core; Electron no longer issues staging-table SQL directly. |
+| Vector records | `sqlite-vector-index.ts` | Embedding model and query orchestration remain in the Electron adapter; persistence belongs to Core. |
+| Learning feedback | `sqlite-knowledge-learning-store.ts` | Electron-facing module is a compatibility re-export. |
+| Conversation and long-term memory | `sqlite-conversation-memory-store.ts`, `sqlite-long-term-memory-store.ts` | Shared database, FTS-assisted search. |
+| Question records | `sqlite-question-repository.ts` | Uses the question domain contracts/types; question-domain source remains under `packages/question-engine/src/`. |
+| Research sessions | `sqlite-research-session-store.ts` | Electron-facing adapter delegates to Core. |
+| Backup/restore archive and file relocation | `apps/desktop/electron/knowledge-db-store.ts` | File/archive orchestration remains in Electron; it currently uses SQL for generic table restore and path relocation. Backup restore now expects `sigma-core.sqlite`. |
+| Browser IndexedDB | `apps/desktop/src/lib/runtime/browser/` | Separate browser-runtime persistence, not part of the desktop SQLite retirement. |
 
-- Created branch `feat/question-engine-rebuild`.
-- Removed 25 tracked files belonging to the disconnected standalone Question Bank package.
-- Added provider-neutral question domain types and application ports under `packages/question-engine/src/`.
-- Added a versioned SQLite schema covering question records, sources, tags, import proposals, knowledge pages, vector records, conversation entries, long-term memories, and research sessions.
-- The desktop main process opens one shared SQLite connection and injects it into knowledge, vector, conversation, long-term memory, and research-session stores.
-- Existing JSON-backed research-session files are no longer read by the new store; the old data is not migrated.
+## Verification status
 
-## Correctness issues observed in the removed Question Bank implementation
+- Core-only typecheck and tests passed in CI run `38115382853`, but the desktop typecheck failed because three remaining consumers still imported removed Question Engine SQLite exports.
+- Those imports were corrected in subsequent commits. The latest CI result must be checked before treating the branch as verified.
+- The Core schema is now namespaced and independent of the old `qe_*` tables, but a source review is still required before claiming the entire schema is a ground-up data-model redesign. Renaming tables alone is not proof of redesign.
+- A passing CI run does not prove that the application has been launched locally or that a user's old files were deleted.
 
-- Its FTS5 virtual table declared external content `questions` with a `body_text` column, while the source table stored `body_json`; triggers also copied `body_json` into that FTS column. This needed explicit tests and was one reason not to reuse that implementation.
-- The old package was not included in the root npm workspace list and was not wired through the inspected Electron main/preload files at the audit baseline.
+## Remaining acceptance checks
 
-## Safe retirement sequence for the still-integrated stores
-
-1. Confirm CI after the latest type correction and SQLite research-session cutover.
-2. Run focused tests for schema upgrades, question repository invariants, Japanese FTS/LIKE search, and research-session persistence.
-3. Audit remaining Electron and browser persistence modules; keep browser IndexedDB as a separate runtime adapter unless the consumer graph supports consolidation.
-4. Validate knowledge backup/restore, PDF source files, and derived preview paths against the SQLite database.
-5. Run typecheck, focused tests, full test suite, build, Electron packaging, and CI; record exact results.
-6. Remove compatibility facades only when all callers are migrated and checks pass.
-
-## Unknowns
-
-- Exact runtime data directories and whether users have production data in them.
-- Full consumer graph for all legacy stores, including indirect calls and UI routes.
-- Whether the new SQLite driver can be packaged correctly for every supported Electron target.
-- Current build/test/CI results for the rebuild branch.
+1. Verify current CI: Core and desktop typecheck, unit tests, lint, production build, Electron packaging/smoke test, and cross-platform file-locking jobs.
+2. Add or confirm explicit migration tests that prove legacy `qe_*` tables are dropped and the new schema is created.
+3. Verify backup/restore round-trip with `sigma-core.sqlite`, including foreign-key integrity and stored file paths.
+4. Search the complete tracked tree for remaining direct persistence SQL outside Core. Keep file extraction and archive management in Electron, but route table-specific operations through Core repositories.
+5. Keep this branch unmerged until these checks pass.
