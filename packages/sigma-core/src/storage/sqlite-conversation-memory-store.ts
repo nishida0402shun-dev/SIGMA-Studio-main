@@ -77,7 +77,7 @@ export class SqliteConversationMemoryStore {
 
     const tokens = tokenize(normalized);
     const terms = [...new Set([normalized, ...tokens])].slice(0, 65);
-    const conditions = terms.map(() => "content LIKE ? ESCAPE '\\'").join(" OR ");
+    const conditions = terms.map(() => "instr(lower(content), lower(?)) > 0").join(" OR ");
     const scope = conversationId ? "conversation_id = ? AND " : "";
     const parameters = terms;
     if (conversationId) parameters.unshift(conversationId);
@@ -181,9 +181,6 @@ function tokenize(value: string): string[] {
   return [...new Set(value.match(/[a-z0-9]+|[ぁ-んァ-ヶ一-龯]{2,}/giu) ?? [])].slice(0, 64);
 }
 
-function escapeLike(value: string): string {
-  return value.replace(/[\\%_]/gu, "\\$&");
-}
 
 function boundedInteger(value: number, fallback: number, min: number, max: number): number {
   const number = Number.isFinite(value) ? Math.trunc(value) : fallback;
