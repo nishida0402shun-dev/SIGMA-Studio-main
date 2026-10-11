@@ -29,6 +29,8 @@ vi.mock("electron", () => ({
 
 vi.mock("../desktop-settings", () => ({ writeDesktopSettings: mocks.writeDesktopSettings }));
 
+vi.mock("../trusted-ipc", () => ({ ipcMain: { handle: vi.fn((channel: string, handler: (...args: unknown[]) => unknown) => { mocks.handlers.set(channel, handler); }), on: vi.fn() } }));
+
 const { registerCodexIpc } = await import("./codex");
 
 const workDir = mkdtempSync(path.join(tmpdir(), "codex-set-bin-test-"));

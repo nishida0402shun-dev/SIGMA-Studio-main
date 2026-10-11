@@ -35,7 +35,8 @@ jobs:
       - run: npm run lint
       # Source-graph scans and real filesystem tests exceed 5s on shared runners.
       - run: npm --workspace @sigma-studio/desktop run test -- --maxWorkers=2 --testTimeout=30000
-      - run: npm run build
+      # Electron opens the static export via file://; the desktop assetPrefix is required.
+      - run: NEXT_PUBLIC_TARGET=desktop npm run build
       - run: npm run electron:build
       # Exercise the shipped Electron runtime against a real window, not only Chromium.
       - name: Install Electron smoke-test display server

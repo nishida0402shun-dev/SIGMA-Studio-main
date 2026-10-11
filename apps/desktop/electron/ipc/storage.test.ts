@@ -20,6 +20,8 @@ vi.mock("electron", () => ({
   },
 }));
 
+vi.mock("../trusted-ipc", () => ({ ipcMain: { handle: vi.fn((channel: string, handler: (...args: unknown[]) => unknown) => { mocks.handlers.set(channel, handler); }), on: vi.fn() } }));
+
 import { registerStorageIpc, type RegisterStorageIpcDeps } from "./storage";
 import { LedgerSchemaError } from "../ledger-schema-error";
 import { LocalMcpEditProposalStore } from "../local-sigma-doc-proposal-store";

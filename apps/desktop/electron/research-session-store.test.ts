@@ -1,20 +1,25 @@
-import fs from "node:fs/promises";
+import { mkdtemp, rm } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
+import { openQuestionEngineDatabase } from "../../../packages/question-engine/src/index";
 import { ResearchSessionStore } from "./research-session-store";
 
-const dirs: string[] = [];
+let dir: string | undefined;
+let database: ReturnType<typeof openQuestionEngineDatabase> | undefined;
 
 afterEach(async () => {
-  await Promise.all(dirs.splice(0).map((dir) => fs.rm(dir, { recursive: true, force: true })));
+  database?.close();
+  database = undefined;
+  if (dir) await rm(dir, { recursive: true, force: true });
+  dir = undefined;
 });
 
 describe("ResearchSessionStore", () => {
-  it("persists a research question and deduplicated page references", async () => {
-    const dir = await fs.mkdtemp(path.join(os.tmpdir(), "sigma-research-session-"));
-    dirs.push(dir);
-    const store = new ResearchSessionStore(dir);
+  it("persists a research question and deduplicated page references in shared SQLite", async () => {
+    dir = await mkdtemp(path.join(os.tmpdir(), "sigma-research-session-"));
+    database = openQuestionEngineDatabase({ dataDir: dir });
+    const store = new ResearchSessionStore(database.raw);
     const created = await store.create({
       title: "材料比較",
       query: "材料Aと材料Bの違い",

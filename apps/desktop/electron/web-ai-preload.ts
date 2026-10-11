@@ -38,7 +38,7 @@ let currentWorkspaceId: string | null = null;
 const conversationCaptureId = `web-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const capturedNodes = new WeakSet<Node>();
 const capturedKeys = new Set<string>();
-let conversationCaptureEnabled = true;
+let conversationCaptureEnabled = false;
 
 function captureText(value: string): string {
   return value.replace(/\\s+/g, " ").trim().slice(0, 50_000);
@@ -366,9 +366,9 @@ async function registerSigmaWebAiTools(): Promise<void> {
   if (!ORIGIN_ALLOWLIST.has(window.location.origin)) return;
   try {
     const enabled = await ipcRenderer.invoke("web-ai:get-conversation-capture-setting") as unknown;
-    conversationCaptureEnabled = enabled !== false;
+    conversationCaptureEnabled = enabled === true;
   } catch {
-    conversationCaptureEnabled = true;
+    conversationCaptureEnabled = false;
   }
   if (!(await ensureBridgeConfig())) {
     reportWebAiStatus(false, false);
