@@ -123,8 +123,6 @@ describe("KnowledgeDbStore", () => {
     await createPdf("ranking.pdf", 2);
     const store = createStore(dataDir);
     const sourceId = "src_ranking";
-    const libraryPath = path.join(dataDir, "knowledge-db", "library.json");
-    await fs.mkdir(path.dirname(libraryPath), { recursive: true });
     const library = {
       version: 3,
       sources: [{
@@ -164,8 +162,6 @@ describe("KnowledgeDbStore", () => {
     tempDirs.push(dataDir);
     const store = createStore(dataDir);
     const sourceIds = ["src_hybrid_a", "src_hybrid_b", "src_hybrid_c"];
-    const libraryPath = path.join(dataDir, "knowledge-db", "library.json");
-    await fs.mkdir(path.dirname(libraryPath), { recursive: true });
     const now = new Date().toISOString();
     const pages = [
       { id: sourceIds[0] + "_p1", sourceId: sourceIds[0], pageNumber: 1, semanticType: "unknown" as const, text: "数学 三角関数 共通説明", extractionStatus: "text" as const, analysisStatus: "analyzed" as const, analysisVersion: 2 },
@@ -196,8 +192,6 @@ describe("KnowledgeDbStore", () => {
     const store = createStore(dataDir);
     const sourceA = "src_exact_a";
     const sourceB = "src_exact_b";
-    const libraryPath = path.join(dataDir, "knowledge-db", "library.json");
-    await fs.mkdir(path.dirname(libraryPath), { recursive: true });
     const now = new Date().toISOString();
     const page = (sourceId: string, pageNumber: number, text: string) => ({
       id: sourceId + "_p" + pageNumber,
@@ -240,8 +234,6 @@ describe("KnowledgeDbStore", () => {
     tempDirs.push(dataDir);
     const store = createStore(dataDir);
     const sourceId = "src_citation";
-    const libraryPath = path.join(dataDir, "knowledge-db", "library.json");
-    await fs.mkdir(path.dirname(libraryPath), { recursive: true });
     const library = {
       version: 3,
       sources: [{
@@ -401,8 +393,6 @@ describe("Knowledge DB large-library resilience", () => {
         taxonomyVersion: KNOWLEDGE_TAXONOMY_VERSION,
       })),
     }));
-    const libraryPath = path.join(dataDir, "knowledge-db", "library.json");
-    await fs.mkdir(path.dirname(libraryPath), { recursive: true });
     seedLibrary(dataDir, { version: 3, sources });
 
     const store = createStore(dataDir);
@@ -438,8 +428,6 @@ describe("Knowledge DB analysis lifecycle", () => {
     const [source] = await store.addFiles([sourcePath]);
     expect(source).toBeTruthy();
     await store.search("warmup", 1);
-
-    const libraryPath = path.join(dataDir, "knowledge-db", "library.json");
     const library = JSON.parse(await fs.readFile(libraryPath, "utf8")) as { sources: Array<{ pages: KnowledgePage[] }> };
     library.sources[0].pages[0].text = "数学Ⅱ 三角関数 定理";
     library.sources[0].pages[0].analysisStatus = "stale";
@@ -486,8 +474,6 @@ describe("Knowledge DB analysis lifecycle", () => {
     const [source] = await store.addFiles([sourcePath]);
     expect(source).toBeTruthy();
     await store.search("warmup", 1);
-
-    const libraryPath = path.join(dataDir, "knowledge-db", "library.json");
     const library = JSON.parse(await fs.readFile(libraryPath, "utf8")) as {
       sources: Array<{
         pages: Array<{
@@ -524,8 +510,6 @@ describe("Knowledge DB analysis lifecycle", () => {
     const sources = await store.addFiles([firstPath, secondPath]);
     expect(sources).toHaveLength(2);
     await store.search("warmup", 2);
-
-    const libraryPath = path.join(dataDir, "knowledge-db", "library.json");
     const library = JSON.parse(await fs.readFile(libraryPath, "utf8")) as {
       sources: Array<{ id: string; pages: KnowledgePage[] }>;
     };
@@ -557,8 +541,6 @@ describe("Knowledge DB analysis lifecycle", () => {
     const [source] = await store.addFiles([sourcePath]);
     expect(source).toBeTruthy();
     await store.search("warmup", 1);
-
-    const libraryPath = path.join(dataDir, "knowledge-db", "library.json");
     const library = JSON.parse(await fs.readFile(libraryPath, "utf8")) as {
       sources: Array<{ pages: KnowledgePage[] }>;
     };
@@ -647,7 +629,6 @@ describe("Knowledge DB smart split", () => {
     const store = createStore(dataDir);
     const [source] = await store.addFiles([sourcePath]);
     expect(source).toBeTruthy();
-    const libraryPath = path.join(dataDir, "knowledge-db", "library.json");
     const library = JSON.parse(await fs.readFile(libraryPath, "utf8")) as { sources: Array<{ pages: KnowledgePage[] }> };
     library.sources[0]!.pages.forEach((page, index) => {
       page.text = index < 2 ? "数学Ⅱ 三角関数" : "物理 力学";
