@@ -418,7 +418,7 @@ export function AiEditPanel({
   const [geminiModel, setGeminiModel] = useState<string>(initialModelPreferences.geminiModel);
   const [reasoningEffort, setReasoningEffort] = useState<AiEditReasoningEffort>(initialModelPreferences.reasoningEffort);
   const [instruction, setInstruction] = useState("");
- live in the module-level
+  // R5: rooms and the active-room selection live in the module-level
   // controller store (ai-run-controller.ts), not component state, so an
   // in-flight run's transcript updates survive this panel being remounted
   // (promoting inline → sidebar moves it across a portal boundary, which
@@ -1114,7 +1114,7 @@ export function AiEditPanel({
   // immediate run and a later queued-follow-up dispatch (R3) go through this
   // same snapshot shape so a follow-up replays exactly what the user composed,
   // even if the live composer state has since moved on to something else.
- = useCallback(async (): Promise<RunParams> => {
+  const buildRunParams = useCallback(async (): Promise<RunParams> => {
     const turnAttachments = await createAttachmentsWithSelectedOverlayPreview({
       attachments,
       overlayPreviews: overlayComposerPreviews,
