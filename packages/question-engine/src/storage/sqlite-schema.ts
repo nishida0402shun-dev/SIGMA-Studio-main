@@ -13,7 +13,7 @@ export interface SqliteSchemaDriver {
     run(...params: unknown[]): unknown;
   };
   pragma?(source: string): unknown;
-  transaction?<T extends (...args: never[]) => unknown>(operation: T): T;
+  transaction<T extends (...args: never[]) => unknown>(operation: T): T;
 }
 
 export const QUESTION_ENGINE_SCHEMA_VERSION = 1;
@@ -217,6 +217,51 @@ const CORE_SCHEMA = `
     body_text,
     tags_text
   );
+
+  CREATE TRIGGER IF NOT EXISTS qe_questions_fts_ai AFTER INSERT ON qe_questions BEGIN
+    INSERT INTO qe_questions_fts(question_id, title, body_text, tags_text)
+    VALUES (new.id, new.title, new.body_json, '');
+  END;
+
+  CREATE TRIGGER IF NOT EXISTS qe_questions_fts_ad AFTER DELETE ON qe_questions BEGIN
+    DELETE FROM qe_questions_fts WHERE question_id = old.id;
+  END;
+
+  CREATE TRIGGER IF NOT EXISTS qe_questions_fts_au AFTER UPDATE ON qe_questions BEGIN
+    DELETE FROM qe_questions_fts WHERE question_id = old.id;
+    INSERT INTO qe_questions_fts(question_id, title, body_text, tags_text)
+    VALUES (new.id, new.title, new.body_json, '');
+  END;
+
+  CREATE TRIGGER IF NOT EXISTS qe_knowledge_pages_fts_ai AFTER INSERT ON qe_knowledge_pages BEGIN
+    INSERT INTO qe_knowledge_pages_fts(page_id, source_id, page_number, title, text_content)
+    VALUES (new.id, new.source_id, new.page_number, COALESCE(new.title, ''), new.text_content);
+  END;
+
+  CREATE TRIGGER IF NOT EXISTS qe_knowledge_pages_fts_ad AFTER DELETE ON qe_knowledge_pages BEGIN
+    DELETE FROM qe_knowledge_pages_fts WHERE page_id = old.id;
+  END;
+
+  CREATE TRIGGER IF NOT EXISTS qe_knowledge_pages_fts_au AFTER UPDATE ON qe_knowledge_pages BEGIN
+    DELETE FROM qe_knowledge_pages_fts WHERE page_id = old.id;
+    INSERT INTO qe_knowledge_pages_fts(page_id, source_id, page_number, title, text_content)
+    VALUES (new.id, new.source_id, new.page_number, COALESCE(new.title, ''), new.text_content);
+  END;
+
+  CREATE TRIGGER IF NOT EXISTS qe_conversation_entries_fts_ai AFTER INSERT ON qe_conversation_entries BEGIN
+    INSERT INTO qe_conversation_entries_fts(entry_id, conversation_id, content)
+    VALUES (new.id, new.conversation_id, new.content);
+  END;
+
+  CREATE TRIGGER IF NOT EXISTS qe_conversation_entries_fts_ad AFTER DELETE ON qe_conversation_entries BEGIN
+    DELETE FROM qe_conversation_entries_fts WHERE entry_id = old.id;
+  END;
+
+  CREATE TRIGGER IF NOT EXISTS qe_conversation_entries_fts_au AFTER UPDATE ON qe_conversation_entries BEGIN
+    DELETE FROM qe_conversation_entries_fts WHERE entry_id = old.id;
+    INSERT INTO qe_conversation_entries_fts(entry_id, conversation_id, content)
+    VALUES (new.id, new.conversation_id, new.content);
+  END;
 `;
 
 export function initializeQuestionEngineSchema(db: SqliteSchemaDriver, now = new Date().toISOString()): void {
@@ -238,6 +283,5 @@ export function initializeQuestionEngineSchema(db: SqliteSchemaDriver, now = new
       now,
     );
   };
-  if (db.transaction) db.transaction(apply)();
-  else apply();
+  db.transaction(apply)();
 }
