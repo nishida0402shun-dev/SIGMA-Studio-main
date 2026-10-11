@@ -2,7 +2,7 @@ import { mkdtemp, rm } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
-import { openQuestionEngineDatabase, type QuestionEngineDatabase } from "../../packages/question-engine/src/index";
+import { openQuestionEngineDatabase, type QuestionEngineDatabase } from "../../../packages/question-engine/src/index";
 import { LocalVectorIndex, embed } from "./local-vector-index";
 
 describe("LocalVectorIndex", () => {
