@@ -7,3 +7,9 @@ export * from "./storage/sqlite-vector-index.js";
 export * from "./storage/sqlite-knowledge-library-repository.js";
 
 export * from "./storage/sqlite-schema.js";
+
+export * from "./storage/sqlite-database.js";
+export * from "./storage/sqlite-conversation-memory-store.js";
+export * from "./storage/sqlite-long-term-memory-store.js";
+export * from "./storage/sqlite-question-repository.js";
+export * from "./storage/sqlite-research-session-store.js";
