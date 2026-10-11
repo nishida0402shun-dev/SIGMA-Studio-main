@@ -120,6 +120,16 @@ export interface VectorSearchResult extends Omit<VectorRecord, "vector"> {
   score: number;
 }
 
+/** Application-owned contract so a different embedded vector engine can replace SQLite without changing retrieval callers. */
+export interface VectorStore {
+  upsert(record: Omit<VectorRecord, "vector">): Promise<void>;
+  upsertMany(records: Array<Omit<VectorRecord, "vector">>): Promise<void>;
+  hasSource(sourceId: string): Promise<boolean>;
+  removeSource(sourceId: string): Promise<void>;
+  search(query: string, limit?: number): Promise<VectorSearchResult[]>;
+  hasRecords(): Promise<boolean>;
+}
+
 const DIMENSIONS = 256;
 // Text-only EmbeddingGemma 2 encoder; multimodal encoders are intentionally not loaded for the vector index.
 const MODEL = "embeddinggemma-2-text";
@@ -217,7 +227,7 @@ async function embedDocuments(texts: string[]): Promise<number[][]> {
   return vectors;
 }
 
-export class LocalVectorIndex {
+export class LocalVectorIndex implements VectorStore {
   constructor(private readonly db: DatabaseSync) {
     initializeVectorSchema(db);
   }
