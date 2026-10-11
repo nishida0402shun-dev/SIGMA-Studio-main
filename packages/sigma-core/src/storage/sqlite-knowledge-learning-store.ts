@@ -14,7 +14,7 @@ export interface KnowledgeLearningFeedback {
   metadata?: Record<string, unknown>;
 }
 
-type FeedbackRow = {
+type FeedbackRecord = {
   id: string;
   query_text: string;
   source_id: string | null;
@@ -25,67 +25,96 @@ type FeedbackRow = {
   metadata_json: string;
 };
 
-const MAX_FEEDBACK = 20_000;
+const FEEDBACK_LIMIT = 20_000;
+const QUERY_LIMIT = 10_000;
 
 export class KnowledgeLearningStore {
-  constructor(private readonly db: DatabaseSync) {}
+  constructor(private readonly database: DatabaseSync) {}
 
-  async record(input: Omit<KnowledgeLearningFeedback, "id" | "createdAt">): Promise<KnowledgeLearningFeedback> {
+  async record(
+    input: Omit<KnowledgeLearningFeedback, "id" | "createdAt">,
+  ): Promise<KnowledgeLearningFeedback> {
     const query = input.query.trim();
     if (!query) throw new Error("learning query is empty");
-    if (query.length > 10_000) throw new Error("learning query is too long");
+    if (query.length > QUERY_LIMIT) throw new Error("learning query is too long");
+    if (!isFeedbackLabel(input.label)) throw new Error("invalid learning feedback label");
+    if (input.pageNumber !== undefined && (!Number.isInteger(input.pageNumber) || input.pageNumber < 1)) {
+      throw new Error("learning page number must be a positive integer");
+    }
+
     const entry: KnowledgeLearningFeedback = {
-      ...input,
-      id: "learn_" + randomUUID(),
+      id: `learn_${randomUUID()}`,
       query,
+      ...(input.sourceId?.trim() ? { sourceId: input.sourceId.trim() } : {}),
+      ...(input.pageNumber !== undefined ? { pageNumber: input.pageNumber } : {}),
+      label: input.label,
+      ...(input.correction?.trim() ? { correction: input.correction.trim() } : {}),
       createdAt: new Date().toISOString(),
+      ...(input.metadata && Object.keys(input.metadata).length ? { metadata: input.metadata } : {}),
     };
-    this.db.prepare(`
-      INSERT INTO sigma_core_knowledge_learning_feedback
+
+    this.database.prepare(
+      `INSERT INTO sigma_core_knowledge_learning_feedback
         (id, query_text, source_id, page_number, label, correction, created_at, metadata_json)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-    `).run(entry.id, entry.query, entry.sourceId ?? null, entry.pageNumber ?? null, entry.label,
-      entry.correction ?? null, entry.createdAt, JSON.stringify(entry.metadata ?? {}));
-    this.db.prepare(`
-      DELETE FROM sigma_core_knowledge_learning_feedback
-      WHERE id IN (
-        SELECT id FROM sigma_core_knowledge_learning_feedback
-        ORDER BY created_at DESC, rowid DESC
-        LIMIT -1 OFFSET ?
-      )
-    `).run(MAX_FEEDBACK);
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+    ).run(
+      entry.id, entry.query, entry.sourceId ?? null, entry.pageNumber ?? null,
+      entry.label, entry.correction ?? null, entry.createdAt, JSON.stringify(entry.metadata ?? {}),
+    );
+    this.database.prepare(
+      `DELETE FROM sigma_core_knowledge_learning_feedback
+       WHERE id IN (
+         SELECT id FROM sigma_core_knowledge_learning_feedback
+         ORDER BY created_at DESC, rowid DESC LIMIT -1 OFFSET ?
+       )`,
+    ).run(FEEDBACK_LIMIT);
     return entry;
   }
 
   async list(limit = 100): Promise<KnowledgeLearningFeedback[]> {
-    const safeLimit = Math.max(1, Math.min(Math.trunc(limit) || 1, 500));
-    return (this.db.prepare(`
-      SELECT * FROM sigma_core_knowledge_learning_feedback
-      ORDER BY created_at DESC, rowid DESC LIMIT ?
-    `).all(safeLimit) as FeedbackRow[]).map(fromRow);
+    const count = boundedInteger(limit, 100, 1, 500);
+    const rows = this.database.prepare(
+      "SELECT * FROM sigma_core_knowledge_learning_feedback ORDER BY created_at DESC, rowid DESC LIMIT ?",
+    ).all(count) as FeedbackRecord[];
+    return rows.map(decodeFeedback);
   }
 
   async getBoost(query: string, sourceId?: string, pageNumber?: number): Promise<number> {
-    const normalized = query.normalize("NFKC").toLocaleLowerCase().trim();
-    if (!normalized) return 0;
-    const rows = this.db.prepare("SELECT * FROM sigma_core_knowledge_learning_feedback").all() as FeedbackRow[];
-    let boost = 0;
+    const normalizedQuery = normalizeText(query);
+    if (!normalizedQuery) return 0;
+
+    const rows = this.database.prepare(
+      `SELECT * FROM sigma_core_knowledge_learning_feedback
+       WHERE (? IS NULL OR source_id = ?)
+         AND (? IS NULL OR page_number = ?)
+       ORDER BY created_at DESC LIMIT 20000`,
+    ).all(sourceId ?? null, sourceId ?? null, pageNumber ?? null, pageNumber ?? null) as FeedbackRecord[];
+
+    let score = 0;
     for (const row of rows) {
-      const item = fromRow(row);
-      if (sourceId && item.sourceId !== sourceId) continue;
-      if (pageNumber !== undefined && item.pageNumber !== pageNumber) continue;
-      const text = item.query.normalize("NFKC").toLocaleLowerCase();
-      if (!(normalized === text || normalized.includes(text) || text.includes(normalized))) continue;
-      if (item.label === "positive") boost += 0.06;
-      if (item.label === "negative") boost -= 0.08;
-      if (item.label === "correction") boost -= 0.02;
+      const feedback = decodeFeedback(row);
+      const phrase = normalizeText(feedback.query);
+      if (!phrase || !(phrase === normalizedQuery
+        || phrase.includes(normalizedQuery)
+        || normalizedQuery.includes(phrase))) continue;
+      if (feedback.label === "positive") score += 0.06;
+      else if (feedback.label === "negative") score -= 0.08;
+      else score -= 0.02;
     }
-    return Math.max(-0.20, Math.min(0.20, boost));
+    return Math.max(-0.2, Math.min(0.2, score));
   }
 }
 
-function fromRow(row: FeedbackRow): KnowledgeLearningFeedback {
-  const metadata = JSON.parse(row.metadata_json) as Record<string, unknown>;
+function decodeFeedback(row: FeedbackRecord): KnowledgeLearningFeedback {
+  let metadata: Record<string, unknown> = {};
+  try {
+    const parsed: unknown = JSON.parse(row.metadata_json);
+    if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+      metadata = parsed as Record<string, unknown>;
+    }
+  } catch {
+    // Feedback scoring does not depend on optional metadata.
+  }
   return {
     id: row.id,
     query: row.query_text,
@@ -96,4 +125,17 @@ function fromRow(row: FeedbackRow): KnowledgeLearningFeedback {
     createdAt: row.created_at,
     ...(Object.keys(metadata).length ? { metadata } : {}),
   };
+}
+
+function isFeedbackLabel(value: string): value is LearningFeedbackLabel {
+  return value === "positive" || value === "negative" || value === "correction";
+}
+
+function normalizeText(value: string): string {
+  return value.normalize("NFKC").toLocaleLowerCase().trim();
+}
+
+function boundedInteger(value: number, fallback: number, min: number, max: number): number {
+  const integer = Number.isFinite(value) ? Math.trunc(value) : fallback;
+  return Math.max(min, Math.min(integer || fallback, max));
 }
