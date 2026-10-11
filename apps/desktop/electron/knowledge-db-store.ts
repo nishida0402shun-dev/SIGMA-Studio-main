@@ -6,7 +6,7 @@ import { createHash, randomUUID } from "node:crypto";
 import { PDFDocument } from "pdf-lib";
 import JSZip from "jszip";
 import { LocalVectorIndex, type VectorSearchResult } from "./local-vector-index";
-import { SqliteKnowledgeLibraryRepository } from "../../../packages/sigma-core/src/index";
+import { SqliteKnowledgeLibraryRepository, SqliteKnowledgeImportRepository } from "../../../packages/sigma-core/src/index";
 import { rerankKnowledgeCandidates } from "./knowledge-decision-reranker";
 import { KnowledgeStructureParser, type KnowledgeStructureBlock, type KnowledgeStructureBlockType, type StructureParserStatus } from "./knowledge-db-structure-parser";
 import { analyzeKnowledgePage, KNOWLEDGE_ANALYSIS_VERSION } from "./knowledge-analysis-engine";
@@ -129,36 +129,6 @@ export interface KnowledgePdfImportStaging {
   segments: KnowledgePdfImportSegmentProposal[];
 }
 
-interface StagingRow {
-  id: string;
-  status: KnowledgePdfImportStaging["status"];
-  source_path: string;
-  source_name: string;
-  source_hash: string;
-  size_bytes: number;
-  page_count: number;
-  created_at: string;
-  updated_at: string;
-  approved_at: string | null;
-  segments_json: string;
-}
-
-function stagingFromRow(row: StagingRow): KnowledgePdfImportStaging {
-  return {
-    id: row.id,
-    status: row.status,
-    sourcePath: row.source_path,
-    sourceName: row.source_name,
-    sourceHash: row.source_hash,
-    sizeBytes: row.size_bytes,
-    pageCount: row.page_count,
-    createdAt: row.created_at,
-    updatedAt: row.updated_at,
-    ...(row.approved_at ? { approvedAt: row.approved_at } : {}),
-    segments: JSON.parse(row.segments_json) as KnowledgePdfImportSegmentProposal[],
-  };
-}
-
 export interface KnowledgeIndexStatus {
   state: "idle" | "running" | "completed" | "failed";
   total: number;
@@ -173,6 +143,7 @@ export class KnowledgeDbStore {
   private readonly dataDir: string;
   private readonly db: DatabaseSync;
   private readonly knowledgeRepository: SqliteKnowledgeLibraryRepository;
+  private readonly importRepository: SqliteKnowledgeImportRepository;
   private indexPromise: Promise<void> | null = null;
   private indexStatus: KnowledgeIndexStatus = { state: "idle", total: 0, completed: 0 };
   private readonly structureParser = new KnowledgeStructureParser();
@@ -182,6 +153,7 @@ export class KnowledgeDbStore {
     this.dataDir = dataDir;
     this.db = db;
     this.knowledgeRepository = new SqliteKnowledgeLibraryRepository(db);
+    this.importRepository = new SqliteKnowledgeImportRepository(db);
   }
 
   async recordLearningFeedback(input: { query: string; sourceId?: string; pageNumber?: number; label: "positive" | "negative" | "correction"; correction?: string }): Promise<unknown> {
@@ -719,13 +691,11 @@ export class KnowledgeDbStore {
   }
 
   async getPdfImportStaging(stagingId: string): Promise<KnowledgePdfImportStaging | null> {
-    const row = this.db.prepare("SELECT * FROM sigma_core_knowledge_staging WHERE id = ?").get(stagingId) as StagingRow | undefined;
-    return row ? stagingFromRow(row) : null;
+    return this.importRepository.get(stagingId);
   }
 
   async listPdfImportStaging(): Promise<KnowledgePdfImportStaging[]> {
-    const rows = this.db.prepare("SELECT * FROM sigma_core_knowledge_staging ORDER BY updated_at DESC, rowid DESC").all() as unknown as StagingRow[];
-    return rows.map(stagingFromRow);
+    return this.importRepository.list();
   }
 
   async updatePdfImportStaging(input: { stagingId: string; segments: KnowledgePdfImportSegmentProposal[] }): Promise<KnowledgePdfImportStaging> {
@@ -975,7 +945,7 @@ export class KnowledgeDbStore {
         await fs.writeFile(target, await entry.async("nodebuffer"));
         fileCount += 1;
       }
-      const restoredDatabasePath = path.join(tempRoot, "sigma-studio.sqlite");
+      const restoredDatabasePath = path.join(tempRoot, "sigma-core.sqlite");
       try { await fs.access(restoredDatabasePath); } catch {
         throw new Error("Invalid Knowledge DB backup: SQLite database missing");
       }
@@ -1024,7 +994,7 @@ export class KnowledgeDbStore {
       // Restore source documents and staging assets, but keep the live SQLite file
       // in place so the shared connection remains valid.
       for (const entry of await fs.readdir(tempRoot, { withFileTypes: true })) {
-        if (entry.name === "sigma-studio.sqlite") continue;
+        if (entry.name === "sigma-core.sqlite") continue;
         const sourcePath = path.join(tempRoot, entry.name);
         const targetPath = path.join(paths.root, entry.name);
         await fs.rm(targetPath, { recursive: true, force: true });
@@ -1265,24 +1235,7 @@ export class KnowledgeDbStore {
   }
 
   private writeStaging(staging: KnowledgePdfImportStaging): void {
-    this.db.prepare(`
-      INSERT INTO sigma_core_knowledge_staging
-        (id, status, source_path, source_name, source_hash, size_bytes, page_count,
-         created_at, updated_at, approved_at, segments_json)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-      ON CONFLICT(id) DO UPDATE SET
-        status = excluded.status,
-        source_path = excluded.source_path,
-        source_name = excluded.source_name,
-        source_hash = excluded.source_hash,
-        size_bytes = excluded.size_bytes,
-        page_count = excluded.page_count,
-        updated_at = excluded.updated_at,
-        approved_at = excluded.approved_at,
-        segments_json = excluded.segments_json
-    `).run(staging.id, staging.status, staging.sourcePath, staging.sourceName, staging.sourceHash,
-      staging.sizeBytes, staging.pageCount, staging.createdAt, staging.updatedAt,
-      staging.approvedAt ?? null, JSON.stringify(staging.segments));
+    this.importRepository.save(staging);
   }
 
   private async readLibrary(): Promise<KnowledgeLibrary> {
