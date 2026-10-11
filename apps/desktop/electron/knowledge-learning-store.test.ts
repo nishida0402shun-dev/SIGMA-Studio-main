@@ -2,7 +2,7 @@ import { mkdtemp, rm } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
-import { openQuestionEngineDatabase } from "../../packages/question-engine/src/index";
+import { openQuestionEngineDatabase } from "../../../packages/question-engine/src/index";
 import { KnowledgeLearningStore } from "./knowledge-learning-store";
 
 describe("KnowledgeLearningStore", () => {
