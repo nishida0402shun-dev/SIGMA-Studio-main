@@ -1,7 +1,7 @@
 import { mkdirSync } from "node:fs";
 import path from "node:path";
 import { DatabaseSync, type SQLInputValue } from "node:sqlite";
-import { initializeQuestionEngineSchema, type SqliteSchemaDriver } from "./sqlite-schema.js";
+import { initializeSigmaCoreSchema, type SqliteSchemaDriver } from "../../../sigma-core/src/storage/sqlite-schema.js";
 
 interface StatementLike {
   get(...params: unknown[]): unknown;
@@ -74,7 +74,7 @@ export function openQuestionEngineDatabase(
     database.exec("PRAGMA foreign_keys = ON");
     database.exec("PRAGMA journal_mode = WAL");
     database.exec("PRAGMA busy_timeout = 5000");
-    initializeQuestionEngineSchema(new NativeSqliteDriver(database));
+    initializeSigmaCoreSchema(new NativeSqliteDriver(database));
   } catch (error) {
     database.close();
     throw error;
