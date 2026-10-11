@@ -18,7 +18,7 @@ SIGMA Studio 専用の問題・知識・会話データ基盤を再構築する�
 - A provider-neutral domain model, application ports, and initial SQLite schema have been added.
 - The schema currently covers question records, sources, tags, import proposals, knowledge pages, vector records, conversation entries, and long-term memories.
 - Electron now opens one shared SQLite database under `data/knowledge-db/sigma-studio.sqlite` and injects that connection into knowledge, vector, conversation-memory, and long-term-memory stores.
-- The former JSON-backed conversation and long-term memory modules have been removed. Knowledge page/source metadata, vector records, and PDF staging metadata now use SQLite; source documents and derived page previews remain ordinary files.
+- The former JSON-backed conversation, long-term memory, learning-feedback, knowledge metadata, vector index, and PDF staging stores have been replaced by SQLite tables; source documents and derived page previews remain ordinary files. A transactional question repository now provides CRUD, optimistic version checks, tags, provenance, history, and filtered search.
 - The `KnowledgeDbStore` API is retained to avoid rewriting its IPC/UI callers, but its persistence implementation now reads/writes the SQLite tables.
 - Existing JSON data files are no longer read by the new stores. They are not automatically deleted from user directories by the code changes.
 

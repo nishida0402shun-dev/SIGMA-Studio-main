@@ -109,14 +109,17 @@ export class SqliteQuestionRepository implements QuestionRepository {
     const params: Array<string | number> = [];
     const text = query.text?.normalize("NFKC").trim();
     if (text) {
-      const tokens = text.match(/[a-z0-9]+|[ぁ-んァ-ヶ一-龯]{2,}/giu) ?? [text];
+      const tokens = text.match(/[a-z0-9]+|[ぁ-んァ-ヶ一-龯]{2,}/giu) ?? [];
       const fts = [...new Set(tokens)].slice(0, 32)
         .map((token) => '"' + token.replace(/"/gu, '""') + '"').join(" OR ");
-      where.push(`(
-        q.title LIKE ? OR q.body_json LIKE ?
-        OR EXISTS (SELECT 1 FROM qe_questions_fts f WHERE f.question_id = q.id AND qe_questions_fts MATCH ?)
-      )`);
-      params.push("%" + text + "%", "%" + text + "%", fts || '""');
+      where.push(fts
+        ? `(q.title LIKE ? OR q.body_json LIKE ? OR EXISTS (
+            SELECT 1 FROM qe_questions_fts f
+            WHERE f.question_id = q.id AND qe_questions_fts MATCH ?
+          ))`
+        : "(q.title LIKE ? OR q.body_json LIKE ?)");
+      params.push("%" + text + "%", "%" + text + "%");
+      if (fts) params.push(fts);
     }
     if (query.difficultyMin !== undefined) { where.push("q.difficulty >= ?"); params.push(query.difficultyMin); }
     if (query.difficultyMax !== undefined) { where.push("q.difficulty <= ?"); params.push(query.difficultyMax); }
@@ -212,6 +215,16 @@ export class SqliteQuestionRepository implements QuestionRepository {
         source.uri ?? null, source.pageNumber ?? 0, new Date().toISOString());
       linkSource.run(record.id, source.id, source.pageNumber ?? null, source.region ? JSON.stringify(source.region) : null);
     }
+
+    const question = this.db.prepare("SELECT title, body_json FROM qe_questions WHERE id = ?").get(record.id) as { title: string; body_json: string };
+    const tagText = (this.db.prepare(`
+      SELECT group_concat(t.label, ' ') AS labels
+      FROM qe_question_tags qt JOIN qe_tags t ON t.id = qt.tag_id
+      WHERE qt.question_id = ?
+    `).get(record.id) as { labels: string | null }).labels ?? "";
+    this.db.prepare("DELETE FROM qe_questions_fts WHERE question_id = ?").run(record.id);
+    this.db.prepare("INSERT INTO qe_questions_fts(question_id, title, body_text, tags_text) VALUES (?, ?, ?, ?)")
+      .run(record.id, question.title, question.body_json, tagText);
   }
 
   private saveVersion(record: QuestionRecord, reason: string): void {
