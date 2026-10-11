@@ -12,7 +12,7 @@ export interface LongTermMemory {
   updatedAt: string;
 }
 
-type MemoryRow = {
+type MemoryRecord = {
   id: string;
   content: string;
   conversation_id: string;
@@ -23,74 +23,104 @@ type MemoryRow = {
   updated_at: string;
 };
 
-export class SqliteLongTermMemoryStore {
-  constructor(private readonly db: DatabaseSync) {}
+const MEMORY_LIMIT = 10_000;
+const CONTENT_LIMIT = 4_000;
 
-  async remember(input: Omit<LongTermMemory, "id" | "createdAt" | "updatedAt">): Promise<LongTermMemory | null> {
-    const content = input.content.normalize("NFKC").trim().replace(/\\s+/gu, " ").slice(0, 4000);
+export class SqliteLongTermMemoryStore {
+  constructor(private readonly database: DatabaseSync) {}
+
+  async remember(
+    input: Omit<LongTermMemory, "id" | "createdAt" | "updatedAt">,
+  ): Promise<LongTermMemory | null> {
+    const content = normalizeContent(input.content);
     if (content.length < 4) return null;
-    const existingRow = this.db.prepare(
-      "SELECT * FROM sigma_core_long_term_memories WHERE content = ? AND conversation_id = ? LIMIT 1",
-    ).get(content, input.conversationId) as MemoryRow | undefined;
-    const now = new Date().toISOString();
-    if (existingRow) {
-      this.db.prepare(
+    if (!input.conversationId.trim()) throw new Error("memory conversation id is empty");
+    if (!input.sourceEntryId.trim()) throw new Error("memory source entry id is empty");
+
+    const confidence = validateConfidence(input.confidence);
+    const previous = this.database.prepare(
+      "SELECT * FROM sigma_core_long_term_memories WHERE conversation_id = ? AND content = ? ORDER BY updated_at DESC LIMIT 1",
+    ).get(input.conversationId, content) as MemoryRecord | undefined;
+    const timestamp = new Date().toISOString();
+
+    if (previous) {
+      this.database.prepare(
         "UPDATE sigma_core_long_term_memories SET updated_at = ?, confidence = MAX(confidence, ?) WHERE id = ?",
-      ).run(now, clampConfidence(input.confidence), existingRow.id);
-      return fromRow(this.db.prepare("SELECT * FROM sigma_core_long_term_memories WHERE id = ?").get(existingRow.id) as MemoryRow);
+      ).run(timestamp, confidence, previous.id);
+      const refreshed = this.database.prepare(
+        "SELECT * FROM sigma_core_long_term_memories WHERE id = ?",
+      ).get(previous.id) as MemoryRecord;
+      return decodeMemory(refreshed);
     }
 
-    const entry: LongTermMemory = {
-      ...input,
-      id: "ltm_" + randomUUID(),
+    const memory: LongTermMemory = {
+      id: `ltm_${randomUUID()}`,
       content,
-      confidence: clampConfidence(input.confidence),
-      createdAt: now,
-      updatedAt: now,
+      conversationId: input.conversationId.trim(),
+      sourceEntryId: input.sourceEntryId.trim(),
+      ...(input.provider?.trim() ? { provider: input.provider.trim() } : {}),
+      confidence,
+      createdAt: timestamp,
+      updatedAt: timestamp,
     };
-    this.db.prepare(`
-      INSERT INTO sigma_core_long_term_memories
+
+    this.database.prepare(
+      `INSERT INTO sigma_core_long_term_memories
         (id, content, conversation_id, source_entry_id, provider, confidence, created_at, updated_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-    `).run(entry.id, entry.content, entry.conversationId, entry.sourceEntryId, entry.provider ?? null,
-      entry.confidence, entry.createdAt, entry.updatedAt);
-    this.prune();
-    return entry;
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+    ).run(
+      memory.id, memory.content, memory.conversationId, memory.sourceEntryId,
+      memory.provider ?? null, memory.confidence, memory.createdAt, memory.updatedAt,
+    );
+    this.enforceRetention();
+    return memory;
   }
 
   async recent(limit = 50): Promise<LongTermMemory[]> {
-    const safeLimit = Math.max(1, Math.min(Math.trunc(limit) || 1, 200));
-    return (this.db.prepare("SELECT * FROM sigma_core_long_term_memories ORDER BY updated_at DESC, rowid DESC LIMIT ?")
-      .all(safeLimit) as MemoryRow[]).map(fromRow);
+    const count = boundedInteger(limit, 50, 1, 200);
+    const rows = this.database.prepare(
+      "SELECT * FROM sigma_core_long_term_memories ORDER BY updated_at DESC, rowid DESC LIMIT ?",
+    ).all(count) as MemoryRecord[];
+    return rows.map(decodeMemory);
   }
 
   async search(query: string, limit = 20): Promise<LongTermMemory[]> {
-    const normalized = query.normalize("NFKC").toLocaleLowerCase().trim();
+    const normalized = normalizeText(query);
     if (!normalized) return [];
-    const tokens = normalized.match(/[a-z0-9]+|[ぁ-んァ-ヶ一-龯]{2,}/giu) ?? [];
-    const rows = this.db.prepare("SELECT * FROM sigma_core_long_term_memories ORDER BY updated_at DESC LIMIT 10000").all() as MemoryRow[];
+    const tokens = [...new Set(normalized.match(/[a-z0-9]+|[ぁ-んァ-ヶ一-龯]{2,}/giu) ?? [])].slice(0, 32);
+    const terms = [...new Set([normalized, ...tokens])];
+    const where = terms.map(() => "instr(lower(content), lower(?)) > 0").join(" OR ");
+    const rows = this.database.prepare(
+      `SELECT * FROM sigma_core_long_term_memories WHERE ${where}
+       ORDER BY updated_at DESC LIMIT 1000`,
+    ).all(...terms) as MemoryRecord[];
+
     return rows.map((row) => {
-      const entry = fromRow(row);
-      const text = entry.content.normalize("NFKC").toLocaleLowerCase();
-      const hits = tokens.reduce((sum, token) => sum + (text.includes(token) ? 1 : 0), 0);
-      return { entry, score: (text.includes(normalized) ? 1 : 0) * 0.6 + (tokens.length ? hits / tokens.length : 0) * 0.4 };
-    }).filter((item) => item.score > 0).sort((a, b) => b.score - a.score)
-      .slice(0, Math.max(1, Math.min(Math.trunc(limit) || 1, 100))).map((item) => item.entry);
+      const memory = decodeMemory(row);
+      const text = normalizeText(memory.content);
+      const phrase = text.includes(normalized) ? 1 : 0;
+      const termCoverage = tokens.length
+        ? tokens.filter((token) => text.includes(token)).length / tokens.length
+        : phrase;
+      return { memory, score: phrase * 0.6 + termCoverage * 0.4 };
+    }).filter((result) => result.score > 0)
+      .sort((left, right) => right.score - left.score)
+      .slice(0, boundedInteger(limit, 20, 1, 100))
+      .map((result) => result.memory);
   }
 
-  private prune(): void {
-    this.db.prepare(`
-      DELETE FROM sigma_core_long_term_memories
-      WHERE id IN (
-        SELECT id FROM sigma_core_long_term_memories
-        ORDER BY updated_at DESC, rowid DESC
-        LIMIT -1 OFFSET 10000
-      )
-    `).run();
+  private enforceRetention(): void {
+    this.database.prepare(
+      `DELETE FROM sigma_core_long_term_memories
+       WHERE id IN (
+         SELECT id FROM sigma_core_long_term_memories
+         ORDER BY updated_at DESC, rowid DESC LIMIT -1 OFFSET ?
+       )`,
+    ).run(MEMORY_LIMIT);
   }
 }
 
-function fromRow(row: MemoryRow): LongTermMemory {
+function decodeMemory(row: MemoryRecord): LongTermMemory {
   return {
     id: row.id,
     content: row.content,
@@ -103,7 +133,20 @@ function fromRow(row: MemoryRow): LongTermMemory {
   };
 }
 
-function clampConfidence(value: number): number {
+function normalizeContent(value: string): string {
+  return value.normalize("NFKC").trim().replace(/\s+/gu, " ").slice(0, CONTENT_LIMIT);
+}
+
+function normalizeText(value: string): string {
+  return value.normalize("NFKC").toLocaleLowerCase().trim();
+}
+
+function validateConfidence(value: number): number {
   if (!Number.isFinite(value)) throw new Error("memory confidence must be finite");
   return Math.max(0, Math.min(1, value));
+}
+
+function boundedInteger(value: number, fallback: number, min: number, max: number): number {
+  const integer = Number.isFinite(value) ? Math.trunc(value) : fallback;
+  return Math.max(min, Math.min(integer || fallback, max));
 }
