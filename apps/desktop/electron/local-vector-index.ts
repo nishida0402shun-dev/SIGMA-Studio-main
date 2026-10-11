@@ -201,9 +201,3 @@ function testEmbed(text: string): number[] {
   return vector.map((value) => value / norm);
 }
 
-function cosine(a: number[], b: number[]): number {
-  let score = 0;
-  const length = Math.min(a.length, b.length);
-  for (let index = 0; index < length; index += 1) score += a[index] * b[index];
-  return score;
-}
