@@ -1,7 +1,6 @@
-import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
-import { acquireFileLock } from "./file-lock";
+import type { DatabaseSync } from "node:sqlite";
 
 export interface VectorRecord {
   id: string;
@@ -11,13 +10,6 @@ export interface VectorRecord {
   chunkIndex: number;
   text: string;
   vector: number[];
-}
-
-interface VectorIndexFile {
-  version: 5;
-  dimensions: number;
-  model: string;
-  records: VectorRecord[];
 }
 
 export interface VectorSearchResult extends Omit<VectorRecord, "vector"> {
@@ -121,31 +113,8 @@ async function embedDocuments(texts: string[]): Promise<number[][]> {
   return vectors;
 }
 
-const indexLocks = new Map<string, Promise<void>>();
-
-async function withIndexLock<T>(indexPath: string, task: () => Promise<T>): Promise<T> {
-  const previous = indexLocks.get(indexPath) ?? Promise.resolve();
-  let release!: () => void;
-  const current = new Promise<void>((resolve) => {
-    release = resolve;
-  });
-  const queued = previous.then(() => current);
-  indexLocks.set(indexPath, queued);
-  await previous;
-  try {
-    return await task();
-  } finally {
-    release();
-    if (indexLocks.get(indexPath) === queued) indexLocks.delete(indexPath);
-  }
-}
-
 export class LocalVectorIndex {
-  private readonly indexPath: string;
-
-  constructor(root: string) {
-    this.indexPath = path.join(root, "vectors.json");
-  }
+  constructor(private readonly db: DatabaseSync) {}
 
   async upsert(record: Omit<VectorRecord, "vector">): Promise<void> {
     await this.upsertMany([record]);
@@ -153,160 +122,76 @@ export class LocalVectorIndex {
 
   async upsertMany(records: Array<Omit<VectorRecord, "vector">>): Promise<void> {
     if (records.length === 0) return;
-    await withIndexLock(this.indexPath, async () => {
-      const fileLock = await acquireFileLock(this.indexPath + ".lock", { op: "knowledge-vector-upsert" });
-      try {
-        const index = await this.read();
-        const keys = new Set(
-        records.map((record) => record.sourceId + ":" + record.pageNumber + ":" + record.chunkIndex),
-      );
-        const next = index.records.filter(
-          (item) => !keys.has(item.sourceId + ":" + item.pageNumber + ":" + item.chunkIndex),
-        );
-
-        const vectors: number[][] = [];
-        const batchSize = 32;
-        for (let start = 0; start < records.length; start += batchSize) {
-          const batch = records.slice(start, start + batchSize);
-          vectors.push(...(await embedDocuments(batch.map((record) => record.text))));
+    const vectors: number[][] = [];
+    for (let start = 0; start < records.length; start += 32) {
+      vectors.push(...await embedDocuments(records.slice(start, start + 32).map((record) => record.text)));
+    }
+    const now = new Date().toISOString();
+    const upsert = this.db.prepare(`
+      INSERT INTO qe_vector_records
+        (id, source_id, page_number, chunk_index, model, dimensions, vector_json, text_content, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ON CONFLICT(source_id, page_number, chunk_index, model) DO UPDATE SET
+        id = excluded.id,
+        dimensions = excluded.dimensions,
+        vector_json = excluded.vector_json,
+        text_content = excluded.text_content,
+        updated_at = excluded.updated_at
+    `);
+    this.db.exec("BEGIN IMMEDIATE");
+    try {
+      records.forEach((record, index) => {
+        const vector = vectors[index];
+        if (!vector || vector.length !== DIMENSIONS || vector.some((value) => !Number.isFinite(value))) {
+          throw new Error("Embedding model returned an invalid vector");
         }
-
-        next.push(...records.map((record, index) => ({ ...record, vector: vectors[index] })));
-        // Re-read immediately before publication so an OS-level lock handoff cannot
-        // publish a stale snapshot when another process completed a write between
-        // the initial read and this point.
-        const latest = await this.read();
-        const merged = [...latest.records];
-        const mergedKeys = new Set(merged.map((record) => record.sourceId + ":" + record.pageNumber + ":" + record.chunkIndex));
-        for (const record of next) {
-          const key = record.sourceId + ":" + record.pageNumber + ":" + record.chunkIndex;
-          const existingIndex = merged.findIndex((item) => item.sourceId + ":" + item.pageNumber + ":" + item.chunkIndex === key);
-          if (existingIndex >= 0) merged[existingIndex] = record;
-          else if (!mergedKeys.has(key)) { merged.push(record); mergedKeys.add(key); }
-        }
-        await this.write({ version: 5, dimensions: DIMENSIONS, model: MODEL, records: merged });
-      } finally {
-        await fileLock.release();
-      }
-    });
+        upsert.run(record.id, record.sourceId, record.pageNumber, record.chunkIndex, MODEL,
+          DIMENSIONS, JSON.stringify(vector), record.text, now);
+      });
+      this.db.exec("COMMIT");
+    } catch (error) {
+      this.db.exec("ROLLBACK");
+      throw error;
+    }
   }
 
   async hasSource(sourceId: string): Promise<boolean> {
-    const index = await this.read();
-    return index.records.some((item) => item.sourceId === sourceId);
+    const row = this.db.prepare("SELECT 1 AS found FROM qe_vector_records WHERE source_id = ? LIMIT 1").get(sourceId) as { found?: number } | undefined;
+    return Boolean(row?.found);
   }
 
   async removeSource(sourceId: string): Promise<void> {
-    await withIndexLock(this.indexPath, async () => {
-      const index = await this.read();
-      const next = index.records.filter((item) => item.sourceId !== sourceId);
-      if (next.length !== index.records.length) {
-        await this.write({ ...index, records: next });
-      }
-    });
+    this.db.prepare("DELETE FROM qe_vector_records WHERE source_id = ?").run(sourceId);
   }
 
   async search(query: string, limit = 12): Promise<VectorSearchResult[]> {
     const normalized = query.trim();
     if (!normalized) return [];
     const queryVector = await embedText(normalized, "query");
-    const index = await this.read();
-    return index.records
-      .filter((record) => record.vector.length === DIMENSIONS)
-      .map(({ vector, ...record }) => ({ ...record, score: cosine(queryVector, vector) }))
-      .filter((item) => item.score > 0)
+    const rows = this.db.prepare(
+      "SELECT id, source_id, page_number, chunk_index, text_content, vector_json FROM qe_vector_records WHERE model = ? AND dimensions = ?",
+    ).all(MODEL, DIMENSIONS) as Array<{
+      id: string; source_id: string; page_number: number; chunk_index: number; text_content: string; vector_json: string;
+    }>;
+    return rows.map((row) => {
+      const { vector_json: vectorJson, ...record } = row;
+      const vector = JSON.parse(vectorJson) as number[];
+      return {
+        id: record.id,
+        sourceId: record.source_id,
+        pageNumber: record.page_number,
+        chunkIndex: record.chunk_index,
+        text: record.text_content,
+        score: cosine(queryVector, vector),
+      };
+    }).filter((item) => item.score > 0)
       .sort((a, b) => b.score - a.score)
-      .slice(0, Math.max(1, Math.min(limit, 50)));
-  }
-
-  private async read(): Promise<VectorIndexFile> {
-    let raw: string;
-    try {
-      raw = await fs.readFile(this.indexPath, "utf8");
-    } catch (error) {
-      if ((error as NodeJS.ErrnoException).code === "ENOENT") {
-        return { version: 5, dimensions: DIMENSIONS, model: MODEL, records: [] };
-      }
-      throw error;
-    }
-
-    let parsed: {
-      version?: number;
-      dimensions?: number;
-      model?: string;
-      records?: unknown;
-    };
-    try {
-      parsed = JSON.parse(raw) as typeof parsed;
-    } catch {
-      return { version: 5, dimensions: DIMENSIONS, model: MODEL, records: [] };
-    }
-
-    if (
-      (parsed.version === 4 || parsed.version === 5) &&
-      parsed.dimensions === DIMENSIONS &&
-      parsed.model === MODEL &&
-      Array.isArray(parsed.records)
-    ) {
-      return parsed as VectorIndexFile;
-    }
-
-    // Any previous semantic model (Ruri/GTE) uses incompatible vector semantics.
-    // Re-embed persisted text instead of silently returning stale results.
-    if (
-      Array.isArray(parsed.records) &&
-      ((parsed.version === 3 && parsed.dimensions === 384) ||
-        ((parsed.version === 4 || parsed.version === 5) && parsed.model !== MODEL))
-    ) {
-      const oldRecords = parsed.records as VectorRecord[];
-      const migratedVectors: number[][] = [];
-      const batchSize = 32;
-      for (let start = 0; start < oldRecords.length; start += batchSize) {
-        const batch = oldRecords.slice(start, start + batchSize);
-        migratedVectors.push(...(await embedDocuments(batch.map((record) => record.text))));
-      }
-      const migrated: VectorIndexFile = {
-        version: 5,
-        dimensions: DIMENSIONS,
-        model: MODEL,
-        records: oldRecords.map((record, index) => ({ ...record, vector: migratedVectors[index] })),
-      };
-      await this.write(migrated);
-      return migrated;
-    }
-
-    // v2 contained deterministic hash vectors. Preserve the records but rebuild
-    // their vectors with the current semantic model.
-    if (parsed.version === 2 && Array.isArray(parsed.records)) {
-      const oldRecords = parsed.records as VectorRecord[];
-      const migratedVectors: number[][] = [];
-      const batchSize = 32;
-      for (let start = 0; start < oldRecords.length; start += batchSize) {
-        const batch = oldRecords.slice(start, start + batchSize);
-        migratedVectors.push(...(await embedDocuments(batch.map((record) => record.text))));
-      }
-      const migrated: VectorIndexFile = {
-        version: 5,
-        dimensions: DIMENSIONS,
-        model: MODEL,
-        records: oldRecords.map((record, index) => ({ ...record, vector: migratedVectors[index] })),
-      };
-      await this.write(migrated);
-      return migrated;
-    }
-
-    return { version: 5, dimensions: DIMENSIONS, model: MODEL, records: [] };
+      .slice(0, Math.max(1, Math.min(Math.trunc(limit) || 1, 50)));
   }
 
   async hasRecords(): Promise<boolean> {
-    return (await this.read()).records.length > 0;
-  }
-
-  private async write(index: VectorIndexFile): Promise<void> {
-    await fs.mkdir(path.dirname(this.indexPath), { recursive: true });
-    const temp = this.indexPath + ".tmp";
-    await fs.writeFile(temp, JSON.stringify(index), "utf8");
-    await fs.rename(temp, this.indexPath);
+    const row = this.db.prepare("SELECT 1 AS found FROM qe_vector_records LIMIT 1").get() as { found?: number } | undefined;
+    return Boolean(row?.found);
   }
 }
 
