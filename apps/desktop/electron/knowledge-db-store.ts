@@ -171,14 +171,16 @@ export interface KnowledgeIndexStatus {
 export class KnowledgeDbStore {
   private readonly dataDir: string;
   private readonly db: DatabaseSync;
+  private readonly vectorDb: DatabaseSync;
   private indexPromise: Promise<void> | null = null;
   private indexStatus: KnowledgeIndexStatus = { state: "idle", total: 0, completed: 0 };
   private readonly structureParser = new KnowledgeStructureParser();
   private structureParserStatusPromise: Promise<StructureParserStatus> | null = null;
 
-  constructor(dataDir: string, db: DatabaseSync) {
+  constructor(dataDir: string, db: DatabaseSync, vectorDb: DatabaseSync = db) {
     this.dataDir = dataDir;
     this.db = db;
+    this.vectorDb = vectorDb;
   }
 
   async recordLearningFeedback(input: { query: string; sourceId?: string; pageNumber?: number; label: "positive" | "negative" | "correction"; correction?: string }): Promise<unknown> {
@@ -1434,7 +1436,7 @@ export class KnowledgeDbStore {
   }
 
   private vectorIndex(): LocalVectorIndex {
-    return new LocalVectorIndex(this.db);
+    return new LocalVectorIndex(this.vectorDb);
   }
 }
 
