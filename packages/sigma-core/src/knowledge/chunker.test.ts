@@ -21,7 +21,11 @@ describe("chunkKnowledgePage", () => {
       expect(current.source.startOffset!).toBeLessThan(previous.source.endOffset!);
       expect(current.source.startOffset!).toBeGreaterThan(previous.source.startOffset!);
     }
-    expect(chunks.map((chunk) => chunk.text).join("")).toContain("uvwxyz0123456789");
+    expect(chunks[0]?.source.startOffset).toBe(0);
+    expect(chunks[chunks.length - 1]?.source.endOffset).toBe(Array.from(text).length);
+    for (let index = 1; index < chunks.length; index += 1) {
+      expect(chunks[index]!.source.startOffset!).toBeLessThanOrEqual(chunks[index - 1]!.source.endOffset!);
+    }
   });
 
   it("returns no chunks for empty text and validates chunk settings", () => {
