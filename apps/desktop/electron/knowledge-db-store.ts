@@ -182,7 +182,7 @@ export class KnowledgeDbStore {
   }
 
   async recordLearningFeedback(input: { query: string; sourceId?: string; pageNumber?: number; label: "positive" | "negative" | "correction"; correction?: string }): Promise<unknown> {
-    const store = new KnowledgeLearningStore(this.dataDir);
+    const store = new KnowledgeLearningStore(this.db);
     return store.record(input);
   }
 
@@ -423,7 +423,7 @@ export class KnowledgeDbStore {
       .filter((page) => Boolean(page.text?.trim()));
     const documentFrequency = buildDocumentFrequency(searchablePages);
     const documentCount = Math.max(1, searchablePages.length);
-    const learningStore = new KnowledgeLearningStore(this.dataDir);
+    const learningStore = new KnowledgeLearningStore(this.db);
     const learningFeedback = await learningStore.list(500);
     const ranked = [...bestByPage.values()].map((match) => {
       const lexical = lexicalScore(match.text, queryTokens, documentFrequency, documentCount);
