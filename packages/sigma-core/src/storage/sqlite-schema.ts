@@ -313,20 +313,6 @@ const CORE_SCHEMA = `
     VALUES (new.id, new.source_id, new.page_number, COALESCE(new.title, ''), new.text_content);
   END;
 
-  CREATE TRIGGER IF NOT EXISTS sigma_core_conversation_entries_fts_ai AFTER INSERT ON sigma_core_conversation_entries BEGIN
-    INSERT INTO sigma_core_conversation_entries_fts(entry_id, conversation_id, content)
-    VALUES (new.id, new.conversation_id, new.content);
-  END;
-
-  CREATE TRIGGER IF NOT EXISTS sigma_core_conversation_entries_fts_ad AFTER DELETE ON sigma_core_conversation_entries BEGIN
-    DELETE FROM sigma_core_conversation_entries_fts WHERE entry_id = old.id;
-  END;
-
-  CREATE TRIGGER IF NOT EXISTS sigma_core_conversation_entries_fts_au AFTER UPDATE ON sigma_core_conversation_entries BEGIN
-    DELETE FROM sigma_core_conversation_entries_fts WHERE entry_id = old.id;
-    INSERT INTO sigma_core_conversation_entries_fts(entry_id, conversation_id, content)
-    VALUES (new.id, new.conversation_id, new.content);
-  END;
 `;
 
 const RETIRED_QUESTION_ENGINE_TABLES = [
@@ -361,6 +347,66 @@ function dropRetiredQuestionEngineTables(db: SqliteSchemaDriver): void {
   }
 }
 
+const RETIRED_QUESTION_ENGINE_TABLES = [
+  "qe_vector_records",
+  "qe_knowledge_pages_fts",
+  "qe_conversation_entries_fts",
+  "qe_questions_fts",
+  "qe_question_tags",
+  "qe_question_sources",
+  "qe_question_versions",
+  "qe_import_proposals",
+  "qe_question_attempts",
+  "qe_knowledge_pages",
+  "qe_knowledge_sources",
+  "qe_knowledge_staging",
+  "qe_knowledge_learning_feedback",
+  "qe_conversation_entries",
+  "qe_long_term_memories",
+  "qe_research_sessions",
+  "qe_questions",
+  "qe_sources",
+  "qe_tags",
+  "qe_import_jobs",
+  "qe_knowledge_state",
+  "qe_schema_migrations",
+] as const;
+
+const REBUILT_SIGMA_CORE_TABLES = [
+  "sigma_core_questions_fts",
+  "sigma_core_knowledge_pages_fts",
+  "sigma_core_question_tags",
+  "sigma_core_question_sources",
+  "sigma_core_question_versions",
+  "sigma_core_question_attempts",
+  "sigma_core_question_answers",
+  "sigma_core_question_contents",
+  "sigma_core_import_proposals",
+  "sigma_core_import_jobs",
+  "sigma_core_research_references",
+  "sigma_core_research_sessions",
+  "sigma_core_conversation_entries",
+  "sigma_core_long_term_memories",
+  "sigma_core_knowledge_pages",
+  "sigma_core_knowledge_staging",
+  "sigma_core_knowledge_learning_feedback",
+  "sigma_core_vector_records",
+  "sigma_core_knowledge_sources",
+  "sigma_core_knowledge_state",
+  "sigma_core_questions",
+  "sigma_core_tags",
+  "sigma_core_sources",
+] as const;
+
+function dropTables(db: SqliteSchemaDriver, tables: readonly string[]): void {
+  for (const table of tables) db.exec(`DROP TABLE IF EXISTS "${table}";`);
+}
+
+function dropRetiredQuestionEngineTables(db: SqliteSchemaDriver): void {
+  // Legacy records are intentionally discarded, never imported into SIGMA Core.
+  dropTables(db, RETIRED_QUESTION_ENGINE_TABLES);
+}
+
 export function initializeSigmaCoreSchema(db: SqliteSchemaDriver, now = new Date().toISOString()): void {
   db.exec("PRAGMA foreign_keys = ON;");
   db.exec(MIGRATION_TABLE);
@@ -373,20 +419,24 @@ export function initializeSigmaCoreSchema(db: SqliteSchemaDriver, now = new Date
   }
 
   if (version === SIGMA_CORE_SCHEMA_VERSION) {
-    // Enforce retirement even for databases that were stamped with the current version
-    // before all legacy cleanup had landed.
     db.transaction(() => dropRetiredQuestionEngineTables(db))();
     return;
   }
 
-  const apply = () => {
-    db.exec(CORE_SCHEMA);
-    // Existing local Question Engine records are intentionally not migrated.
-    dropRetiredQuestionEngineTables(db);
-    db.prepare("INSERT INTO sigma_core_schema_migrations(version, applied_at) VALUES (?, ?)").run(
-      SIGMA_CORE_SCHEMA_VERSION,
-      now,
-    );
-  };
-  db.transaction(apply)();
+  // The user authorized a clean rebuild without importing records from the retired schema.
+  // Reset the pre-v8 Core prototype as well; its table model is not the new canonical model.
+  db.exec("PRAGMA foreign_keys = OFF;");
+  try {
+    db.transaction(() => {
+      dropTables(db, REBUILT_SIGMA_CORE_TABLES);
+      db.exec(CORE_SCHEMA);
+      dropRetiredQuestionEngineTables(db);
+      db.prepare("INSERT INTO sigma_core_schema_migrations(version, applied_at) VALUES (?, ?)").run(
+        SIGMA_CORE_SCHEMA_VERSION,
+        now,
+      );
+    })();
+  } finally {
+    db.exec("PRAGMA foreign_keys = ON;");
+  }
 }
