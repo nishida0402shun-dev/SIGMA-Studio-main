@@ -1385,7 +1385,7 @@ export class KnowledgeDbStore {
 
   private paths() {
     const root = path.join(this.dataDir, "knowledge-db");
-    return { root, libraryPath: path.join(root, "library.json"), sourcesDir: path.join(root, "sources"), openedPagesDir: path.join(root, "opened-pages") };
+    return { root, sourcesDir: path.join(root, "sources"), openedPagesDir: path.join(root, "opened-pages") };
   }
 
   private vectorIndex(): LocalVectorIndex {
