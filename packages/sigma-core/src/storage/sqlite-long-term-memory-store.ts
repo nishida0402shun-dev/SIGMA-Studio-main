@@ -1,4 +1,4 @@
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import type { DatabaseSync } from "node:sqlite";
 
 export interface LongTermMemory {
@@ -14,6 +14,9 @@ export interface LongTermMemory {
 
 type MemoryRecord = {
   id: string;
+  memory_key: string;
+  content_hash: string;
+  normalized_content: string;
   content: string;
   conversation_id: string;
   source_entry_id: string;
@@ -21,6 +24,7 @@ type MemoryRecord = {
   confidence: number;
   created_at: string;
   updated_at: string;
+  metadata_json: string;
 };
 
 const MEMORY_LIMIT = 10_000;
@@ -34,46 +38,51 @@ export class SqliteLongTermMemoryStore {
   ): Promise<LongTermMemory | null> {
     const content = normalizeContent(input.content);
     if (content.length < 4) return null;
-    if (!input.conversationId.trim()) throw new Error("memory conversation id is empty");
-    if (!input.sourceEntryId.trim()) throw new Error("memory source entry id is empty");
+    const conversationId = input.conversationId.trim();
+    const sourceEntryId = input.sourceEntryId.trim();
+    if (!conversationId) throw new Error("memory conversation id is empty");
+    if (!sourceEntryId) throw new Error("memory source entry id is empty");
 
-    const confidence = validateConfidence(input.confidence);
-    const previous = this.database.prepare(
-      "SELECT * FROM sigma_core_long_term_memories WHERE conversation_id = ? AND content = ? ORDER BY updated_at DESC LIMIT 1",
-    ).get(input.conversationId, content) as MemoryRecord | undefined;
+    const normalized = normalizeText(content);
+    const contentHash = digest(normalized);
+    const memoryKey = digest(conversationId + "\u0000" + normalized);
+    const confidence = boundedConfidence(input.confidence);
     const timestamp = new Date().toISOString();
 
-    if (previous) {
+    const existing = this.database.prepare(
+      "SELECT id FROM sigma_core_long_term_memories WHERE memory_key = ?",
+    ).get(memoryKey) as { id: string } | undefined;
+
+    if (existing) {
       this.database.prepare(
-        "UPDATE sigma_core_long_term_memories SET updated_at = ?, confidence = MAX(confidence, ?) WHERE id = ?",
-      ).run(timestamp, confidence, previous.id);
-      const refreshed = this.database.prepare(
-        "SELECT * FROM sigma_core_long_term_memories WHERE id = ?",
-      ).get(previous.id) as MemoryRecord;
-      return decodeMemory(refreshed);
+        `UPDATE sigma_core_long_term_memories
+         SET updated_at = ?, confidence = MAX(confidence, ?), source_entry_id = ?
+         WHERE id = ?`,
+      ).run(timestamp, confidence, sourceEntryId, existing.id);
+      return this.readById(existing.id);
     }
 
-    const memory: LongTermMemory = {
-      id: `ltm_${randomUUID()}`,
+    const record: LongTermMemory = {
+      id: `memory_${randomUUID()}`,
       content,
-      conversationId: input.conversationId.trim(),
-      sourceEntryId: input.sourceEntryId.trim(),
+      conversationId,
+      sourceEntryId,
       ...(input.provider?.trim() ? { provider: input.provider.trim() } : {}),
       confidence,
       createdAt: timestamp,
       updatedAt: timestamp,
     };
-
     this.database.prepare(
       `INSERT INTO sigma_core_long_term_memories
-        (id, content, conversation_id, source_entry_id, provider, confidence, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+        (id, memory_key, content_hash, normalized_content, content, conversation_id,
+         source_entry_id, provider, confidence, created_at, updated_at, metadata_json)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, '{}')`,
     ).run(
-      memory.id, memory.content, memory.conversationId, memory.sourceEntryId,
-      memory.provider ?? null, memory.confidence, memory.createdAt, memory.updatedAt,
+      record.id, memoryKey, contentHash, normalized, record.content, record.conversationId,
+      record.sourceEntryId, record.provider ?? null, record.confidence, record.createdAt, record.updatedAt,
     );
     this.enforceRetention();
-    return memory;
+    return record;
   }
 
   async recent(limit = 50): Promise<LongTermMemory[]> {
@@ -89,24 +98,29 @@ export class SqliteLongTermMemoryStore {
     if (!normalized) return [];
     const tokens = [...new Set(normalized.match(/[a-z0-9]+|[ぁ-んァ-ヶ一-龯]{2,}/giu) ?? [])].slice(0, 32);
     const terms = [...new Set([normalized, ...tokens])];
-    const where = terms.map(() => "instr(lower(content), lower(?)) > 0").join(" OR ");
+    const predicate = terms.map(() => "instr(normalized_content, ?) > 0").join(" OR ");
     const rows = this.database.prepare(
-      `SELECT * FROM sigma_core_long_term_memories WHERE ${where}
+      `SELECT * FROM sigma_core_long_term_memories WHERE ${predicate}
        ORDER BY updated_at DESC LIMIT 1000`,
     ).all(...terms) as MemoryRecord[];
 
     return rows.map((row) => {
       const memory = decodeMemory(row);
-      const text = normalizeText(memory.content);
-      const phrase = text.includes(normalized) ? 1 : 0;
-      const termCoverage = tokens.length
-        ? tokens.filter((token) => text.includes(token)).length / tokens.length
-        : phrase;
-      return { memory, score: phrase * 0.6 + termCoverage * 0.4 };
-    }).filter((result) => result.score > 0)
+      const text = row.normalized_content;
+      const exact = text.includes(normalized) ? 1 : 0;
+      const coverage = tokens.length ? tokens.filter((token) => text.includes(token)).length / tokens.length : exact;
+      return { memory, score: exact * 0.6 + coverage * 0.4 };
+    }).filter((item) => item.score > 0)
       .sort((left, right) => right.score - left.score)
       .slice(0, boundedInteger(limit, 20, 1, 100))
-      .map((result) => result.memory);
+      .map((item) => item.memory);
+  }
+
+  private readById(id: string): LongTermMemory {
+    const row = this.database.prepare(
+      "SELECT * FROM sigma_core_long_term_memories WHERE id = ?",
+    ).get(id) as MemoryRecord;
+    return decodeMemory(row);
   }
 
   private enforceRetention(): void {
@@ -141,7 +155,11 @@ function normalizeText(value: string): string {
   return value.normalize("NFKC").toLocaleLowerCase().trim();
 }
 
-function validateConfidence(value: number): number {
+function digest(value: string): string {
+  return createHash("sha256").update(value).digest("hex");
+}
+
+function boundedConfidence(value: number): number {
   if (!Number.isFinite(value)) throw new Error("memory confidence must be finite");
   return Math.max(0, Math.min(1, value));
 }
