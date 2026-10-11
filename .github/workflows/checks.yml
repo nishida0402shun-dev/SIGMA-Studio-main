@@ -16,8 +16,8 @@ concurrency:
 jobs:
   desktop:
     name: Desktop build and checks
-    runs-on: ubuntu-latest
-    timeout-minutes: 20
+    runs-on: windows-latest
+    timeout-minutes: 30
     env:
       NODE_OPTIONS: --max-old-space-size=4096
     steps:
@@ -33,15 +33,11 @@ jobs:
       - run: npm exec --workspace @sigma-studio/desktop -- next typegen
       - run: npm run typecheck
       - run: npm run lint
-      # Electron smoke tests must use the desktop export (relative asset URLs), not the generic web build.
+      # Electron smoke tests exercise the shipped desktop build on the supported OS.
       - run: npm --workspace @sigma-studio/desktop run electron:prepare
-      # Source-graph scans and real filesystem tests exceed 5s on shared runners.
       - run: npm --workspace @sigma-studio/desktop run test -- --maxWorkers=2 --testTimeout=30000
-      # Exercise the shipped Electron runtime against a real window, not only Chromium.
-      - name: Install Electron smoke-test display server
-        run: sudo apt-get update && sudo apt-get install -y xvfb
       - name: Run Electron smoke test
-        run: xvfb-run -a npm --workspace @sigma-studio/desktop run test:e2e:electron -- tests/electron/open-document.spec.ts
+        run: npm --workspace @sigma-studio/desktop run test:e2e:electron -- tests/electron/open-document.spec.ts
 
   public-packages:
     name: Public package build and contracts
@@ -67,12 +63,8 @@ jobs:
         run: npm pack --workspace @sigma-studio/viewer --workspace @sigma-studio/editor --dry-run --ignore-scripts
 
   file-lock:
-    name: File locking (${{ matrix.os }})
-    strategy:
-      fail-fast: false
-      matrix:
-        os: [ubuntu-latest, macos-latest, windows-latest]
-    runs-on: ${{ matrix.os }}
+    name: File locking (Windows)
+    runs-on: windows-latest
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v6
