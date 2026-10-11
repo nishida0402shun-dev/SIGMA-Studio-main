@@ -889,7 +889,8 @@ function DesktopSettingsBody({
   };
 
 
-
+  return (
+    <ModalFrame
       open
       onDismiss={onClose}
       embedded={embedded}
