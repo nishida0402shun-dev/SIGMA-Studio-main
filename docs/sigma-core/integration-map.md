@@ -1,31 +1,40 @@
 # SIGMA Core integration map
 
-Audit ref: branch feat/question-engine-rebuild, commit 5c5e37b1201396b6a0fe9c08c73d1de65e58a511. This map is based on repository files, not runtime verification.
+Audit ref: current branch `feat/sigma-core-foundation`. This map records tracked-code boundaries, not a claim that runtime behavior or all tests are verified.
 
-| Existing area | Current path(s) | Planned Core destination | Action |
-|---|---|---|---|
-| Question domain and import ports | packages/question-engine/src/core, application/contracts.ts | learning + shared core contracts | Adapt and then deprecate duplicate public contracts after call sites move |
-| Shared SQLite schema/repositories | packages/question-engine/src/storage | data | Preserve schema/data initially; put repository interfaces behind Core |
-| Knowledge source/page metadata | apps/desktop/electron/knowledge-db-store.ts, Question Engine schema | documents + data | Separate extraction orchestration from authoritative persistence |
-| Embeddings/vector index | apps/desktop/electron/local-vector-index.ts | retrieval/adapters/vector | Keep as first adapter; do not change engine until benchmarks justify it |
-| Knowledge search/reranking | knowledge-db-store.ts, knowledge-db-search-utils.ts, decision reranker | retrieval | Unify query/result shape and preserve citations |
-| Web AI agent runtime | apps/desktop/electron/web-ai-agent-runtime.ts | ai-runtime/adapters/web | Wrap behind common run/events/cancel contract |
-| MCP gateway and local MCP server | web-ai-mcp-gateway.ts, apps/desktop/mcp | extensions/adapters/mcp | Preserve tool schemas and current approval boundaries |
-| CLI provider configuration | claude-mcp-config.ts, codex-mcp-config.ts, related runtime modules | ai-runtime/adapters/cli | Normalize lifecycle/events without removing provider-specific features |
-| Built-in Skills | apps/desktop/electron/official-skills | extensions/skills | Preserve existing Skill format; add discovery/validation adapter |
-| Conversation history | Question Engine conversation storage and existing UI/IPC callers | memory/conversations | Unify search/result provenance; avoid duplicating records |
-| Long-term memory | Question Engine SQLite long-term memory storage | memory/long-term | Track origin messages and deletion/update semantics |
-| Research sessions | Question Engine research-session storage | memory/research or a separate research module | Keep distinct from conversation history; decide after caller audit |
-| StudyAid / Question Engine UI | existing question repository and import pipeline | learning | Add answer/evaluation and learning history incrementally |
+| Area | Current location | Current boundary |
+|---|---|---|
+| Question domain and application contracts | `packages/question-engine/src/core`, `application/contracts.ts` | Domain types/contracts remain; the package's old SQLite storage layer is removed. Core's question repository currently consumes these types. |
+| Shared database and schema | `packages/sigma-core/src/storage/sqlite-database.ts`, `sqlite-schema.ts` | SIGMA Core opens `sigma-core.sqlite` and owns schema initialization. Legacy `qe_*` tables are dropped without row migration. |
+| Knowledge source/page metadata | `sqlite-knowledge-library-repository.ts` | Core owns relational reads/writes; Electron retains document extraction, classification, ranking, and UI orchestration. |
+| PDF import staging | `sqlite-knowledge-import-repository.ts` | Core owns staging-record persistence; Electron retains PDF processing and approval workflow. |
+| Embeddings/vector index | `sqlite-vector-index.ts`, `apps/desktop/electron/local-vector-index.ts` | Core owns vector persistence; Electron adapter still owns embedding model initialization and query embedding. |
+| Learning feedback | `sqlite-knowledge-learning-store.ts`, Electron compatibility export | Persistence is in Core. |
+| Conversation history | `sqlite-conversation-memory-store.ts` | Shared SQLite persistence and search. |
+| Long-term memory | `sqlite-long-term-memory-store.ts` | Shared SQLite persistence, distinct from raw conversation history. |
+| Research sessions | `sqlite-research-session-store.ts`, Electron compatibility export | Persistence is in Core. |
+| Backup/restore | `apps/desktop/electron/knowledge-db-store.ts` | Electron still owns archive/filesystem workflow and generic SQL restore; database-specific path updates use the Core repository. |
+| Web AI runtime | `apps/desktop/electron/web-ai-agent-runtime.ts` | Existing runtime remains; Core integration is a separate workstream. |
+| MCP and local MCP server | `apps/desktop/electron/web-ai-mcp-gateway.ts`, `apps/desktop/mcp/` | Existing tool schemas and approval boundaries must be preserved during future integration. |
+| CLI providers | `claude-mcp-config.ts`, `codex-mcp-config.ts`, related runtime modules | Provider-specific runtime remains; common run contracts are future work. |
+| Built-in Skills | `apps/desktop/electron/official-skills/` | Existing Skill format remains and must be regression-tested. |
+| Browser persistence | `apps/desktop/src/lib/runtime/browser/` | Separate browser-runtime IndexedDB layer; not part of desktop SQLite deletion. |
+| StudyAid / question UI | Existing app consumers and Question Engine domain | Question workflows require separate behavior and regression verification. |
 
-## Known constraints
+## Confirmed code removals
 
-- The root npm workspace list on this branch currently includes the desktop app, viewer, editor and React 18 example; packages/question-engine is not in that list. Its own package has a TypeScript typecheck script, but root CI does not currently invoke that package script directly.
-- The separate-vector-store draft PR (#22) is based on feat/question-engine-rebuild and has not reported CI statuses in the inspected status endpoint. It should remain unmerged until code review and test/build evidence exist.
-- The current vector implementation stores normalized embeddings as JSON and performs cosine scoring in JavaScript. An alternate engine should be evaluated against representative datasets before adoption.
-- Existing storage migrations include deliberate retirement of older JSON-backed stores. Verify actual user-data locations and migration behavior before deleting compatibility code or data.
-- The official upstream repository has additional files/features in some areas; each diff needs classification and focused tests rather than wholesale copying.
+- `packages/question-engine/src/storage/` is absent from the current branch.
+- The disconnected standalone Question Bank package is absent.
+- The Electron KnowledgeDbStore no longer directly reads/writes the PDF staging table.
+- Electron backup restore expects `sigma-core.sqlite`, not the retired `sigma-studio.sqlite` filename.
+- Electron startup attempts to delete the previous `sigma-studio.sqlite` file and its WAL/SHM sidecars.
 
-## First adapter milestone
+These are source-tree facts. They do not prove local files have already been removed from a user's machine.
 
-The first code milestone is intentionally narrow: export contracts from @sigma-studio/sigma-core, then create adapters that delegate to the current Question Engine and retrieval implementation. No data schema, vector engine, AI provider, MCP server, Skill format or UI behavior should change in this milestone.
+## Verification gates
+
+- Inspect the latest CI run after the last commit; previous runs failed or were cancelled during this sequence.
+- Require desktop/Core typecheck, Core and desktop tests, lint, production build, Electron package/smoke tests, and cross-platform file-locking checks to pass.
+- Test the schema cleanup and backup/restore round-trip.
+- Review the Core schema for genuine domain-model design rather than treating table-prefix changes as proof of a ground-up redesign.
+- Keep the draft PR unmerged until the verification gates pass.
