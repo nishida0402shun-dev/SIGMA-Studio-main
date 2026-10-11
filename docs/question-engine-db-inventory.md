@@ -1,6 +1,6 @@
 # SQLite retirement and SIGMA Core storage inventory
 
-Last checked: branch `feat/sigma-core-foundation`. This inventory describes tracked source files; runtime data deletion and full desktop verification require a passing CI run and an actual application launch.
+Last code verification: commit `043c9bbe2301d2ee2c6b50d17e978a5abec4a630`, [CI run 38120761778](https://github.com/nishida0402shun-dev/SIGMA-Studio-main/actions/runs/38120761778) passed. This inventory describes tracked source files; cleanup of files on a particular user's machine is not independently verified.
 
 ## Legacy storage removed from the branch
 
@@ -29,15 +29,16 @@ Last checked: branch `feat/sigma-core-foundation`. This inventory describes trac
 
 ## Verification status
 
-- Core-only typecheck and tests passed in CI run `38115382853`, but the desktop typecheck failed because three remaining consumers still imported removed Question Engine SQLite exports.
-- Those imports were corrected in subsequent commits. The latest CI result must be checked before treating the branch as verified.
-- The Core schema is now namespaced and independent of the old `qe_*` tables, but a source review is still required before claiming the entire schema is a ground-up data-model redesign. Renaming tables alone is not proof of redesign.
-- A passing CI run does not prove that the application has been launched locally or that a user's old files were deleted.
+- **Passed:** [CI run 38120761778](https://github.com/nishida0402shun-dev/SIGMA-Studio-main/actions/runs/38120761778) at code commit `043c9bbe2301d2ee2c6b50d17e978a5abec4a630` verified Core/Desktop typecheck, lint, tests, production build, Electron build/smoke test, public package checks, and file locking on Ubuntu, macOS, and Windows.
+- The old standalone Question Bank package, Question Engine storage directory, and Electron learning/research compatibility modules are absent from the tracked tree. Desktop typecheck passed after all known imports were redirected to SIGMA Core.
+- The schema is version 8. Question content and answers are separate records; conversation ordering/capture identity, long-term memory identity, research page references, and learning ranking deltas have dedicated fields or tables.
+- Migration tests verify the pre-v8 prototype tables are reset without importing rows. Backup/restore tests verify source-path restoration and rebuilding of the question FTS index.
+- Passing CI does not prove that old files have been deleted from every user's machine. Electron startup attempts to remove the retired `sigma-studio.sqlite` database and its WAL/SHM sidecars.
 
 ## Remaining acceptance checks
 
-1. Verify current CI: Core and desktop typecheck, unit tests, lint, production build, Electron packaging/smoke test, and cross-platform file-locking jobs.
-2. Add or confirm explicit migration tests that prove legacy `qe_*` tables are dropped and the new schema is created.
-3. Verify backup/restore round-trip with `sigma-core.sqlite`, including foreign-key integrity and stored file paths.
-4. Search the complete tracked tree for remaining direct persistence SQL outside Core. Keep file extraction and archive management in Electron, but route table-specific operations through Core repositories.
-5. Keep this branch unmerged until these checks pass.
+1. **Passed at code commit `043c9bbe`** in CI run 38120761778; rerun CI after any subsequent source changes.
+2. **Implemented and tested:** migration tests prove legacy `qe_*` tables are dropped and the normalized schema is created.
+3. **Implemented and tested:** backup/restore round-trip checks foreign-key integrity, stored source paths, and question search-index rebuild.
+4. The deleted legacy module paths are absent and typecheck passes. Continue reviewing direct persistence SQL boundaries so table-specific persistence remains in Core repositories.
+5. Keep this branch unmerged until final design review and acceptance of the remaining persistence boundaries.
