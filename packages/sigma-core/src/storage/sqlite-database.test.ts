@@ -23,6 +23,14 @@ describe("openSigmaCoreDatabase", () => {
       INSERT INTO qe_questions(id, title) VALUES ('legacy-question', 'must not be migrated');
       CREATE TABLE qe_schema_migrations (version INTEGER PRIMARY KEY, applied_at TEXT NOT NULL);
       CREATE TABLE qe_vector_records (id TEXT PRIMARY KEY, vector_json TEXT NOT NULL);
+      CREATE TABLE sigma_core_questions (
+        id TEXT PRIMARY KEY, title TEXT NOT NULL, body_format TEXT NOT NULL, body_json TEXT NOT NULL,
+        answer_json TEXT, difficulty INTEGER, review_status TEXT NOT NULL, version INTEGER NOT NULL,
+        created_at TEXT NOT NULL, updated_at TEXT NOT NULL
+      );
+      INSERT INTO sigma_core_questions VALUES
+        ('prototype-question', 'discard me', 'plain-text', '{}', NULL, NULL, 'draft', 1, '2026-01-01', '2026-01-01');
+      CREATE VIRTUAL TABLE sigma_core_conversation_entries_fts USING fts5(entry_id, conversation_id, content);
     `);
     legacy.close();
 
@@ -36,6 +44,12 @@ describe("openSigmaCoreDatabase", () => {
         "SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'sigma_core_questions'",
       ).all();
       expect(newTables).toHaveLength(1);
+      const questionColumns = database.raw.prepare("PRAGMA table_info(sigma_core_questions)").all() as Array<{ name: string }>;
+      expect(questionColumns.some((column) => column.name === "body_json")).toBe(false);
+      expect(database.raw.prepare("SELECT question_id FROM sigma_core_question_contents").all()).toEqual([]);
+      expect(database.raw.prepare(
+        "SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'sigma_core_conversation_entries_fts'",
+      ).get()).toBeUndefined();
       const migrations = database.raw.prepare(
         "SELECT version FROM sigma_core_schema_migrations ORDER BY version",
       ).all() as Array<{ version: number }>;
