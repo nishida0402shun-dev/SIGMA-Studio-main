@@ -719,12 +719,12 @@ export class KnowledgeDbStore {
   }
 
   async getPdfImportStaging(stagingId: string): Promise<KnowledgePdfImportStaging | null> {
-    const row = this.db.prepare("SELECT * FROM qe_knowledge_staging WHERE id = ?").get(stagingId) as StagingRow | undefined;
+    const row = this.db.prepare("SELECT * FROM sigma_core_knowledge_staging WHERE id = ?").get(stagingId) as StagingRow | undefined;
     return row ? stagingFromRow(row) : null;
   }
 
   async listPdfImportStaging(): Promise<KnowledgePdfImportStaging[]> {
-    const rows = this.db.prepare("SELECT * FROM qe_knowledge_staging ORDER BY updated_at DESC, rowid DESC").all() as unknown as StagingRow[];
+    const rows = this.db.prepare("SELECT * FROM sigma_core_knowledge_staging ORDER BY updated_at DESC, rowid DESC").all() as unknown as StagingRow[];
     return rows.map(stagingFromRow);
   }
 
@@ -1030,8 +1030,8 @@ export class KnowledgeDbStore {
         await fs.rm(targetPath, { recursive: true, force: true });
         await fs.cp(sourcePath, targetPath, { recursive: true, force: true });
       }
-      const sourceRows = this.db.prepare("SELECT id, stored_uri FROM qe_knowledge_sources").all() as Array<{ id: string; stored_uri: string }>;
-      const updateStoredPath = this.db.prepare("UPDATE qe_knowledge_sources SET stored_uri = ? WHERE id = ?");
+      const sourceRows = this.db.prepare("SELECT id, stored_uri FROM sigma_core_knowledge_sources").all() as Array<{ id: string; stored_uri: string }>;
+      const updateStoredPath = this.db.prepare("UPDATE sigma_core_knowledge_sources SET stored_uri = ? WHERE id = ?");
       for (const source of sourceRows) {
         const filename = path.basename(source.stored_uri);
         if (!filename || filename === "." || filename === path.sep) continue;
@@ -1266,7 +1266,7 @@ export class KnowledgeDbStore {
 
   private writeStaging(staging: KnowledgePdfImportStaging): void {
     this.db.prepare(`
-      INSERT INTO qe_knowledge_staging
+      INSERT INTO sigma_core_knowledge_staging
         (id, status, source_path, source_name, source_hash, size_bytes, page_count,
          created_at, updated_at, approved_at, segments_json)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
