@@ -9,8 +9,8 @@ describe("Knowledge DB backup/restore", () => {
   it("round-trips the shared SQLite database and source files", async () => {
     const dataDir = await fs.mkdtemp(path.join(os.tmpdir(), "sigma-knowledge-backup-"));
     const backupDir = await fs.mkdtemp(path.join(os.tmpdir(), "sigma-knowledge-backup-out-"));
-    const sourceDatabase = openQuestionEngineDatabase({ dataDir: path.join(dataDir, "knowledge-db") });
-    let restoredDatabase: ReturnType<typeof openQuestionEngineDatabase> | undefined;
+    const sourceDatabase = openSigmaCoreDatabase({ dataDir: path.join(dataDir, "knowledge-db") });
+    let restoredDatabase: ReturnType<typeof openSigmaCoreDatabase> | undefined;
     try {
       const store = new KnowledgeDbStore(dataDir, sourceDatabase.raw);
       const sourceDir = path.join(dataDir, "input");
@@ -25,7 +25,7 @@ describe("Knowledge DB backup/restore", () => {
       expect((await fs.stat(backupPath)).size).toBeGreaterThan(0);
 
       const secondDir = await fs.mkdtemp(path.join(os.tmpdir(), "sigma-knowledge-restore-"));
-      restoredDatabase = openQuestionEngineDatabase({ dataDir: path.join(secondDir, "knowledge-db") });
+      restoredDatabase = openSigmaCoreDatabase({ dataDir: path.join(secondDir, "knowledge-db") });
       const restoredStore = new KnowledgeDbStore(secondDir, restoredDatabase.raw);
       const restored = await restoredStore.restoreBackup(backupPath);
       expect(restored.fileCount).toBeGreaterThan(0);
@@ -47,7 +47,7 @@ describe("Knowledge DB backup/restore", () => {
   it("rejects zip-slip entries and archives without a SQLite database", async () => {
     const dataDir = await fs.mkdtemp(path.join(os.tmpdir(), "sigma-knowledge-backup-slip-"));
     const backupPath = path.join(dataDir, "bad.zip");
-    const database = openQuestionEngineDatabase({ dataDir: path.join(dataDir, "knowledge-db") });
+    const database = openSigmaCoreDatabase({ dataDir: path.join(dataDir, "knowledge-db") });
     try {
       const JSZip = (await import("jszip")).default;
       const zip = new JSZip();
