@@ -162,7 +162,6 @@ import type  {
   DesktopAiSourceReference,
   DesktopDocumentMetadata,
 } from "@/types/desktop";
-import type { KnowledgeDbAiContext } from "@/types/knowledge-db";
 
 /**
  * **呼び出し時点**の表示言語で解決する `t`。
@@ -262,8 +261,6 @@ interface AiEditPanelProps {
   /** Bumped by the in-body run-anchor widget (R2) when the user clicks a
    * background room's widget: selects that room so its log becomes visible. */
   focusRoomRequest?: { roomId: string; seq: number } | null;
-  initialKnowledgeDbContext?: KnowledgeDbAiContext[] | null;
-  onKnowledgeDbContextConsumed?: () => void;
 }
 
 interface OverlayReferencePreview {
@@ -405,8 +402,6 @@ export function AiEditPanel({
   onPromoteToSidebar,
   onInlineRunAnchorChange,
   focusRoomRequest = null,
-  initialKnowledgeDbContext = null,
-  onKnowledgeDbContextConsumed,
 }: AiEditPanelProps) {
   const t = useT("ai");
   const tEditor = useT("editor");
@@ -423,17 +418,7 @@ export function AiEditPanel({
   const [geminiModel, setGeminiModel] = useState<string>(initialModelPreferences.geminiModel);
   const [reasoningEffort, setReasoningEffort] = useState<AiEditReasoningEffort>(initialModelPreferences.reasoningEffort);
   const [instruction, setInstruction] = useState("");
-  useEffect(() => {
-    if (!initialKnowledgeDbContext?.length) return;
-    const contextText = initialKnowledgeDbContext.map((item) =>
-      `[Knowledge DB] ${item.sourceName} — p.${item.pageNumber} — ${item.semanticType}\n${item.text}`,
-    ).join("\n\n");
-    setInstruction((current) => current.trim()
-      ? `${current.trim()}\n\n以下はKnowledge DBから選択した参考資料です。内容を踏まえて回答してください。\n\n${contextText}`
-      : `以下はKnowledge DBから選択した参考資料です。内容を踏まえて回答してください。\n\n${contextText}`);
-    onKnowledgeDbContextConsumed?.();
-  }, [initialKnowledgeDbContext, onKnowledgeDbContextConsumed]);
-  // R5: rooms and the active-room selection live in the module-level
+ live in the module-level
   // controller store (ai-run-controller.ts), not component state, so an
   // in-flight run's transcript updates survive this panel being remounted
   // (promoting inline → sidebar moves it across a portal boundary, which
@@ -1129,161 +1114,13 @@ export function AiEditPanel({
   // immediate run and a later queued-follow-up dispatch (R3) go through this
   // same snapshot shape so a follow-up replays exactly what the user composed,
   // even if the live composer state has since moved on to something else.
-  const retrieveKnowledgeDbContext = useCallback(async (query: string): Promise<{ text: string; references: Array<{ sourceId: string; sourceName: string; pageNumber: number }> }> => {
-    const desktop = getDesktopBridge();
-    const normalizedQuery = query.trim();
-    if (!desktop?.knowledgeDb?.search || !normalizedQuery) {
-      return { text: "", references: [] };
-    }
-    try {
-      const sources = await desktop.knowledgeDb.list() as Array<{
-        id?: string;
-        name?: string;
-      }>;
-      const sourceNames = new Map(
-        sources
-          .filter((source) => typeof source.id === "string" && typeof source.name === "string")
-          .map((source) => [source.id as string, source.name as string]),
-      );
-
-      const baseQueries = [
-        normalizedQuery,
-        `${resolveDocumentTitle(document)} ${normalizedQuery}`.trim(),
-        ...turnReferences
-          .map((item) => getReferenceContextText(item).trim())
-          .filter(Boolean)
-          .slice(0, 2)
-          .map((context) => `${normalizedQuery} ${context}`.trim()),
-      ].filter((candidate, index, candidates) =>
-        candidate.length > 0 && candidates.indexOf(candidate) === index,
-      ).slice(0, 4);
-
-      const searchQueries = async (candidates: string[]) => {
-        const queryResults = await Promise.all(
-          candidates.map((candidate) =>
-            desktop.knowledgeDb!.search({ query: candidate, limit: 6 }) as Promise<Array<{
-              sourceId?: string;
-              pageNumber?: number;
-              text?: string;
-              score?: number;
-            }>>,
-          ),
-        );
-        const bestByChunk = new Map<string, {
-          sourceId: string;
-          pageNumber: number;
-          text: string;
-          score: number;
-        }>();
-        for (const matches of queryResults) {
-          for (const match of matches) {
-            if (
-              typeof match.sourceId !== "string"
-              || typeof match.pageNumber !== "number"
-              || typeof match.text !== "string"
-              || !match.text.trim()
-            ) {
-              continue;
-            }
-            const key = `${match.sourceId}:${match.pageNumber}:${match.text}`;
-            const score = typeof match.score === "number" ? match.score : 0;
-            const current = bestByChunk.get(key);
-            if (!current || score > current.score) {
-              bestByChunk.set(key, {
-                sourceId: match.sourceId,
-                pageNumber: match.pageNumber,
-                text: match.text.trim(),
-                score,
-              });
-            }
-          }
-        }
-        return [...bestByChunk.values()].sort((a, b) => b.score - a.score);
-      };
-
-      let usable = (await searchQueries(baseQueries)).slice(0, 6);
-      const bestScore = usable[0]?.score ?? 0;
-
-      // Search is intentionally AI-assisted only when the local retrieval is weak.
-      // The one-shot skill-draft runtime has no MCP/tools, so it cannot recursively
-      // search the Knowledge DB or invent source contents.
-      if ((usable.length < 3 || bestScore < 0.32) && desktop.aiSkillDraft?.generate) {
-        const runProvider = lockedProvider ?? provider;
-        try {
-          const expanded = await desktop.aiSkillDraft.generate({
-            provider: runProvider,
-            prompt: [
-              "Knowledge DB検索用の検索語を5個まで考えてください。",
-              "ユーザーの質問を、教科書・教材で実際に使われそうな具体的な用語へ言い換えてください。",
-              "出力はMarkdownの箇条書きだけにしてください。説明は禁止です。",
-              `ユーザーの質問: ${normalizedQuery}`,
-              `現在のドキュメント: ${resolveDocumentTitle(document)}`,
-              ...turnReferences
-                .map((item) => getReferenceContextText(item).trim())
-                .filter(Boolean)
-                .slice(0, 2)
-                .map((context) => `現在の参照内容: ${context}`),
-            ].join("\n"),
-            context: {
-              title: "Knowledge DB検索語展開",
-              description: "Knowledge DBの検索語候補生成",
-              currentContent: "",
-            },
-          });
-          const raw = expanded && typeof expanded === "object" && "ok" in expanded && expanded.ok === true
-            && "text" in expanded && typeof expanded.text === "string"
-            ? expanded.text
-            : "";
-          const expandedQueries = raw
-            .split(/\r?\n/)
-            .map((line) => line.replace(/^\s*[-*•]\s*/, "").replace(/^\d+[.)]\s*/, "").trim())
-            .filter((line) => line.length >= 2 && line.length <= 120)
-            .filter((line, index, values) => values.indexOf(line) === index)
-            .slice(0, 5);
-          if (expandedQueries.length > 0) {
-            usable = (await searchQueries([...baseQueries, ...expandedQueries])).slice(0, 6);
-          }
-        } catch (error) {
-          console.warn("Knowledge DB AI query expansion failed; continuing with local retrieval.", error);
-        }
-      }
-
-      if (usable.length === 0) return { text: "", references: [] };
-
-      const references = usable.map((match) => ({
-        sourceId: match.sourceId,
-        sourceName: sourceNames.get(match.sourceId) ?? match.sourceId,
-        pageNumber: match.pageNumber,
-      })).filter((reference, index, values) =>
-        values.findIndex((candidate) =>
-          candidate.sourceId === reference.sourceId && candidate.pageNumber === reference.pageNumber,
-        ) === index,
-      );
-
-      return {
-        text: usable.map((match) =>
-          `[Knowledge DB / ${sourceNames.get(match.sourceId) ?? match.sourceId} / p.${match.pageNumber} / score ${match.score.toFixed(3)}]\n${match.text}`,
-        ).join("\n\n"),
-        references,
-      };
-    } catch (error) {
-      console.warn("Knowledge DB retrieval failed; continuing without retrieved context.", error);
-      return { text: "", references: [] };
-    }
-  }, [document, lockedProvider, provider, turnReferences]);
-
-
-  const buildRunParams = useCallback(async (): Promise<RunParams> => {
+ = useCallback(async (): Promise<RunParams> => {
     const turnAttachments = await createAttachmentsWithSelectedOverlayPreview({
       attachments,
       overlayPreviews: overlayComposerPreviews,
       overlaySelection,
       activeReferenceKey,
     });
-    const retrievedKnowledge = await retrieveKnowledgeDbContext(instruction);
-    const knowledgeInstruction = retrievedKnowledge.text
-      ? `\n\n以下はKnowledge DBから質問内容に関連して自動検索した参考資料です。回答では必要な範囲で利用し、資料にない内容は推測せず明示してください。\n\n${retrievedKnowledge.text}`
-      : "";
     // A room bound to a provider always runs on it, even if the composer's
     // `provider` state hasn't caught up to a just-selected room yet.
     const runProvider = lockedProvider ?? provider;
@@ -1301,8 +1138,7 @@ export function AiEditPanel({
       turnMentionedDocuments: mentionedDocuments,
       turnProvider: runProvider,
       turnAiResourceIds,
-      turnInstruction: (instruction.trim() || getAttachmentDefaultInstruction(turnAttachments)) + knowledgeInstruction,
-      knowledgeDbSourceReferences: retrievedKnowledge.references,
+      turnInstruction: instruction.trim() || getAttachmentDefaultInstruction(turnAttachments),
       turnModel: runProvider === "claude" ? claudeModel : runProvider === "antigravity" ? geminiModel : model,
       turnReasoningEffort: reasoningEffort,
       aiTargetId,
@@ -1319,7 +1155,7 @@ export function AiEditPanel({
   }, [
     activeReferenceKey, aiResources, aiTargetId, attachments, claudeModel, document, documentIdentityKey, geminiModel,
     inlineAnchor, instruction, lockedProvider, mentionedDocuments, model, overlayComposerPreviews, overlaySelection, overlaySelectionContext, provider, reasoningEffort,
-    scopedAgentThreadId, selectedAiResourceIds, turnReferences, variant, retrieveKnowledgeDbContext,
+    scopedAgentThreadId, selectedAiResourceIds, turnReferences, variant,
   ]);
 
   const clearComposerAfterSubmit = useCallback(() => {
