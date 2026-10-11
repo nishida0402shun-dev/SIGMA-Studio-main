@@ -6,7 +6,7 @@ import { createInterface } from "node:readline";
 import { resolveDevServerUrl, isDevServerNavigation } from "./dev-server";
 import http from "node:http";
 import path from "node:path";
-import { existsSync, readFileSync, rmSync, watch, type FSWatcher } from "node:fs";
+import { existsSync, readFileSync, watch, type FSWatcher } from "node:fs";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
 import { LocalAiEditChatRoomStore } from "./ai-edit-chat-room-store";
