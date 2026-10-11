@@ -282,6 +282,8 @@ export class KnowledgeDbStore {
   }
 
   async addFiles(filePaths: string[]): Promise<KnowledgeSource[]> {
+    // Do not race a background index write against this read-modify-write operation.
+    if (this.indexPromise) await this.indexPromise;
     const paths = this.paths();
     const library = await this.readLibrary();
     const added: KnowledgeSource[] = [];
