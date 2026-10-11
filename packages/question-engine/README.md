@@ -2,7 +2,7 @@
 
 SIGMA Studio 専用の問題・知識・会話データ基盤を再構築するための新しいライブラリ境界です。
 
-> Status: initial rebuild scaffold. The new schema is not wired into the desktop app, and migration tests have not yet been run.
+> Status: partial SQLite cutover. Desktop knowledge metadata, vectors, conversation memory, long-term memory, and PDF staging now use the shared database API. Build and test results have not yet been verified.
 
 ## Goals
 
@@ -17,8 +17,10 @@ SIGMA Studio 専用の問題・知識・会話データ基盤を再構築する�
 - The disconnected legacy Question Bank package was removed from this branch.
 - A provider-neutral domain model, application ports, and initial SQLite schema have been added.
 - The schema currently covers question records, sources, tags, import proposals, knowledge pages, vector records, conversation entries, and long-term memories.
-- Existing integrated Knowledge DB and memory stores still have live application references. They are **not yet removed or replaced**; the new adapter layer must be implemented and verified before those code paths can be retired.
-- No data files are deleted by this code change. Runtime data removal is a separate operation and is not part of this branch.
+- Electron now opens one shared SQLite database under `data/knowledge-db/sigma-studio.sqlite` and injects that connection into knowledge, vector, conversation-memory, and long-term-memory stores.
+- The former JSON-backed conversation and long-term memory modules have been removed. Knowledge page/source metadata, vector records, and PDF staging metadata now use SQLite; source documents and derived page previews remain ordinary files.
+- The `KnowledgeDbStore` API is retained to avoid rewriting its IPC/UI callers, but its persistence implementation now reads/writes the SQLite tables.
+- Existing JSON data files are no longer read by the new stores. They are not automatically deleted from user directories by the code changes.
 
 ## Boundaries
 
@@ -35,7 +37,7 @@ SIGMA Studio 専用の問題・知識・会話データ基盤を再構築する�
 
 ## Migration rule
 
-The old integrated stores are marked for retirement, but their application call sites must be migrated to the new API before deleting the old modules. Existing runtime data files are left untouched until explicit migration, backup/restore validation, and regression tests pass.
+The application-facing `KnowledgeDbStore` and `LocalVectorIndex` names remain as compatibility façades, but persistence is SQLite-backed. Old JSON files are not imported. Database and PDF assets share the Knowledge DB directory so the backup path can include both.
 
 ## Acceptance criteria
 
