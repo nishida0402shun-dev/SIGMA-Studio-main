@@ -1,41 +1,46 @@
 # Question Engine migration inventory
 
-Audit baseline: commit `7377554902141bba9335435394ed7bfeefbf3efe`.
+Audit baseline: commit `7377554902141bba9335435394ed7bfeefbf3efe`; rebuild branch includes subsequent changes.
 
 This is a source-code inventory, not a claim that runtime data locations or test results have been verified.
 
-## Existing data stores found
+## Legacy implementations found at the audit baseline
 
-| Area | Existing implementation | Format / role | Migration decision |
+| Area | Previous implementation | Format / role | Current status |
 |---|---|---|---|
-| Question Bank | `packages/sigma_studio_question_bank_package/packages/question-bank/src/db/schema.ts`, `repository.ts`, `stagingRepository.ts` | SQLite via `better-sqlite3`; question records, taxonomy, FTS5, PDF import staging | Reuse domain ideas and repository behavior after schema and FTS correctness tests. Do not delete or migrate yet. |
-| Knowledge DB | `apps/desktop/electron/knowledge-db-store.ts` | File-backed knowledge library; source documents, pages, extraction/classification metadata and knowledge retrieval integration | Preserve existing user-visible workflows. Audit file format, backup/restore, locking, and all consumers before choosing whether to migrate records or retain an adapter. |
-| Local vector index | `apps/desktop/electron/local-vector-index.ts` | Versioned file-backed vector records and local embedding model integration | Keep as an adapter initially. Decide whether vector records should be indexed from the new canonical source model only after checking rebuild/recovery behavior and performance. |
-| Conversation memory | `apps/desktop/electron/conversation-memory-store.ts` | JSON file-backed conversation entries, recent/search operations | Preserve the feature and its retention/privacy behavior; evaluate a repository adapter rather than deleting it. |
-| Long-term memory | `apps/desktop/electron/long-term-memory-store.ts` | JSON file-backed extracted memory entries | Preserve existing APIs and semantics during migration; assess deduplication, retention, and error handling. |
-| Browser runtime stores | `apps/desktop/src/lib/runtime/browser/idb-backend.ts`, `memory-backend.ts` | Browser-side persistence abstractions | Treat separately from Electron's local data stores; audit callers and compatibility requirements before unifying APIs. |
+| Standalone Question Bank | `packages/sigma_studio_question_bank_package/packages/question-bank/src/db/` | SQLite via `better-sqlite3`; questions, taxonomy, FTS5, PDF staging | **Removed from this branch**. Its schema/repository should not be reused as the new storage implementation. |
+| Knowledge DB | `apps/desktop/electron/knowledge-db-store.ts` | File-backed knowledge library with source/page metadata, extraction/classification and retrieval | Still present and referenced by Electron main/IPC/UI. Must be replaced behind the new library API before deletion. |
+| Local vector index | `apps/desktop/electron/local-vector-index.ts` | Versioned file-backed vectors and local embedding model integration | Still present and coupled to Knowledge DB. New schema includes vector records, but adapter/model behavior is not migrated yet. |
+| Conversation memory | `apps/desktop/electron/conversation-memory-store.ts` | JSON file-backed conversation entries and search | Still present and referenced by Electron IPC/preload. New schema includes conversation entries, but API consumers are not migrated yet. |
+| Long-term memory | `apps/desktop/electron/long-term-memory-store.ts` | JSON file-backed extracted memory entries | Still present and referenced by Electron IPC/preload. New schema includes long-term memories, but API consumers are not migrated yet. |
+| Browser runtime stores | `apps/desktop/src/lib/runtime/browser/idb-backend.ts`, `memory-backend.ts` | Browser persistence abstractions | Separate browser-runtime layer. Audit callers before deciding whether it should share the same storage API or remain an adapter. |
 
-## Important observations
+## Rebuild changes already made
 
-- The project does not currently have one uniform physical database engine for all these features. At this baseline, the Question Bank uses SQLite while Knowledge DB, vector index, and memory stores are file-backed.
-- A shared *library/API* does not require every record to be stored in one SQLite file. Domain ownership and persistence adapters should be separated.
-- The Knowledge DB already has substantial import, page analysis, classification, and retrieval logic. Reimplementing it without a detailed audit risks losing valuable independent functionality.
-- The Question Bank package uses an older dependency set and is outside the root npm workspaces shown in the audited root `package.json`; integration must account for this rather than assuming it is already wired into the desktop app.
-- The Question Bank FTS5 schema uses an external-content FTS table with `body_text`, while the source table has `body_json`. Its triggers also refer to `body_json`. This needs an explicit correctness test and likely a schema adjustment in the new implementation.
+- Created branch `feat/question-engine-rebuild`.
+- Removed 25 tracked files belonging to the disconnected standalone Question Bank package.
+- Added provider-neutral question domain types and application ports under `packages/question-engine/src/`.
+- Added an initial versioned SQLite schema covering question records, sources, tags, import proposals, knowledge pages, vector records, conversation entries, and long-term memories.
+- The new package is not yet wired into the desktop app. No build or test run has verified it.
 
-## Safe rebuild strategy
+## Correctness issues observed in the removed Question Bank implementation
 
-1. Keep all old stores and their on-disk formats untouched during initial development.
-2. Establish the new library's domain/application interfaces independently of storage.
-3. Add storage adapters and versioned migrations behind those interfaces.
-4. Write import/export and round-trip tests using disposable copies of old data.
-5. Preserve backward compatibility through adapters until all consumers have migrated.
-6. Only propose removal of legacy stores after data parity, backup/restore, performance, and regression checks pass.
+- Its FTS5 virtual table declared external content `questions` with a `body_text` column, while the source table stored `body_json`; triggers also copied `body_json` into that FTS column. This needed explicit tests and was one reason not to reuse that implementation.
+- The old package was not included in the root npm workspace list and was not wired through the inspected Electron main/preload files at the audit baseline.
 
-## Unknowns that require runtime or broader source inspection
+## Safe retirement sequence for the still-integrated stores
 
-- Exact runtime data directories and whether users have existing production data in them.
-- All constructor/initialization sites and all IPC/MCP/UI consumers.
-- Full browser-store migration behavior and its persisted schema.
-- Current automated test/build/CI results for the audit baseline.
-- Whether the vector index can be deterministically rebuilt from the current Knowledge DB.
+1. Implement a SQLite adapter and automated temporary-database tests, including FTS index synchronization.
+2. Migrate Knowledge DB and vector index APIs, preserving page extraction, indexing, retrieval, backup/restore, and recovery behavior.
+3. Migrate conversation and long-term memory APIs, preserving search, deduplication, and retention semantics.
+4. Update Electron IPC/preload and UI consumers to use the new library, with sender validation intact.
+5. Verify a backup-and-restore plus round-trip migration using disposable copies of old data.
+6. Run typecheck, focused tests, full test suite, build, and CI; record exact results.
+7. Only then remove remaining legacy modules. This retires old code without silently discarding runtime user data.
+
+## Unknowns
+
+- Exact runtime data directories and whether users have production data in them.
+- Full consumer graph for all legacy stores, including indirect calls and UI routes.
+- Whether the new SQLite driver can be packaged correctly for every supported Electron target.
+- Current build/test/CI results for the rebuild branch.
