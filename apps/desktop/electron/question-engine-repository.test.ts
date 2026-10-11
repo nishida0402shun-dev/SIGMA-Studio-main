@@ -39,7 +39,7 @@ describe("SqliteQuestionRepository", () => {
 
     expect(created.version).toBe(1);
     expect((await repository.getById(created.id))?.answer?.verification).toBe("source-checked");
-    expect((await repository.search({ text: "平方完成", tagIds: ["tag-math"], reviewStatuses: ["needs-review"] })).total).toBe(1);
+    expect((await repository.search({ text: "放物線", tagIds: ["tag-math"], reviewStatuses: ["needs-review"] })).total).toBe(1);
     expect((await repository.search({ sourceIds: ["textbook-1"], difficultyMin: 2 })).items[0]?.id).toBe(created.id);
 
     const updated = await repository.update(created.id, 1, {
