@@ -478,10 +478,6 @@ export const settings = {
       label: "Allow the AI to search the web",
       description: "Lets the AI search the web when it needs to, and cite its sources.",
     },
-    knowledgeDecision: {
-      label: "Local Jev decision for Knowledge DB",
-      description: "Re-ranks search candidates with local Tev1. When OFF, Ruri + RRF results are used directly.",
-    },
     hint: {
       codexPathWindows: "codex or C:\\Users\\...\\AppData\\Roaming\\npm\\codex.cmd",
       codexPathPosix: "codex or /Users/.../codex",
@@ -538,7 +534,6 @@ export const settings = {
       aiAgents: "AI agent codex claude antigravity gemini connection エージェント",
       autoApply: "auto apply proposal verified 自動適用 提案",
       webSearch: "web search internet citation Web検索 出典",
-      knowledgeDecision: "Knowledge DB local Jev decision Tev1 reranking semantic search precision",
       paper: "paper size A4 A3 B5 B4 orientation 用紙 向き",
       margins: "margin margins top bottom left right 余白",
       columns: "column columns gap count 段組み 段数",
