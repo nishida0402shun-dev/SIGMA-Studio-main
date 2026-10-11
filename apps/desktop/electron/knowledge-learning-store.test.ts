@@ -3,7 +3,7 @@ import os from "node:os";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
 import { openSigmaCoreDatabase } from "../../../packages/sigma-core/src/index";
-import { KnowledgeLearningStore } from "./knowledge-learning-store";
+import { KnowledgeLearningStore } from "../../../packages/sigma-core/src/storage/sqlite-knowledge-learning-store";
 
 describe("KnowledgeLearningStore", () => {
   it("persists feedback and returns bounded query boost", async () => {
