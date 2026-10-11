@@ -4,11 +4,69 @@ import path from "node:path";
 import { PDFDocument } from "pdf-lib";
 import { afterEach, describe, expect, it } from "vitest";
 import { KnowledgeDbStore, type KnowledgePage, type KnowledgeSource } from "./knowledge-db-store";
+import { openQuestionEngineDatabase, type QuestionEngineDatabase } from "../../packages/question-engine/src/index";
 import { LocalVectorIndex } from "./local-vector-index";
 import { KNOWLEDGE_ANALYSIS_VERSION } from "./knowledge-analysis-engine";
 import { KNOWLEDGE_TAXONOMY_VERSION } from "./knowledge-taxonomy";
 
 const tempDirs: string[] = [];
+const databases: QuestionEngineDatabase[] = [];
+const databasesByDir = new Map<string, QuestionEngineDatabase>();
+
+function getDatabase(dataDir: string): QuestionEngineDatabase {
+  const existing = databasesByDir.get(dataDir);
+  if (existing) return existing;
+  const database = openQuestionEngineDatabase({ dataDir: path.join(dataDir, "knowledge-db") });
+  databases.push(database);
+  databasesByDir.set(dataDir, database);
+  return database;
+}
+
+function createStore(dataDir: string): KnowledgeDbStore {
+  return new KnowledgeDbStore(dataDir, getDatabase(dataDir).raw);
+}
+
+function createVectorIndex(dataDir: string): LocalVectorIndex {
+  return new LocalVectorIndex(getDatabase(dataDir).raw);
+}
+
+function seedLibrary(dataDir: string, fixture: { sources: Array<Record<string, any>> }): void {
+  const db = getDatabase(dataDir).raw;
+  db.exec("BEGIN IMMEDIATE");
+  try {
+    db.exec("DELETE FROM qe_knowledge_sources");
+    const insertSource = db.prepare(`
+      INSERT INTO qe_knowledge_sources
+        (id, display_name, original_uri, stored_uri, mime_type, size_bytes, content_hash,
+         page_count, extraction_status, imported_at, updated_at, metadata_json)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `);
+    const insertPage = db.prepare(`
+      INSERT INTO qe_knowledge_pages
+        (id, source_id, page_number, semantic_type, title, text_content, extraction_status,
+         structure_json, analysis_json, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `);
+    for (const source of fixture.sources) {
+      insertSource.run(source.id, source.name ?? source.display_name ?? source.id,
+        source.originalPath ?? "", source.storedPath ?? "", source.mimeType ?? "text/plain",
+        source.sizeBytes ?? 0, source.contentHash ?? "", source.pageCount ?? source.pages?.length ?? 0,
+        source.extractionStatus ?? "complete", source.importedAt ?? new Date().toISOString(),
+        source.updatedAt ?? new Date().toISOString(),
+        JSON.stringify({ indexedAt: source.indexedAt, indexError: source.indexError }));
+      for (const page of source.pages ?? []) {
+        insertPage.run(page.id, source.id, page.pageNumber, page.semanticType ?? "unknown",
+          page.title ?? null, page.text ?? "", page.extractionStatus ?? (page.text ? "text" : "empty"),
+          JSON.stringify(page.structureBlocks ?? []), JSON.stringify(page),
+          source.updatedAt ?? new Date().toISOString());
+      }
+    }
+    db.exec("COMMIT");
+  } catch (error) {
+    db.exec("ROLLBACK");
+    throw error;
+  }
+}
 
 async function createPdf(fileName: string, pageCount: number): Promise<string> {
   const dir = await fs.mkdtemp(path.join(os.tmpdir(), "sigma-knowledge-db-"));
@@ -21,6 +79,8 @@ async function createPdf(fileName: string, pageCount: number): Promise<string> {
 }
 
 afterEach(async () => {
+  for (const database of databases.splice(0)) database.close();
+  databasesByDir.clear();
   await Promise.all(tempDirs.splice(0).map((dir) => fs.rm(dir, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 })));
 });
 
@@ -29,7 +89,7 @@ describe("KnowledgeDbStore", () => {
     const dataDir = await fs.mkdtemp(path.join(os.tmpdir(), "sigma-knowledge-db-data-"));
     tempDirs.push(dataDir);
     const sourcePath = await createPdf("source.pdf", 3);
-    const store = new KnowledgeDbStore(dataDir);
+    const store = createStore(dataDir);
     const [source] = await store.addFiles([sourcePath]);
     expect(source).toBeTruthy();
 
@@ -61,7 +121,7 @@ describe("KnowledgeDbStore", () => {
     const dataDir = await fs.mkdtemp(path.join(os.tmpdir(), "sigma-knowledge-db-ranking-"));
     tempDirs.push(dataDir);
     await createPdf("ranking.pdf", 2);
-    const store = new KnowledgeDbStore(dataDir);
+    const store = createStore(dataDir);
     const sourceId = "src_ranking";
     const libraryPath = path.join(dataDir, "knowledge-db", "library.json");
     await fs.mkdir(path.dirname(libraryPath), { recursive: true });
@@ -84,9 +144,9 @@ describe("KnowledgeDbStore", () => {
         ],
       }],
     };
-    await fs.writeFile(libraryPath, JSON.stringify(library), "utf8");
+    seedLibrary(dataDir, library);
 
-    const index = new LocalVectorIndex(path.join(dataDir, "knowledge-db", "vector-index"));
+    const index = createVectorIndex(dataDir);
     await index.upsertMany([
       { id: sourceId + "_p1_c0", sourceId, pageNumber: 1, chunkIndex: 0, text: "shared neutral content 定理" },
       { id: sourceId + "_p2_c0", sourceId, pageNumber: 2, chunkIndex: 0, text: "shared neutral content" },
@@ -102,7 +162,7 @@ describe("KnowledgeDbStore", () => {
   it("uses corpus-aware lexical ranking to prefer rare query terms over common terms", async () => {
     const dataDir = await fs.mkdtemp(path.join(os.tmpdir(), "sigma-knowledge-db-hybrid-"));
     tempDirs.push(dataDir);
-    const store = new KnowledgeDbStore(dataDir);
+    const store = createStore(dataDir);
     const sourceIds = ["src_hybrid_a", "src_hybrid_b", "src_hybrid_c"];
     const libraryPath = path.join(dataDir, "knowledge-db", "library.json");
     await fs.mkdir(path.dirname(libraryPath), { recursive: true });
@@ -112,15 +172,15 @@ describe("KnowledgeDbStore", () => {
       { id: sourceIds[1] + "_p1", sourceId: sourceIds[1], pageNumber: 1, semanticType: "theorem" as const, text: "数学 三角関数 加法定理 特殊定理", extractionStatus: "text" as const, analysisStatus: "analyzed" as const, analysisVersion: 2, title: "加法定理", keywords: ["加法定理", "三角関数"] },
       { id: sourceIds[2] + "_p1", sourceId: sourceIds[2], pageNumber: 1, semanticType: "unknown" as const, text: "数学 三角関数 共通説明 公式", extractionStatus: "text" as const, analysisStatus: "analyzed" as const, analysisVersion: 2 },
     ];
-    await fs.writeFile(libraryPath, JSON.stringify({
+    seedLibrary(dataDir, {
       version: 3,
       sources: sourceIds.map((id, index) => ({
         id, name: `hybrid-${index}.md`, originalPath: "", storedPath: "", mimeType: "text/markdown",
         sizeBytes: 0, pageCount: 1, importedAt: now, updatedAt: now, extractionStatus: "complete",
         pages: [pages[index]],
       })),
-    }), "utf8");
-    const index = new LocalVectorIndex(path.join(dataDir, "knowledge-db", "vector-index"));
+    });
+    const index = createVectorIndex(dataDir);
     await index.upsertMany(pages.map((page) => ({
       id: page.id + "_c0", sourceId: page.sourceId, pageNumber: 1, chunkIndex: 0, text: page.text,
     })));
@@ -133,7 +193,7 @@ describe("KnowledgeDbStore", () => {
   it("prioritizes exact phrase matches and can scope retrieval to selected sources", async () => {
     const dataDir = await fs.mkdtemp(path.join(os.tmpdir(), "sigma-knowledge-db-exact-"));
     tempDirs.push(dataDir);
-    const store = new KnowledgeDbStore(dataDir);
+    const store = createStore(dataDir);
     const sourceA = "src_exact_a";
     const sourceB = "src_exact_b";
     const libraryPath = path.join(dataDir, "knowledge-db", "library.json");
@@ -149,14 +209,14 @@ describe("KnowledgeDbStore", () => {
       analysisStatus: "analyzed" as const,
       analysisVersion: 2,
     });
-    await fs.writeFile(libraryPath, JSON.stringify({
+    seedLibrary(dataDir, {
       version: 3,
       sources: [
         { id: sourceA, name: "a.md", originalPath: "", storedPath: "", mimeType: "text/markdown", sizeBytes: 0, pageCount: 1, importedAt: now, updatedAt: now, extractionStatus: "complete", pages: [page(sourceA, 1, "exact phrase: 三角関数の加法定理")] },
         { id: sourceB, name: "b.md", originalPath: "", storedPath: "", mimeType: "text/markdown", sizeBytes: 0, pageCount: 1, importedAt: now, updatedAt: now, extractionStatus: "complete", pages: [page(sourceB, 1, "三角関数について一般的に説明する")] },
       ],
-    }), "utf8");
-    const index = new LocalVectorIndex(path.join(dataDir, "knowledge-db", "vector-index"));
+    });
+    const index = createVectorIndex(dataDir);
     await index.upsertMany([
       { id: sourceA + "_p1_c0", sourceId: sourceA, pageNumber: 1, chunkIndex: 0, text: "exact phrase: 三角関数の加法定理" },
       { id: sourceB + "_p1_c0", sourceId: sourceB, pageNumber: 1, chunkIndex: 0, text: "三角関数について一般的に説明する" },
@@ -178,7 +238,7 @@ describe("KnowledgeDbStore", () => {
   it("attaches structure-aware citation regions to search/context results", async () => {
     const dataDir = await fs.mkdtemp(path.join(os.tmpdir(), "sigma-knowledge-db-citation-"));
     tempDirs.push(dataDir);
-    const store = new KnowledgeDbStore(dataDir);
+    const store = createStore(dataDir);
     const sourceId = "src_citation";
     const libraryPath = path.join(dataDir, "knowledge-db", "library.json");
     await fs.mkdir(path.dirname(libraryPath), { recursive: true });
@@ -210,8 +270,8 @@ describe("KnowledgeDbStore", () => {
         }],
       }],
     };
-    await fs.writeFile(libraryPath, JSON.stringify(library), "utf8");
-    const index = new LocalVectorIndex(path.join(dataDir, "knowledge-db", "vector-index"));
+    seedLibrary(dataDir, library);
+    const index = createVectorIndex(dataDir);
     await index.upsertMany([{ id: sourceId + "_p1_c0", sourceId, pageNumber: 1, chunkIndex: 0, text: "三角関数の定理を確認する。" }]);
 
     const results = await store.search("三角関数の定理", 1);
@@ -228,7 +288,7 @@ describe("KnowledgeDbStore", () => {
     tempDirs.push(dataDir);
     const first = await createPdf("first.pdf", 3);
     const second = await createPdf("second.pdf", 2);
-    const store = new KnowledgeDbStore(dataDir);
+    const store = createStore(dataDir);
     const added = await store.addFiles([first, second]);
     expect(added).toHaveLength(2);
 
@@ -244,7 +304,7 @@ describe("KnowledgeDbStore", () => {
     const dataDir = await fs.mkdtemp(path.join(os.tmpdir(), "sigma-knowledge-db-staging-"));
     tempDirs.push(dataDir);
     const sourcePath = await createPdf("staging.pdf", 3);
-    const store = new KnowledgeDbStore(dataDir);
+    const store = createStore(dataDir);
 
     const staging = await store.previewPdfImport(sourcePath);
     expect(staging.status).toBe("draft");
@@ -268,7 +328,7 @@ describe("KnowledgeDbStore", () => {
     const dataDir = await fs.mkdtemp(path.join(os.tmpdir(), "sigma-knowledge-db-staging-hash-"));
     tempDirs.push(dataDir);
     const sourcePath = await createPdf("mutable.pdf", 1);
-    const store = new KnowledgeDbStore(dataDir);
+    const store = createStore(dataDir);
     const staging = await store.previewPdfImport(sourcePath);
 
     await fs.appendFile(sourcePath, Buffer.from("changed"));
@@ -284,7 +344,7 @@ it("classifies taxonomy from content rather than the filename", async () => {
   tempDirs.push(dataDir);
   const filePath = path.join(dataDir, "random-name.md");
   await fs.writeFile(filePath, "# 三角関数\\n\\n数学Ⅱの三角関数について、正弦定理と余弦定理を説明する。", "utf8");
-  const store = new KnowledgeDbStore(dataDir);
+  const store = createStore(dataDir);
   const [source] = await store.addFiles([filePath]);
   await store.search("正弦定理", 5);
   const indexed = (await store.listSources()).find((item) => item.id === source?.id);
@@ -296,7 +356,7 @@ it("imports non-PDF files into the global Knowledge DB and indexes their text", 
   tempDirs.push(dataDir);
   const filePath = path.join(dataDir, "notes.md");
   await fs.writeFile(filePath, "# 数学II 三角関数\\n\\n正弦定理と余弦定理のメモ", "utf8");
-  const store = new KnowledgeDbStore(dataDir);
+  const store = createStore(dataDir);
   const [source] = await store.addFiles([filePath]);
   expect(source?.mimeType).toBe("text/markdown");
   expect(source?.pageCount).toBe(1);
@@ -343,9 +403,9 @@ describe("Knowledge DB large-library resilience", () => {
     }));
     const libraryPath = path.join(dataDir, "knowledge-db", "library.json");
     await fs.mkdir(path.dirname(libraryPath), { recursive: true });
-    await fs.writeFile(libraryPath, JSON.stringify({ version: 3, sources }), "utf8");
+    seedLibrary(dataDir, { version: 3, sources });
 
-    const store = new KnowledgeDbStore(dataDir);
+    const store = createStore(dataDir);
     const results = await store.search("三角関数 加法定理", 12);
 
     expect(results.length).toBeLessThanOrEqual(12);
@@ -359,7 +419,7 @@ describe("global library", () => {
     const dataDir = await fs.mkdtemp(path.join(os.tmpdir(), "sigma-knowledge-db-global-"));
     tempDirs.push(dataDir);
     const sourcePath = await createPdf("global.pdf", 1);
-    const store = new KnowledgeDbStore(dataDir);
+    const store = createStore(dataDir);
     const [source] = await store.addFiles([sourcePath]);
     expect(source).toBeTruthy();
     expect(await store.listSources()).toHaveLength(1);
@@ -374,7 +434,7 @@ describe("Knowledge DB analysis lifecycle", () => {
     const dataDir = await fs.mkdtemp(path.join(os.tmpdir(), "sigma-knowledge-db-analysis-"));
     tempDirs.push(dataDir);
     const sourcePath = await createPdf("analysis.pdf", 1);
-    const store = new KnowledgeDbStore(dataDir);
+    const store = createStore(dataDir);
     const [source] = await store.addFiles([sourcePath]);
     expect(source).toBeTruthy();
     await store.search("warmup", 1);
@@ -384,7 +444,7 @@ describe("Knowledge DB analysis lifecycle", () => {
     library.sources[0].pages[0].text = "数学Ⅱ 三角関数 定理";
     library.sources[0].pages[0].analysisStatus = "stale";
     library.sources[0].pages[0].analysisVersion = 0;
-    await fs.writeFile(libraryPath, JSON.stringify(library), "utf8");
+    seedLibrary(dataDir, library);
 
     await store.search("三角関数", 1);
     const refreshed = await store.listSources();
@@ -398,7 +458,7 @@ describe("Knowledge DB analysis lifecycle", () => {
     const dataDir = await fs.mkdtemp(path.join(os.tmpdir(), "sigma-knowledge-db-reanalyze-"));
     tempDirs.push(dataDir);
     const sourcePath = await createPdf("reanalyze.pdf", 1);
-    const store = new KnowledgeDbStore(dataDir);
+    const store = createStore(dataDir);
     const [source] = await store.addFiles([sourcePath]);
     expect(source).toBeTruthy();
     await store.search("warmup", 1);
@@ -422,7 +482,7 @@ describe("Knowledge DB analysis lifecycle", () => {
     const dataDir = await fs.mkdtemp(path.join(os.tmpdir(), "sigma-knowledge-db-context-"));
     tempDirs.push(dataDir);
     const sourcePath = await createPdf("context.pdf", 2);
-    const store = new KnowledgeDbStore(dataDir);
+    const store = createStore(dataDir);
     const [source] = await store.addFiles([sourcePath]);
     expect(source).toBeTruthy();
     await store.search("warmup", 1);
@@ -443,7 +503,7 @@ describe("Knowledge DB analysis lifecycle", () => {
       page.analysisStatus = "stale";
       page.analysisVersion = 0;
     }
-    await fs.writeFile(libraryPath, JSON.stringify(library), "utf8");
+    seedLibrary(dataDir, library);
 
     const context = await store.getContext("数学Ⅱ 三角関数 定理", 8, undefined, 600);
     expect(context.length).toBeGreaterThan(0);
@@ -460,7 +520,7 @@ describe("Knowledge DB analysis lifecycle", () => {
     const secondPath = path.join(dataDir, "second.md");
     await fs.writeFile(firstPath, "三角関数を説明する本文。", "utf8");
     await fs.writeFile(secondPath, "三角関数を別資料から補足する本文。", "utf8");
-    const store = new KnowledgeDbStore(dataDir);
+    const store = createStore(dataDir);
     const sources = await store.addFiles([firstPath, secondPath]);
     expect(sources).toHaveLength(2);
     await store.search("warmup", 2);
@@ -471,9 +531,9 @@ describe("Knowledge DB analysis lifecycle", () => {
     };
     library.sources[0]!.pages[0]!.text = "三角関数の定理を説明する本文。";
     library.sources[1]!.pages[0]!.text = "三角関数の定理と公式を別資料から補足する本文。";
-    await fs.writeFile(libraryPath, JSON.stringify(library), "utf8");
+    seedLibrary(dataDir, library);
 
-    const index = new LocalVectorIndex(path.join(dataDir, "knowledge-db", "vector-index"));
+    const index = createVectorIndex(dataDir);
     await index.removeSource(sources[0]!.id);
     await index.removeSource(sources[1]!.id);
     await index.upsertMany([
@@ -493,7 +553,7 @@ describe("Knowledge DB analysis lifecycle", () => {
     const dataDir = await fs.mkdtemp(path.join(os.tmpdir(), "sigma-knowledge-db-related-context-"));
     tempDirs.push(dataDir);
     const sourcePath = await createPdf("related.pdf", 2);
-    const store = new KnowledgeDbStore(dataDir);
+    const store = createStore(dataDir);
     const [source] = await store.addFiles([sourcePath]);
     expect(source).toBeTruthy();
     await store.search("warmup", 1);
@@ -506,9 +566,9 @@ describe("Knowledge DB analysis lifecycle", () => {
     library.sources[0]!.pages[0]!.taxonomyPaths = [["数学Ⅱ", "三角関数"]];
     library.sources[0]!.pages[1]!.text = "公式と証明を補足する本文。";
     library.sources[0]!.pages[1]!.taxonomyPaths = [["数学Ⅱ", "三角関数"]];
-    await fs.writeFile(libraryPath, JSON.stringify(library), "utf8");
+    seedLibrary(dataDir, library);
 
-    const index = new LocalVectorIndex(path.join(dataDir, "knowledge-db", "vector-index"));
+    const index = createVectorIndex(dataDir);
     await index.removeSource(source!.id);
     await index.upsertMany([
       { id: source!.id + "_p1_c0", sourceId: source!.id, pageNumber: 1, chunkIndex: 0, text: "三角関数を説明する本文。" },
@@ -530,7 +590,7 @@ describe("Knowledge DB RAG retrieval quality", () => {
     tempDirs.push(dataDir);
     const filePath = path.join(dataDir, "ai.md");
     await fs.writeFile(filePath, "AI（人工知能）と検索拡張生成（RAG）について説明する。", "utf8");
-    const store = new KnowledgeDbStore(dataDir);
+    const store = createStore(dataDir);
     const [source] = await store.addFiles([filePath]);
     const japanese = await store.search("人工知能", 5);
     expect(japanese[0]?.sourceId).toBe(source?.id);
@@ -545,7 +605,7 @@ describe("Knowledge DB RAG retrieval quality", () => {
     await fs.writeFile(firstPath, "検索拡張生成の基本説明と一次資料。", "utf8");
     await fs.writeFile(secondPath, "検索拡張生成の評価方法を補足する資料。", "utf8");
     await fs.writeFile(thirdPath, "検索拡張生成の別の実装例を紹介する資料。", "utf8");
-    const store = new KnowledgeDbStore(dataDir);
+    const store = createStore(dataDir);
     const sources = await store.addFiles([firstPath, secondPath, thirdPath]);
     expect(sources).toHaveLength(3);
     const context = await store.getContext("検索拡張生成", 4, undefined, 5000);
@@ -564,8 +624,8 @@ describe("Knowledge DB write safety", () => {
     const secondPath = path.join(dataDir, "second.md");
     await fs.writeFile(firstPath, "最初の資料", "utf8");
     await fs.writeFile(secondPath, "追加の資料", "utf8");
-    const first = new KnowledgeDbStore(dataDir);
-    const second = new KnowledgeDbStore(dataDir);
+    const first = createStore(dataDir);
+    const second = createStore(dataDir);
     await first.addFiles([firstPath]);
     const secondInternal = second as unknown as {
       readLibrary: () => Promise<{ sources: KnowledgeSource[]; __fingerprint?: string }>;
@@ -584,7 +644,7 @@ describe("Knowledge DB smart split", () => {
     const dataDir = await fs.mkdtemp(path.join(os.tmpdir(), "sigma-knowledge-smart-split-"));
     tempDirs.push(dataDir);
     const sourcePath = await createPdf("mixed.pdf", 4);
-    const store = new KnowledgeDbStore(dataDir);
+    const store = createStore(dataDir);
     const [source] = await store.addFiles([sourcePath]);
     expect(source).toBeTruthy();
     const libraryPath = path.join(dataDir, "knowledge-db", "library.json");
@@ -594,7 +654,7 @@ describe("Knowledge DB smart split", () => {
       page.taxonomyPaths = index < 2 ? [["数学", "数学II", "三角関数"]] : [["理科", "物理", "力学"]];
       page.taxonomyConfidence = 0.92;
     });
-    await fs.writeFile(libraryPath, JSON.stringify(library), "utf8");
+    seedLibrary(dataDir, library);
 
     const preview = await store.previewSmartSplit(source!.id);
     expect(preview.segments).toHaveLength(2);
@@ -620,7 +680,7 @@ describe("Knowledge DB classification review", () => {
     tempDirs.push(dataDir);
     const filePath = path.join(dataDir, "review.md");
     await fs.writeFile(filePath, "# 三角関数\n\n数学Ⅱの三角関数について説明する。", "utf8");
-    const store = new KnowledgeDbStore(dataDir);
+    const store = createStore(dataDir);
     const [source] = await store.addFiles([filePath]);
     await store.search("三角関数", 5);
     const page = (await store.listSources()).find((item) => item.id === source?.id)?.pages[0];
