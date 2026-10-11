@@ -10,7 +10,7 @@ import type {
   QuestionTag,
   ReviewStatus,
 } from "../../../question-engine/src/core/question.js";
-import type { QuestionRepository, QuestionSearchResult } from "../application/contracts.js";
+import type { QuestionRepository, QuestionSearchResult } from "../../../question-engine/src/application/contracts.js";
 
 type QuestionRow = {
   id: string;
