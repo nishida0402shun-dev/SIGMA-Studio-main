@@ -6,6 +6,7 @@
     "apps/desktop",
     "packages/viewer",
     "packages/editor",
+    "packages/sigma-core",
     "examples/editor-react18"
   ],
   "scripts": {
@@ -18,7 +19,7 @@
     "test:public-browser": "npm exec --workspace @sigma-studio/desktop -- tsc --project ../../tests/public-browser/tsconfig.json && npm exec --workspace @sigma-studio/desktop -- playwright test --config ../../tests/public-browser/playwright.config.mts",
     "test:e2e": "npm --workspace @sigma-studio/desktop run test:e2e",
     "test:e2e:electron": "npm --workspace @sigma-studio/desktop run test:e2e:electron",
-    "typecheck": "npm --workspace @sigma-studio/desktop run typecheck",
+    "typecheck": "npm --workspace @sigma-studio/desktop run typecheck && npm --workspace @sigma-studio/sigma-core run typecheck",
     "viewer:build": "npm --workspace @sigma-studio/viewer run build",
     "viewer:test": "npm --workspace @sigma-studio/viewer run test",
     "viewer:typecheck": "npm --workspace @sigma-studio/viewer run typecheck",
