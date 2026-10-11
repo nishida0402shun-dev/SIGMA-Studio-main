@@ -37,7 +37,35 @@ async function readLibraryFixture(dataDir: string): Promise<{ version: 3; source
   return internal.readLibrary();
 }
 
-function seedLibrary(dataDir: string, fixture: { version?: number; sources: Array<Record<string, unknown>> }): void {
+type FixtureScalar = string | number | boolean | null | undefined;
+interface FixturePage {
+  id: string;
+  pageNumber: number;
+  semanticType?: string;
+  title?: string | null;
+  text?: string;
+  extractionStatus?: string;
+  structureBlocks?: unknown[];
+  [key: string]: FixtureScalar | unknown[] | undefined;
+}
+interface FixtureSource {
+  id: string;
+  name?: string;
+  display_name?: string;
+  originalPath?: string;
+  storedPath?: string;
+  mimeType?: string;
+  sizeBytes?: number;
+  contentHash?: string;
+  pageCount?: number;
+  extractionStatus?: string;
+  importedAt?: string;
+  updatedAt?: string;
+  indexedAt?: string;
+  indexError?: string;
+  pages?: FixturePage[];
+}
+function seedLibrary(dataDir: string, fixture: { version?: number; sources: FixtureSource[] }): void {
   const db = getDatabase(dataDir).raw;
   db.exec("BEGIN IMMEDIATE");
   try {
