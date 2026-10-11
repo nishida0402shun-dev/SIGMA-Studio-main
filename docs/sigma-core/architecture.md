@@ -23,11 +23,11 @@ SIGMA Core is the shared owner of contracts and persistence for knowledge, retri
 | Knowledge records | `sqlite-knowledge-library-repository.ts` owns source/page reads and writes. Electron retains extraction, analysis, classification, ranking, and UI-facing mapping. |
 | PDF import review | `sqlite-knowledge-import-repository.ts` owns draft/segment persistence; Electron retains PDF processing and review orchestration. |
 | Vector persistence | `sqlite-vector-index.ts` owns vector records. The embedding model and Electron-facing adapter remain in `apps/desktop/electron/local-vector-index.ts`. |
-| Learning feedback | `sqlite-knowledge-learning-store.ts`; the Electron module is a compatibility re-export. |
+| Learning feedback | `sqlite-knowledge-learning-store.ts`; Electron and tests import Core directly. The compatibility re-export has been deleted. |
 | Conversation memory | `sqlite-conversation-memory-store.ts`. |
 | Long-term memory | `sqlite-long-term-memory-store.ts`. |
 | Question persistence | `sqlite-question-repository.ts`; it uses domain types/contracts in `packages/question-engine/src/`. The Question Engine package no longer owns SQLite storage. |
-| Research sessions | `sqlite-research-session-store.ts`; Electron delegates to the Core store. |
+| Research sessions | `sqlite-research-session-store.ts`; Electron imports Core directly. The compatibility re-export has been deleted. |
 | Retrieval algorithms | `retrieval/hybrid-retriever.ts`, `knowledge/chunker.ts`, and `knowledge/document-indexer.ts` provide reusable Core logic/contracts. |
 
 ## Legacy retirement
@@ -36,6 +36,7 @@ Removed from the working branch:
 - `packages/question-engine/src/storage/` and its SQLite persistence modules.
 - The disconnected standalone Question Bank package from the previous rebuild work.
 - Electron's direct SQL for PDF staging (now routed through `SqliteKnowledgeImportRepository`).
+- Electron compatibility re-export modules for learning feedback and research sessions; all known callers now import SIGMA Core directly.
 
 The Electron startup path attempts to remove `sigma-studio.sqlite` and its `-wal`/`-shm` sidecars before opening `sigma-core.sqlite`. This is committed code; it does not prove those files have been deleted on any particular user's machine.
 
