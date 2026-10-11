@@ -142,51 +142,18 @@ describe("Web AI MCP gateway live server path", () => {
 
   });
 
-  it("requires approval for a writable global Knowledge DB operation", async () => {
-    await expect(
-      gateway.callTool(
-        "knowledge_db_submit_classification_review",
-        { sourceId: "missing", pageNumber: 1, paths: ["その他"], confidence: 0.5 },
-        null,
-      ),
-    ).resolves.toMatchObject({ isError: true });
-    expect(requestedWrites).toContain("knowledge_db_submit_classification_review");
-  });
-
-  it("exposes PDF staging through the global Web AI scope", async () => {
-    await expect(
-      gateway.callTool("knowledge_db_pdf_import_staging_list", {}, null),
-    ).resolves.toBeTruthy();
-    await expect(
-      gateway.callTool("knowledge_db_pdf_import_staging_get", { stagingId: "missing-staging" }, null),
-    ).resolves.toBeTruthy();
-  });
-
-  it("requires approval for PDF import preview and approval", async () => {
-    await expect(
-      gateway.callTool(
-        "knowledge_db_pdf_import_preview",
-        { sourcePath: path.join(userDataPath, "missing.pdf") },
-        null,
-      ),
-    ).resolves.toMatchObject({ isError: true });
-    expect(requestedWrites).toContain("knowledge_db_pdf_import_preview");
+  it("does not expose or invoke removed Knowledge DB and conversation-memory tools", async () => {
+    const tools = await gateway.listTools("workspace_live_test");
+    const names = new Set(tools.map((tool) => tool.name));
+    expect([...names].some((name) => name.startsWith("knowledge_db_"))).toBe(false);
+    expect([...names].some((name) => name.startsWith("conversation_memory_"))).toBe(false);
 
     await expect(
-      gateway.callTool(
-        "knowledge_db_pdf_import_approve",
-        { stagingId: "missing-staging" },
-        null,
-      ),
-    ).resolves.toMatchObject({ isError: true });
-    expect(requestedWrites).toContain("knowledge_db_pdf_import_approve");
+      gateway.callTool("knowledge_db_search", { query: "test", limit: 1 }, "workspace_live_test"),
+    ).rejects.toThrow("Web AI cannot use this Tool: knowledge_db_search");
+    await expect(
+      gateway.callTool("conversation_memory_search", { query: "test", limit: 1 }, "workspace_live_test"),
+    ).rejects.toThrow("Web AI cannot use this Tool: conversation_memory_search");
   });
 
-  it("allows global Knowledge DB tools without a selected Workspace", async () => {
-    await expect(gateway.callTool("knowledge_db_search", { query: "test", limit: 1 }, null)).resolves.toBeTruthy();
-    await expect(gateway.callTool("list_local_documents", {}, null)).rejects.toThrow(/Workspace/);
-    await expect(
-      gateway.callTool("list_local_documents", { workspaceId: "workspace_foreign" }, "workspace_selected"),
-    ).rejects.toThrow(/selected Workspace/);
-  });
 });
