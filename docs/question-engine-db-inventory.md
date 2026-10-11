@@ -8,7 +8,7 @@ Last checked: branch `feat/sigma-core-foundation`. This inventory describes trac
 |---|---|
 | `packages/question-engine/src/storage/` SQLite implementation | Removed. The Question Engine package retains question-domain types and application contracts only. |
 | Disconnected standalone Question Bank package | Removed from this branch; it is not used as the new storage implementation. |
-| `qe_*` database tables | Retired by the SIGMA Core schema initializer. Existing rows are intentionally not migrated. |
+| `qe_*` database tables | Retired by the SIGMA Core schema initializer on migration and on every startup, including databases already stamped with the current schema version. Existing rows are intentionally not migrated. |
 | Previous `sigma-studio.sqlite` database and WAL/SHM sidecars | Electron startup now attempts to delete these files from the configured `knowledge-db` directory. This is code behavior, not evidence that a user's local files have already been deleted. |
 | JSON-backed conversation, long-term memory, and research-session persistence | Replaced by SQLite stores in SIGMA Core for the migrated Electron flows. |
 
@@ -20,10 +20,10 @@ Last checked: branch `feat/sigma-core-foundation`. This inventory describes trac
 | Knowledge source/page records | `sqlite-knowledge-library-repository.ts` | Electron still owns extraction, classification, and user-facing orchestration. |
 | PDF import staging | `sqlite-knowledge-import-repository.ts` | Added to SIGMA Core; Electron no longer issues staging-table SQL directly. |
 | Vector records | `sqlite-vector-index.ts` | Embedding model and query orchestration remain in the Electron adapter; persistence belongs to Core. |
-| Learning feedback | `sqlite-knowledge-learning-store.ts` | Electron-facing module is a compatibility re-export. |
+| Learning feedback | `sqlite-knowledge-learning-store.ts` | Electron imports Core directly; the compatibility re-export is deleted. |
 | Conversation and long-term memory | `sqlite-conversation-memory-store.ts`, `sqlite-long-term-memory-store.ts` | Shared database, FTS-assisted search. |
 | Question records | `sqlite-question-repository.ts` | Uses the question domain contracts/types; question-domain source remains under `packages/question-engine/src/`. |
-| Research sessions | `sqlite-research-session-store.ts` | Electron-facing adapter delegates to Core. |
+| Research sessions | `sqlite-research-session-store.ts` | Electron imports Core directly; the compatibility re-export is deleted. |
 | Backup/restore archive and file relocation | `apps/desktop/electron/knowledge-db-store.ts` | File/archive orchestration remains in Electron; it currently uses SQL for generic table restore and path relocation. Backup restore now expects `sigma-core.sqlite`. |
 | Browser IndexedDB | `apps/desktop/src/lib/runtime/browser/` | Separate browser-runtime persistence, not part of the desktop SQLite retirement. |
 
