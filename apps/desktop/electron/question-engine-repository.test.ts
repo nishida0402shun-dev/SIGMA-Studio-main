@@ -49,6 +49,29 @@ describe("SqliteQuestionRepository", () => {
     expect(migration.version).toBe(SIGMA_CORE_SCHEMA_VERSION);
   });
 
+  it("removes legacy Question Engine tables even when the schema version is already current", async () => {
+    await createRepository();
+    database!.raw.exec(`
+      CREATE TABLE qe_questions (id TEXT PRIMARY KEY, body_json TEXT NOT NULL);
+      CREATE TABLE qe_vector_records (id TEXT PRIMARY KEY, text_content TEXT NOT NULL);
+      INSERT INTO qe_questions (id, body_json) VALUES ('legacy-question', '{}');
+      INSERT INTO qe_vector_records (id, text_content) VALUES ('legacy-vector', 'obsolete');
+    `);
+    database!.close();
+    database = undefined;
+
+    database = openSigmaCoreDatabase({ dataDir: dir! });
+    for (const name of ["qe_questions", "qe_vector_records"]) {
+      const table = database.raw.prepare(
+        "SELECT name FROM sqlite_master WHERE type = 'table' AND name = ?",
+      ).get(name);
+      expect(table).toBeUndefined();
+    }
+    expect(database.raw.prepare(
+      "SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'sigma_core_questions'",
+    ).get()).toBeTruthy();
+  });
+
   it("creates, searches, updates with optimistic locking, and deletes questions", async () => {
     const repository = await createRepository();
     const created = await repository.create({
