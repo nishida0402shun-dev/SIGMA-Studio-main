@@ -62,15 +62,6 @@ import { registerCodexIpc } from "./ipc/codex";
 import { registerAiEditIpc } from "./ipc/ai-edit";
 import { registerAiResourcesIpc } from "./ipc/ai-resources";
 import { registerFileIpc } from "./ipc/file";
-import { KnowledgeDbStore } from "./knowledge-db-store";
-import {
-  openQuestionEngineDatabase,
-  SqliteConversationMemoryStore,
-  SqliteLongTermMemoryStore,
-} from "../../../packages/question-engine/src/index";
-import { registerKnowledgeDbIpc } from "./ipc/knowledge-db";
-import { ResearchSessionStore } from "./research-session-store";
-import { registerResearchSessionIpc } from "./ipc/research-session";
 import { documentPathsFromArgv, ExternalDocumentOpenQueue } from "./external-document-open";
 import { registerMaterialsIpc } from "./ipc/materials";
 import { registerStorageIpc } from "./ipc/storage";
@@ -126,11 +117,6 @@ ipcMain.handle("web-ai:get-preload-url", () => {
   return pathToFileURL(path.join(__dirname, "web-ai-preload.cjs")).toString();
 });
 
-electronIpcMain.handle("web-ai:get-conversation-capture-setting", (event) => {
-  if (!isTrustedWebAiFrame(event)) throw new Error("conversation capture setting is not available for this origin");
-  return readDesktopSettingsSync(SIGMA_STUDIO_DATA_PATH).webAiConversationCaptureEnabled !== false;
-});
-
 electronIpcMain.handle("web-ai:get-bridge-info", (event) => {
   if (!isTrustedWebAiFrame(event) || !webAiBridgeInfo) {
     throw new Error("Web AI bridge is unavailable for this origin");
@@ -140,98 +126,6 @@ electronIpcMain.handle("web-ai:get-bridge-info", (event) => {
     token: webAiBridgeInfo.token,
   };
 });
-
-electronIpcMain.handle("web-ai:capture-conversation", async (event, payload: unknown) => {
-  if (!isTrustedWebAiFrame(event)) throw new Error("conversation capture is not allowed for this origin");
-  if (!payload || typeof payload !== "object" || Array.isArray(payload)) throw new Error("invalid conversation capture payload");
-  const input = payload as Record<string, unknown>;
-  const conversationId = typeof input.conversationId === "string" ? input.conversationId.trim() : "";
-  const role = input.role;
-  const content = typeof input.content === "string" ? input.content.trim() : "";
-  const provider = typeof input.provider === "string" ? input.provider.trim() : "";
-  const captureKey = typeof input.captureKey === "string" ? input.captureKey.trim() : "";
-  if (!conversationId || !captureKey || !content || !["user", "assistant", "system", "tool"].includes(String(role))) {
-    throw new Error("invalid conversation capture entry");
-  }
-  const saved = await conversationMemoryStore.appendCaptured({
-    conversationId,
-    role: role as "user" | "assistant" | "system" | "tool",
-    content,
-    ...(provider ? { provider } : {}),
-    captureKey,
-    metadata: { source: "web-ai-capture", origin, captureKey },
-  });
-  if (saved && role === "user") {
-    const durable = extractLongTermMemory(content);
-    if (durable) {
-      void longTermMemoryStore.remember({
-        content: durable.text,
-        conversationId,
-        sourceEntryId: saved.id,
-        ...(provider ? { provider } : {}),
-        confidence: durable.confidence,
-      });
-    }
-  }
-  return saved;
-});
-
-ipcMain.handle("long-term-memory:recent", async (_event, payload: unknown) => {
-  const input = payload && typeof payload === "object" && !Array.isArray(payload) ? payload as Record<string, unknown> : {};
-  const limit = typeof input.limit === "number" ? input.limit : undefined;
-  return longTermMemoryStore.recent(limit);
-});
-
-ipcMain.handle("long-term-memory:search", async (_event, payload: unknown) => {
-  const input = payload && typeof payload === "object" && !Array.isArray(payload) ? payload as Record<string, unknown> : {};
-  const query = typeof input.query === "string" ? input.query : "";
-  const limit = typeof input.limit === "number" ? input.limit : undefined;
-  return longTermMemoryStore.search(query, limit);
-});
-
-ipcMain.handle("conversation-memory:recent", async (_event, payload: unknown) => {
-  const input = payload && typeof payload === "object" && !Array.isArray(payload) ? payload as Record<string, unknown> : {};
-  const conversationId = typeof input.conversationId === "string" ? input.conversationId.trim() || undefined : undefined;
-  const limit = typeof input.limit === "number" ? input.limit : undefined;
-  return conversationMemoryStore.recent(conversationId, limit);
-});
-
-ipcMain.handle("conversation-memory:search", async (_event, payload: unknown) => {
-  const input = payload && typeof payload === "object" && !Array.isArray(payload) ? payload as Record<string, unknown> : {};
-  const query = typeof input.query === "string" ? input.query : "";
-  const conversationId = typeof input.conversationId === "string" ? input.conversationId.trim() || undefined : undefined;
-  const limit = typeof input.limit === "number" ? input.limit : undefined;
-  return conversationMemoryStore.search(query, conversationId, limit);
-});
-
-ipcMain.handle("conversation-memory:save", async (_event, payload: unknown) => {
-  if (!payload || typeof payload !== "object" || Array.isArray(payload)) throw new Error("invalid conversation memory payload");
-  const input = payload as Record<string, unknown>;
-  const conversationId = typeof input.conversationId === "string" ? input.conversationId.trim() : "";
-  const role = input.role;
-  const content = typeof input.content === "string" ? input.content : "";
-  const provider = typeof input.provider === "string" ? input.provider.trim() : "";
-  if (!conversationId || !["user","assistant","system","tool"].includes(String(role)) || !content.trim()) {
-    throw new Error("invalid conversation memory payload");
-  }
-  return conversationMemoryStore.append({
-    conversationId,
-    role: role as "user" | "assistant" | "system" | "tool",
-    content,
-    ...(provider ? { provider } : {}),
-    metadata: input.metadata && typeof input.metadata === "object" && !Array.isArray(input.metadata) ? input.metadata as Record<string, unknown> : undefined,
-  });
-});
-
-function extractLongTermMemory(content: string): { text: string; confidence: number } | null {
-  const normalized = content.normalize("NFKC").trim().replace(/\s+/gu, " ");
-  if (normalized.length < 8) return null;
-  const explicit = normalized.match(/(?:覚えて(?:おいて|て)|記憶して|今後(?:も|は)|これから(?:も|は)|必ず|常に|デフォルトで|好みは|設定は|方針は|ルールは)[:：]?\\s*(.+)$/u);
-  if (explicit?.[1]) return { text: explicit[1].slice(0, 4000), confidence: 0.95 };
-  const preference = normalized.match(/(?:私は|自分は|私の|自分の).{0,80}(?:好き|嫌い|好み|使う|使わない|したい|したくない|でいてほしい|にしてほしい|方がいい).{0,160}/u);
-  if (preference?.[0]) return { text: preference[0].slice(0, 4000), confidence: 0.82 };
-  return null;
-}
 
 const externalDocumentOpenQueue = new ExternalDocumentOpenQueue(() => {
   if (mainWindow && !mainWindow.isDestroyed()) {
@@ -276,11 +170,6 @@ const localAiEditRunLogStore = new LocalAiEditRunLogStore(USER_DATA_PATH);
 const localAiEditChatRoomStore = new LocalAiEditChatRoomStore(USER_DATA_PATH);
 const localAiResourceStore = new LocalAiResourceStore(USER_DATA_PATH);
 const SIGMA_STUDIO_DATA_PATH = path.join(USER_DATA_PATH, "data");
-const questionEngineDatabase = openQuestionEngineDatabase({ dataDir: path.join(SIGMA_STUDIO_DATA_PATH, "knowledge-db") });
-const knowledgeDbStore = new KnowledgeDbStore(SIGMA_STUDIO_DATA_PATH, questionEngineDatabase.raw);
-const conversationMemoryStore = new SqliteConversationMemoryStore(questionEngineDatabase.raw);
-const longTermMemoryStore = new SqliteLongTermMemoryStore(questionEngineDatabase.raw);
-const researchSessionStore = new ResearchSessionStore(questionEngineDatabase.raw);
 const appUpdateController = new AppUpdateController({ releaseUrl: RELEASE_PAGE_URL });
 const desktopSettings = readDesktopSettingsSync(SIGMA_STUDIO_DATA_PATH);
 /**
@@ -1709,18 +1598,6 @@ function registerIpc() {
     getMainWindow: () => mainWindow,
     externalDocumentOpenQueue,
   });
-
-  registerKnowledgeDbIpc({
-    getMainWindow: () => mainWindow,
-    store: knowledgeDbStore,
-  });
-
-  registerResearchSessionIpc({
-    getMainWindow: () => mainWindow,
-    store: researchSessionStore,
-  });
-
-  knowledgeDbStore.startBackgroundIndexing();
 
   registerMaterialsIpc({
     localMaterialStore,

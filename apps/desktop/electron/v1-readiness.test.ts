@@ -6,7 +6,7 @@ const root=path.resolve(electronDir,"..");
 const source=(relativePath:string)=>path.join(root,relativePath);
 describe("SIGMA Studio v1 completion gate",()=>{
   it("has implementation anchors for all 16 roadmap phases",()=>{
-    const required=["electron/preload.ts","electron/knowledge-db-store.ts","electron/knowledge-analysis-engine.ts","electron/knowledge-corpus-analysis.ts","electron/ai-edit-run-context.ts","electron/web-ai-bridge.ts","electron/web-ai-mcp-gateway.ts","electron/local-sigma-doc-store.ts","electron/local-sigma-doc-proposal-store.ts","electron/proposal-approval.ts","electron/app-updater.ts","src/app/content-security-policy.ts","scripts/electron-csp-smoke.mjs","tests/e2e/large-document-performance.spec.ts"];
+    const required=["electron/preload.ts","electron/ai-edit-run-context.ts","electron/web-ai-bridge.ts","electron/web-ai-mcp-gateway.ts","electron/local-sigma-doc-store.ts","electron/local-sigma-doc-proposal-store.ts","electron/proposal-approval.ts","electron/app-updater.ts","src/app/content-security-policy.ts","scripts/electron-csp-smoke.mjs","tests/e2e/large-document-performance.spec.ts"];
     for(const relativePath of required) expect(existsSync(source(relativePath)),relativePath).toBe(true);
   });
   it("keeps the supported desktop release/test surface",()=>{

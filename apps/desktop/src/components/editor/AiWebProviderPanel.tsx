@@ -5,7 +5,6 @@ import { useEffect, useMemo, useRef, useState, type ElementType } from "react";
 
 import { ClaudeMark, GeminiMark, OpenAiMark } from "@/components/branding/provider-logos";
 import { getDesktopBridge } from "@/lib/desktop-bridge";
-import { ConversationDbPanel } from "./ConversationDbPanel";
 import { useT } from "@/lib/i18n/react";
 
 export type AiWebProvider = "chatgpt" | "claude" | "gemini" | "google-ai-studio";
@@ -52,8 +51,6 @@ export function AiWebProviderPanel({
   const [bridgeAvailable, setBridgeAvailable] = useState<boolean | null>(null);
   const [webMcpAvailable, setWebMcpAvailable] = useState<boolean | null>(null);
   const [webviewReady, setWebviewReady] = useState(false);
-  const [conversationDbOpen, setConversationDbOpen] = useState(false);
-  const [conversationCaptureEnabled, setConversationCaptureEnabled] = useState(true);
   useEffect(() => {
     let cancelled = false;
     const promise = getDesktopBridge()?.webAi?.getPreloadUrl();
@@ -65,15 +62,6 @@ export function AiWebProviderPanel({
     };
   }, []);
 
-  useEffect(() => {
-    let cancelled = false;
-    void getDesktopBridge()?.settings?.get().then((value) => {
-      if (!cancelled && typeof value?.webAiConversationCaptureEnabled === "boolean") {
-        setConversationCaptureEnabled(value.webAiConversationCaptureEnabled);
-      }
-    }).catch(() => undefined);
-    return () => { cancelled = true; };
-  }, []);
 
   const selected = useMemo(
     () => PROVIDERS.find((item) => item.id === provider) ?? PROVIDERS[0],
@@ -115,19 +103,6 @@ export function AiWebProviderPanel({
       if (!url) return;
       try {
         const parsed = new URL(url);
-        if (parsed.protocol === "sigma:" && parsed.hostname === "knowledge-db") {
-          const parts = parsed.pathname.split("/").filter(Boolean).map(decodeURIComponent);
-          const sourceId = parts[0] ?? "";
-          const pageIndex = parts.findIndex((part) => part === "p");
-          const pageNumber = pageIndex >= 0 ? Number(parts[pageIndex + 1]) : 0;
-          if (sourceId && Number.isInteger(pageNumber) && pageNumber > 0) {
-            event.preventDefault();
-            void getDesktopBridge()?.knowledgeDb?.openPage({ sourceId, pageNumber });
-          } else {
-            event.preventDefault();
-          }
-          return;
-        }
         if (![...allowedHosts].some((allowed) => parsed.hostname === allowed || parsed.hostname.endsWith(`.${allowed}`))) {
           event.preventDefault();
         }
@@ -210,14 +185,6 @@ export function AiWebProviderPanel({
           </label>
         )}
         <div className="ai-web-provider-actions">
-          <button type="button" className="ai-web-provider-icon-button" onClick={() => setConversationDbOpen(true)} title="Conversation DB" aria-label="Conversation DB">DB</button>
-          <button type="button" className="ai-web-provider-icon-button" onClick={() => {
-            const next = !conversationCaptureEnabled;
-            setConversationCaptureEnabled(next);
-            void getDesktopBridge()?.settings?.setWebAiConversationCaptureEnabled?.(next);
-          }} title={conversationCaptureEnabled ? "Conversation capture: ON" : "Conversation capture: OFF"} aria-label="Conversation capture">
-            {conversationCaptureEnabled ? "REC" : "OFF"}
-          </button>
           <button type="button" className="ai-web-provider-icon-button" onClick={reload} title="Reload" aria-label="Reload">
             <RefreshCw size={13} />
           </button>
@@ -265,7 +232,6 @@ export function AiWebProviderPanel({
           <div className="ai-web-provider-loading">{t("webAi.preparing")}</div>
         )}
       </div>
-      <ConversationDbPanel open={conversationDbOpen} onClose={() => setConversationDbOpen(false)} />
     </section>
   );
 }

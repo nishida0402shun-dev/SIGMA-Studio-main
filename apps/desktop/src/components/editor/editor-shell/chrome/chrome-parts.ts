@@ -13,7 +13,6 @@ export interface EditorChromeParts {
   fileMenu: ReactNode;
   insertMenu: ReactNode;
   aiMenu: ReactNode;
-  dbMenu: ReactNode;
   settingsMenu: ReactNode;
   documentTabsRow: ReactNode;
   saveStateBadge: ReactNode;

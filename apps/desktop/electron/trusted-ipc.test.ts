@@ -119,9 +119,7 @@ it("keeps privileged IPC behind the common boundary while isolating Web AI", () 
   const main = readFileSync(path.join(root, "main.ts"), "utf8");
   const rawChannels = [...main.matchAll(/electronIpcMain\.handle\("([^"]+)"/gu)].map(match => match[1]);
   expect(rawChannels).toEqual([
-    "web-ai:get-conversation-capture-setting",
     "web-ai:get-bridge-info",
-    "web-ai:capture-conversation",
   ]);
   expect(main).not.toMatch(/electronIpcMain\.on\s*\(/u);
   expect(main).toContain('ipcMain.handle("web-ai:get-preload-url"');
@@ -129,11 +127,4 @@ it("keeps privileged IPC behind the common boundary while isolating Web AI", () 
   expect(main).toContain("authorizePreviewSender(renderWindow.webContents, renderId, previewUrl.href)");
   const aiEdit = readFileSync(path.join(root, "ipc", "ai-edit.ts"), "utf8");
   expect(aiEdit).toContain("registerPreviewDocumentIpc(async");
-});
-it("fails closed when the Web AI conversation-capture setting is unavailable", () => {
-  const root = fileURLToPath(new URL("./", import.meta.url));
-  const source = readFileSync(path.join(root, "web-ai-preload.ts"), "utf8");
-  expect(source).toContain("let conversationCaptureEnabled = false;");
-  expect(source).toContain("conversationCaptureEnabled = enabled === true;");
-  expect(source).toContain("} catch {\n    conversationCaptureEnabled = false;\n  }\n  if (!(await ensureBridgeConfig()))");
 });

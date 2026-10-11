@@ -63,21 +63,6 @@ MCPからの書き込み系ツールは、既定では教材ファイルを直�
 - `get_blocks` - 複数ブロックを最大10件までIDでまとめて読みます。既定では `{id, type, text}` の軽量ビューのみを返し、`includeFull: true` を指定した場合のみ各ブロックの完全なJSONも含めます。
 - `search_document` - 本文テキスト、TeX、表セル、overlayテキスト図形を横断してクエリ文字列を検索します。`get_document_outline` より対象を絞り込みたい時に使います。
 - `search_library` - 今開いている教材だけでなく、ユーザーの過去教材ライブラリ全体から類似の問題・記述を検索します。
-- `knowledge_db_get_analysis_status` - グローバルKnowledge DBの解析・分類状態を取得します。
-- `knowledge_db_reanalyze` - グローバルKnowledge DBの解析を再実行します。
-- `knowledge_db_list_classification_reviews` - AI分類の確認待ちページ一覧を取得します。
-- `knowledge_db_get_classification_review_context` - 分類確認に必要な本文・OCR・構造情報を取得します。
-- `knowledge_db_submit_classification_review` - AI分類の確認結果を承認ゲート経由で反映します。
-- `knowledge_db_get_context` - グローバルKnowledge DBからAI用コンテキストを取得します。
-- `knowledge_db_rag_query` - Knowledge DB参照要否の判定からハイブリッド検索、重複除去、関連資料選定、citation領域付きContext Pack生成までを一度に実行します。
-- `knowledge_db_get_related_sources` - 関連するKnowledge DBソースを取得します。
-- `knowledge_db_route_query` - クエリをKnowledge DB検索経路へ振り分けます。`query`(必須)、`scope`(`"all"` 既定 / `"problems"`)、`limit`(既定8、上限20)、`excludeFileId`(結果から除外するfileId。通常は現在編集中の教材)を受け取ります。`scope: "problems"` にすると問題ブロック単位でヒットし、prompt本文とtagsを含む詳しい抜粋を返すため、類題を探す用途に向きます。
-- `knowledge_db_pdf_import_preview` - PDFをKnowledge DBへ登録せずにAI分割・分類のプレビューを作成します。
-- `knowledge_db_pdf_import_staging_list` - PDF取り込みプレビューの保留中ステージング一覧を取得します。
-- `knowledge_db_pdf_import_staging_get` - PDF取り込みステージングの詳細を取得します。
-- `knowledge_db_pdf_import_staging_update` - PDF取り込みステージングの分割範囲・名称・分類候補などを更新します。
-- `knowledge_db_pdf_import_approve` - 承認済みPDFをKnowledge DBへ登録し、確定した分割結果を生成します。
-- `knowledge_db_pdf_import_reject` - PDF取り込みステージングを却下します。
 - `validate_local_document` - SigmaDoc と MathLive TeX を検証します。
 - `list_edit_proposals` - 現在のrun/チャットに帰属するMCP編集提案の軽量な一覧を返します。`draft`、変更後教材全体、内部proposal IDは含みません。
 - `get_edit_proposal` - `fileId`/`runId`から現在の作業案を読みます。既定の `detail:"summary"` は要約のみ、`detail:"full"` は再適用可能な `draft` を含みますが、内部の教材スナップショットとproposal IDは返しません。
@@ -328,9 +313,5 @@ Electron側が判定する未完了セッションは `operationCount > 0` か�
 
 SIGMA also exposes persistent conversation memory, separate from the global Knowledge DB:
 
-- `conversation_memory_save` — save an important conversation entry or durable summary.
-- `conversation_memory_search` — retrieve relevant prior conversation entries.
-- `conversation_memory_recent` — retrieve recent saved entries.
-- `knowledge_db_record_feedback` — record positive, negative, or corrective feedback for RAG results in the Learning DB.
 
 The Web AI providers expose the same capability as `sigma_memory_save`, `sigma_memory_search`, and `sigma_memory_recent`. Memory is stored locally under SIGMA's data directory and is not automatically inserted into a Workspace. WebView conversation capture can also extract explicit durable preferences into the separate long-term memory store. Web AI can read saved memory through these tools, while memory writes remain a consequential operation subject to the existing SIGMA permission gate.

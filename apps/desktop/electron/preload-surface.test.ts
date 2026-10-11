@@ -156,18 +156,6 @@ describe("preload bridge surface", () => {
     expect(preloadSource).toMatch(/workspace-preview:put/u);
   });
 
-  it("exposes the Knowledge DB structure parser status bridge", () => {
-    expect(preloadSource).toMatch(/knowledge-db:structure-status/u);
-    expect(preloadSource).toMatch(/getStructureParserStatus/u);
-  });
-
-  it("exposes separate Knowledge DB file and folder pickers", () => {
-    expect(preloadSource).toMatch(/knowledge-db:choose-files/u);
-    expect(preloadSource).toMatch(/knowledge-db:choose-folder/u);
-    expect(preloadSource).toMatch(/chooseFiles/u);
-    expect(preloadSource).toMatch(/chooseFolder/u);
-  });
-
 
   it("keeps every typed desktop API namespace and method backed by preload", () => {
     const typeSource = readFileSync(

@@ -46,9 +46,9 @@ interface Exemption {
  * offers it, or a local variable that happens to be called "how wide this may be".
  */
 const EXEMPTIONS = new Map<string, Exemption>([
-  ["src/components/editor/KnowledgePdfPageViewer.tsx", {
-    reason: "PDF page sizing and container width, not overlay text sizing",
-    lines: /^(?:const maxWidth = 760;|const scale = Math\.min\(1\.5, maxWidth \/ base\.width\);|style=\{\{ position: "relative", display: "inline-block", maxWidth: "100%", cursor: "crosshair", userSelect: "none" \}\},?)/,
+  ["src/components/editor/AiEditPanel.tsx", {
+    reason: "AI panel layout sizing, not the removed overlay text shape model",
+    lines: /^(?:style=\{\{ width: frameSize\.width, minWidth: 0, maxWidth: "100%" \}\}|const maxWidth = 112;|const scale = Math\.min\(maxWidth \/ safeWidth, maxHeight \/ safeHeight\);)$/,
   }],
   // The existing WebMCP schema still advertises this legacy field. Preserve that public
   // contract during internal refactors; the characterization below verifies that accepting
@@ -102,10 +102,6 @@ const EXEMPTIONS = new Map<string, Exemption>([
   ["src/components/editor/EditorShell.tsx", {
     reason: "a local: the outline pane's width clamp",
     lines: /const maxWidth = Math\.min|Math\.min\(maxWidth,/,
-  }],
-  ["src/components/editor/AiEditPanel.tsx", {
-    reason: "the CSS property, and a local scaling a preview thumbnail",
-    lines: /maxWidth: "100%"|const maxWidth = \d+;|maxWidth \/ safeWidth/,
   }],
   ["packages/viewer/src/SigmaDocViewer.tsx", {
     reason: "the CSS property, sizing the page to its container",
