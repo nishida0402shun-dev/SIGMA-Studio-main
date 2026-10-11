@@ -13,7 +13,7 @@ export interface ConversationMemoryEntry {
   metadata?: Record<string, unknown>;
 }
 
-type EntryRow = {
+type StoredEntry = {
   id: string;
   conversation_id: string;
   role: ConversationMemoryRole;
@@ -23,116 +23,114 @@ type EntryRow = {
   metadata_json: string;
 };
 
-const MAX_ENTRIES = 20_000;
-const MAX_CONTENT_LENGTH = 50_000;
+const ENTRY_LIMIT = 20_000;
+const CONTENT_LIMIT = 50_000;
+const SEARCH_CANDIDATE_LIMIT = 500;
 
 export class SqliteConversationMemoryStore {
-  constructor(private readonly db: DatabaseSync) {}
+  constructor(private readonly database: DatabaseSync) {}
 
   async append(input: Omit<ConversationMemoryEntry, "id" | "createdAt">): Promise<ConversationMemoryEntry> {
-    const content = input.content.trim();
-    if (!content) throw new Error("conversation memory content is empty");
-    if (content.length > MAX_CONTENT_LENGTH) throw new Error("conversation memory content is too long");
-    const entry: ConversationMemoryEntry = {
-      ...input,
-      id: "mem_" + randomUUID(),
-      content,
-      createdAt: new Date().toISOString(),
-    };
-    this.insert(entry);
-    this.prune();
+    const entry = this.buildEntry(input);
+    this.persist(entry);
+    this.enforceRetention();
     return entry;
   }
 
   async appendCaptured(
     input: Omit<ConversationMemoryEntry, "id" | "createdAt"> & { captureKey: string },
   ): Promise<ConversationMemoryEntry | null> {
-    const captureKey = input.captureKey.trim();
-    if (!captureKey) throw new Error("conversation capture key is empty");
-    const existing = this.db.prepare(
+    const key = input.captureKey.trim();
+    if (!key) throw new Error("conversation capture key is empty");
+
+    const duplicate = this.database.prepare(
       "SELECT id FROM sigma_core_conversation_entries WHERE json_extract(metadata_json, '$.captureKey') = ? LIMIT 1",
-    ).get(captureKey);
-    if (existing) return null;
-    const { captureKey: _captureKey, ...entryInput } = input;
-    const content = entryInput.content.trim();
-    if (!content) throw new Error("conversation memory content is empty");
-    if (content.length > MAX_CONTENT_LENGTH) throw new Error("conversation memory content is too long");
-    const entry: ConversationMemoryEntry = {
-      ...entryInput,
-      id: "mem_" + randomUUID(),
-      content,
-      createdAt: new Date().toISOString(),
-      metadata: { ...entryInput.metadata, captureKey },
-    };
-    this.insert(entry);
-    this.prune();
+    ).get(key);
+    if (duplicate) return null;
+
+    const { captureKey: _captureKey, ...fields } = input;
+    const entry = this.buildEntry({ ...fields, metadata: { ...fields.metadata, captureKey: key } });
+    this.persist(entry);
+    this.enforceRetention();
     return entry;
   }
 
   async recent(conversationId?: string, limit = 20): Promise<ConversationMemoryEntry[]> {
-    const safeLimit = Math.max(1, Math.min(Math.trunc(limit) || 1, 100));
+    const count = boundedInteger(limit, 20, 1, 100);
     const rows = conversationId
-      ? this.db.prepare("SELECT * FROM sigma_core_conversation_entries WHERE conversation_id = ? ORDER BY created_at DESC, rowid DESC LIMIT ?").all(conversationId, safeLimit)
-      : this.db.prepare("SELECT * FROM sigma_core_conversation_entries ORDER BY created_at DESC, rowid DESC LIMIT ?").all(safeLimit);
-    return (rows as EntryRow[]).map(fromRow);
+      ? this.database.prepare(
+          "SELECT * FROM sigma_core_conversation_entries WHERE conversation_id = ? ORDER BY created_at DESC, rowid DESC LIMIT ?",
+        ).all(conversationId, count)
+      : this.database.prepare(
+          "SELECT * FROM sigma_core_conversation_entries ORDER BY created_at DESC, rowid DESC LIMIT ?",
+        ).all(count);
+    return (rows as StoredEntry[]).map(decodeEntry);
   }
 
-  async search(query: string, conversationId?: string, limit = 8): Promise<Array<ConversationMemoryEntry & { score: number }>> {
-    const normalized = query.normalize("NFKC").toLocaleLowerCase().trim();
+  async search(
+    query: string,
+    conversationId?: string,
+    limit = 8,
+  ): Promise<Array<ConversationMemoryEntry & { score: number }>> {
+    const normalized = normalizeText(query);
     if (!normalized) return [];
+
     const tokens = tokenize(normalized);
-    const safeLimit = Math.max(1, Math.min(Math.trunc(limit) || 1, 50));
-    // FTS narrows the candidate set; LIKE is a fallback for scripts that FTS tokenizes poorly.
-    const ftsQuery = tokens.map((token) => '"' + token.replace(/"/gu, '""') + '"').join(" OR ");
-    let rows: EntryRow[] = [];
-    if (ftsQuery) {
-      try {
-        const sql = conversationId
-          ? "SELECT e.* FROM sigma_core_conversation_entries e JOIN sigma_core_conversation_entries_fts ON sigma_core_conversation_entries_fts.entry_id = e.id WHERE sigma_core_conversation_entries_fts MATCH ? AND e.conversation_id = ? ORDER BY e.created_at DESC LIMIT 500"
-          : "SELECT e.* FROM sigma_core_conversation_entries e JOIN sigma_core_conversation_entries_fts ON sigma_core_conversation_entries_fts.entry_id = e.id WHERE sigma_core_conversation_entries_fts MATCH ? ORDER BY e.created_at DESC LIMIT 500";
-        rows = (conversationId
-          ? this.db.prepare(sql).all(ftsQuery, conversationId)
-          : this.db.prepare(sql).all(ftsQuery)) as EntryRow[];
-      } catch {
-        rows = [];
-      }
-    }
-    // Always add a LIKE-based candidate pass: unicode61 does not reliably segment
-    // Japanese text, and an FTS partial hit must not hide other matching entries.
-    const likeTokens = [...new Set([normalized, ...tokens])].slice(0, 65);
-    if (likeTokens.length) {
-      const predicate = likeTokens.map(() => "content LIKE ? ESCAPE '\\'").join(" OR ");
-      const sql = conversationId
-        ? `SELECT * FROM sigma_core_conversation_entries WHERE conversation_id = ? AND (${predicate}) ORDER BY created_at DESC LIMIT 500`
-        : `SELECT * FROM sigma_core_conversation_entries WHERE ${predicate} ORDER BY created_at DESC LIMIT 500`;
-      const parameters = likeTokens.map((token) => "%" + escapeLike(token) + "%");
-      const likeRows = (conversationId
-        ? this.db.prepare(sql).all(conversationId, ...parameters)
-        : this.db.prepare(sql).all(...parameters)) as EntryRow[];
-      const merged = new Map(rows.map((row) => [row.id, row]));
-      for (const row of likeRows) merged.set(row.id, row);
-      rows = [...merged.values()];
-    }
+    const terms = [...new Set([normalized, ...tokens])].slice(0, 65);
+    const conditions = terms.map(() => "content LIKE ? ESCAPE '\\'").join(" OR ");
+    const scope = conversationId ? "conversation_id = ? AND " : "";
+    const parameters = terms.map((term) => `%${escapeLike(term)}%`);
+    if (conversationId) parameters.unshift(conversationId);
+
+    const rows = this.database.prepare(
+      `SELECT * FROM sigma_core_conversation_entries WHERE ${scope}(${conditions}) ORDER BY created_at DESC LIMIT ?`,
+    ).all(...parameters, SEARCH_CANDIDATE_LIMIT) as StoredEntry[];
 
     const now = Date.now();
-    return rows.map((row) => {
-      const entry = fromRow(row);
-      const text = entry.content.normalize("NFKC").toLocaleLowerCase();
-      const tokenHits = tokens.reduce((sum, token) => sum + (text.includes(token) ? 1 : 0), 0);
-      const phrase = text.includes(normalized) ? 1 : 0;
+    const scored = rows.map((row) => {
+      const entry = decodeEntry(row);
+      const content = normalizeText(entry.content);
+      const phraseMatch = content.includes(normalized) ? 1 : 0;
+      const matchedTerms = tokens.filter((term) => content.includes(term)).length;
+      const lexicalMatch = tokens.length ? matchedTerms / tokens.length : phraseMatch;
       const ageDays = Math.max(0, (now - Date.parse(entry.createdAt)) / 86_400_000);
-      const recency = Math.max(0, 1 - ageDays / 30);
-      const score = phrase * 0.45 + (tokens.length ? tokenHits / tokens.length : 0) * 0.45 + recency * 0.1;
-      return { ...entry, score };
-    }).filter((entry) => entry.score > 0).sort((a, b) => b.score - a.score).slice(0, safeLimit);
+      const recency = Number.isFinite(ageDays) ? Math.max(0, 1 - ageDays / 30) : 0;
+      return { ...entry, score: phraseMatch * 0.5 + lexicalMatch * 0.4 + recency * 0.1 };
+    });
+
+    return scored.filter((entry) => entry.score > 0)
+      .sort((left, right) => right.score - left.score)
+      .slice(0, boundedInteger(limit, 8, 1, 50));
   }
 
-  private insert(entry: ConversationMemoryEntry): void {
-    this.db.prepare(`
-      INSERT INTO sigma_core_conversation_entries
+  private buildEntry(
+    input: Omit<ConversationMemoryEntry, "id" | "createdAt">,
+  ): ConversationMemoryEntry {
+    const conversationId = input.conversationId.trim();
+    const content = input.content.trim();
+    if (!conversationId) throw new Error("conversation id is empty");
+    if (!content) throw new Error("conversation memory content is empty");
+    if (content.length > CONTENT_LIMIT) throw new Error("conversation memory content is too long");
+    if (!["user", "assistant", "system", "tool"].includes(input.role)) {
+      throw new Error("invalid conversation memory role");
+    }
+    return {
+      id: `mem_${randomUUID()}`,
+      conversationId,
+      role: input.role,
+      content,
+      ...(input.provider?.trim() ? { provider: input.provider.trim() } : {}),
+      createdAt: new Date().toISOString(),
+      ...(input.metadata && Object.keys(input.metadata).length ? { metadata: input.metadata } : {}),
+    };
+  }
+
+  private persist(entry: ConversationMemoryEntry): void {
+    this.database.prepare(
+      `INSERT INTO sigma_core_conversation_entries
         (id, conversation_id, role, content, provider, created_at, metadata_json)
-      VALUES (?, ?, ?, ?, ?, ?, ?)
-    `).run(
+       VALUES (?, ?, ?, ?, ?, ?, ?)`,
+    ).run(
       entry.id,
       entry.conversationId,
       entry.role,
@@ -143,20 +141,27 @@ export class SqliteConversationMemoryStore {
     );
   }
 
-  private prune(): void {
-    this.db.prepare(`
-      DELETE FROM sigma_core_conversation_entries
-      WHERE id IN (
-        SELECT id FROM sigma_core_conversation_entries
-        ORDER BY created_at DESC, rowid DESC
-        LIMIT -1 OFFSET ?
-      )
-    `).run(MAX_ENTRIES);
+  private enforceRetention(): void {
+    this.database.prepare(
+      `DELETE FROM sigma_core_conversation_entries
+       WHERE id IN (
+         SELECT id FROM sigma_core_conversation_entries
+         ORDER BY created_at DESC, rowid DESC LIMIT -1 OFFSET ?
+       )`,
+    ).run(ENTRY_LIMIT);
   }
 }
 
-function fromRow(row: EntryRow): ConversationMemoryEntry {
-  const metadata = JSON.parse(row.metadata_json) as Record<string, unknown>;
+function decodeEntry(row: StoredEntry): ConversationMemoryEntry {
+  let metadata: Record<string, unknown> = {};
+  try {
+    const parsed: unknown = JSON.parse(row.metadata_json);
+    if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+      metadata = parsed as Record<string, unknown>;
+    }
+  } catch {
+    // Corrupt optional metadata must not hide otherwise readable conversation content.
+  }
   return {
     id: row.id,
     conversationId: row.conversation_id,
@@ -168,11 +173,19 @@ function fromRow(row: EntryRow): ConversationMemoryEntry {
   };
 }
 
+function normalizeText(value: string): string {
+  return value.normalize("NFKC").toLocaleLowerCase().trim();
+}
+
 function tokenize(value: string): string[] {
-  const tokens = value.match(/[a-z0-9]+|[ぁ-んァ-ヶ一-龯]{2,}/giu) ?? [];
-  return [...new Set(tokens)].slice(0, 64);
+  return [...new Set(value.match(/[a-z0-9]+|[ぁ-んァ-ヶ一-龯]{2,}/giu) ?? [])].slice(0, 64);
 }
 
 function escapeLike(value: string): string {
   return value.replace(/[\\%_]/gu, "\\$&");
+}
+
+function boundedInteger(value: number, fallback: number, min: number, max: number): number {
+  const number = Number.isFinite(value) ? Math.trunc(value) : fallback;
+  return Math.max(min, Math.min(number || fallback, max));
 }
