@@ -5,7 +5,7 @@ import { KnowledgeLearningStore } from "./knowledge-learning-store";
 import { createHash, randomUUID } from "node:crypto";
 import { PDFDocument } from "pdf-lib";
 import JSZip from "jszip";
-import { LocalVectorIndex, type VectorSearchResult } from "./local-vector-index";
+import { LocalVectorIndex, type VectorSearchResult, type VectorStore } from "./local-vector-index";
 import { rerankKnowledgeCandidates } from "./knowledge-decision-reranker";
 import { KnowledgeStructureParser, type KnowledgeStructureBlock, type KnowledgeStructureBlockType, type StructureParserStatus } from "./knowledge-db-structure-parser";
 import { analyzeKnowledgePage, KNOWLEDGE_ANALYSIS_VERSION } from "./knowledge-analysis-engine";
@@ -171,16 +171,16 @@ export interface KnowledgeIndexStatus {
 export class KnowledgeDbStore {
   private readonly dataDir: string;
   private readonly db: DatabaseSync;
-  private readonly vectorDb: DatabaseSync;
+  private readonly vectorStore: VectorStore;
   private indexPromise: Promise<void> | null = null;
   private indexStatus: KnowledgeIndexStatus = { state: "idle", total: 0, completed: 0 };
   private readonly structureParser = new KnowledgeStructureParser();
   private structureParserStatusPromise: Promise<StructureParserStatus> | null = null;
 
-  constructor(dataDir: string, db: DatabaseSync, vectorDb: DatabaseSync = db) {
+  constructor(dataDir: string, db: DatabaseSync, vectorStore: VectorStore = new LocalVectorIndex(db)) {
     this.dataDir = dataDir;
     this.db = db;
-    this.vectorDb = vectorDb;
+    this.vectorStore = vectorStore;
   }
 
   async recordLearningFeedback(input: { query: string; sourceId?: string; pageNumber?: number; label: "positive" | "negative" | "correction"; correction?: string }): Promise<unknown> {
@@ -1435,8 +1435,8 @@ export class KnowledgeDbStore {
     return { root, sourcesDir: path.join(root, "sources"), openedPagesDir: path.join(root, "opened-pages") };
   }
 
-  private vectorIndex(): LocalVectorIndex {
-    return new LocalVectorIndex(this.vectorDb);
+  private vectorIndex(): VectorStore {
+    return this.vectorStore;
   }
 }
 
