@@ -53,13 +53,15 @@ export class KnowledgeLearningStore {
       ...(input.metadata && Object.keys(input.metadata).length ? { metadata: input.metadata } : {}),
     };
 
+    const normalizedQuery = normalizeText(entry.query);
+    const scoreDelta = entry.label === "positive" ? 0.06 : entry.label === "negative" ? -0.08 : -0.02;
     this.database.prepare(
       `INSERT INTO sigma_core_knowledge_learning_feedback
-        (id, query_text, source_id, page_number, label, correction, created_at, metadata_json)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+        (id, query_text, normalized_query, source_id, page_number, label, score_delta, correction, created_at, metadata_json)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     ).run(
-      entry.id, entry.query, entry.sourceId ?? null, entry.pageNumber ?? null,
-      entry.label, entry.correction ?? null, entry.createdAt, JSON.stringify(entry.metadata ?? {}),
+      entry.id, entry.query, normalizedQuery, entry.sourceId ?? null, entry.pageNumber ?? null,
+      entry.label, scoreDelta, entry.correction ?? null, entry.createdAt, JSON.stringify(entry.metadata ?? {}),
     );
     this.database.prepare(
       `DELETE FROM sigma_core_knowledge_learning_feedback
@@ -84,23 +86,14 @@ export class KnowledgeLearningStore {
     if (!normalizedQuery) return 0;
 
     const rows = this.database.prepare(
-      `SELECT * FROM sigma_core_knowledge_learning_feedback
+      `SELECT score_delta FROM sigma_core_knowledge_learning_feedback
        WHERE (? IS NULL OR source_id = ?)
          AND (? IS NULL OR page_number = ?)
+         AND (instr(normalized_query, ?) > 0 OR instr(?, normalized_query) > 0)
        ORDER BY created_at DESC LIMIT 20000`,
-    ).all(sourceId ?? null, sourceId ?? null, pageNumber ?? null, pageNumber ?? null) as FeedbackRecord[];
-
-    let score = 0;
-    for (const row of rows) {
-      const feedback = decodeFeedback(row);
-      const phrase = normalizeText(feedback.query);
-      if (!phrase || !(phrase === normalizedQuery
-        || phrase.includes(normalizedQuery)
-        || normalizedQuery.includes(phrase))) continue;
-      if (feedback.label === "positive") score += 0.06;
-      else if (feedback.label === "negative") score -= 0.08;
-      else score -= 0.02;
-    }
+    ).all(sourceId ?? null, sourceId ?? null, pageNumber ?? null, pageNumber ?? null,
+      normalizedQuery, normalizedQuery) as Array<{ score_delta: number }>;
+    const boost = rows.reduce((total, row) => total + row.score_delta, 0);
     return Math.max(-0.2, Math.min(0.2, score));
   }
 }
