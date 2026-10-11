@@ -86,7 +86,7 @@ export function createHybridRetrievalService(options: HybridRetrievalOptions): R
       const accumulate = (hits: readonly SearchHit[], weight: number, kind: "lexicalRank" | "semanticRank") => {
         hits.forEach((hit, index) => {
           if (query.domains && !query.domains.includes(hit.domain)) return;
-          if (query.sourceIds && hit.source && !query.sourceIds.includes(hit.source.sourceId)) return;
+          if (query.sourceIds && (!hit.source || !query.sourceIds.includes(hit.source.sourceId))) return;
           const key = identity(hit);
           const current = fused.get(key);
           const rank = index + 1;
