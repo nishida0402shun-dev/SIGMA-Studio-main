@@ -31,7 +31,7 @@ export class SqliteResearchSessionStore {
 
   async list(): Promise<ResearchSession[]> {
     const rows = this.db.prepare(
-      "SELECT * FROM qe_research_sessions ORDER BY updated_at DESC, rowid DESC",
+      "SELECT * FROM sigma_core_research_sessions ORDER BY updated_at DESC, rowid DESC",
     ).all() as ResearchSessionRow[];
     return rows.map(fromRow);
   }
@@ -53,14 +53,14 @@ export class SqliteResearchSessionStore {
       updatedAt: now,
     };
     this.db.prepare(`
-      INSERT INTO qe_research_sessions
+      INSERT INTO sigma_core_research_sessions
         (id, title, query_text, source_references_json, created_at, updated_at)
       VALUES (?, ?, ?, ?, ?, ?)
     `).run(session.id, session.title, session.query, JSON.stringify(session.sourceReferences), now, now);
     this.db.prepare(`
-      DELETE FROM qe_research_sessions
+      DELETE FROM sigma_core_research_sessions
       WHERE id IN (
-        SELECT id FROM qe_research_sessions
+        SELECT id FROM sigma_core_research_sessions
         ORDER BY updated_at DESC, rowid DESC
         LIMIT -1 OFFSET 200
       )
@@ -73,7 +73,7 @@ export class SqliteResearchSessionStore {
     query?: string;
     sourceReferences?: ResearchSourceReference[];
   }): Promise<ResearchSession | null> {
-    const existing = this.db.prepare("SELECT * FROM qe_research_sessions WHERE id = ?").get(id) as ResearchSessionRow | undefined;
+    const existing = this.db.prepare("SELECT * FROM sigma_core_research_sessions WHERE id = ?").get(id) as ResearchSessionRow | undefined;
     if (!existing) return null;
     const current = fromRow(existing);
     const query = patch.query === undefined ? current.query : patch.query.trim();
@@ -88,7 +88,7 @@ export class SqliteResearchSessionStore {
       updatedAt: new Date().toISOString(),
     };
     this.db.prepare(`
-      UPDATE qe_research_sessions
+      UPDATE sigma_core_research_sessions
       SET title = ?, query_text = ?, source_references_json = ?, updated_at = ?
       WHERE id = ?
     `).run(updated.title, updated.query, JSON.stringify(updated.sourceReferences), updated.updatedAt, id);
@@ -96,7 +96,7 @@ export class SqliteResearchSessionStore {
   }
 
   async remove(id: string): Promise<boolean> {
-    const result = this.db.prepare("DELETE FROM qe_research_sessions WHERE id = ?").run(id) as { changes: number | bigint };
+    const result = this.db.prepare("DELETE FROM sigma_core_research_sessions WHERE id = ?").run(id) as { changes: number | bigint };
     return Number(result.changes) > 0;
   }
 }
