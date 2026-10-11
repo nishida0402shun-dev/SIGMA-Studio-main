@@ -22,8 +22,9 @@ export function chunkKnowledgePage(page: KnowledgePageInput, options: ChunkTextO
 
   const chars = Array.from(page.text);
   const chunks: KnowledgeChunk[] = [];
-  const stride = chunkSize - chunkOverlap;
-  for (let start = 0, chunkIndex = 0; start < chars.length; start += stride, chunkIndex += 1) {
+  let start = 0;
+  let chunkIndex = 0;
+  while (start < chars.length) {
     let end = Math.min(chars.length, start + chunkSize);
     // Prefer a nearby paragraph/sentence boundary without making tiny chunks.
     if (end < chars.length) {
@@ -36,6 +37,7 @@ export function chunkKnowledgePage(page: KnowledgePageInput, options: ChunkTextO
         }
       }
     }
+
     const text = chars.slice(start, end).join("").trim();
     if (text) {
       const id = options.createChunkId?.(page.sourceId, page.pageNumber, chunkIndex)
@@ -55,9 +57,12 @@ export function chunkKnowledgePage(page: KnowledgePageInput, options: ChunkTextO
       });
     }
     if (end === chars.length) break;
-    // When a boundary shortened this chunk, advance from its actual end to avoid
-    // repeatedly indexing the same text; overlap is still retained.
-    if (end < start + chunkSize) start = Math.max(start - 1, end - stride - 1);
+
+    // Advance from the actual chosen boundary, preserving overlap and avoiding
+    // both skipped text and repeated windows when a sentence boundary is early.
+    const nextStart = end - chunkOverlap;
+    start = nextStart > start ? nextStart : start + 1;
+    chunkIndex += 1;
   }
   return chunks;
 }
