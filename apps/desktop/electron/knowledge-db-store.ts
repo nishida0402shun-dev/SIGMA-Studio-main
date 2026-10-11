@@ -6,6 +6,7 @@ import { createHash, randomUUID } from "node:crypto";
 import { PDFDocument } from "pdf-lib";
 import JSZip from "jszip";
 import { LocalVectorIndex, type VectorSearchResult } from "./local-vector-index";
+import { SqliteKnowledgeLibraryRepository } from "../../../packages/sigma-core/src/index";
 import { rerankKnowledgeCandidates } from "./knowledge-decision-reranker";
 import { KnowledgeStructureParser, type KnowledgeStructureBlock, type KnowledgeStructureBlockType, type StructureParserStatus } from "./knowledge-db-structure-parser";
 import { analyzeKnowledgePage, KNOWLEDGE_ANALYSIS_VERSION } from "./knowledge-analysis-engine";
@@ -171,6 +172,7 @@ export interface KnowledgeIndexStatus {
 export class KnowledgeDbStore {
   private readonly dataDir: string;
   private readonly db: DatabaseSync;
+  private readonly knowledgeRepository: SqliteKnowledgeLibraryRepository;
   private indexPromise: Promise<void> | null = null;
   private indexStatus: KnowledgeIndexStatus = { state: "idle", total: 0, completed: 0 };
   private readonly structureParser = new KnowledgeStructureParser();
@@ -179,6 +181,7 @@ export class KnowledgeDbStore {
   constructor(dataDir: string, db: DatabaseSync) {
     this.dataDir = dataDir;
     this.db = db;
+    this.knowledgeRepository = new SqliteKnowledgeLibraryRepository(db);
   }
 
   async recordLearningFeedback(input: { query: string; sourceId?: string; pageNumber?: number; label: "positive" | "negative" | "correction"; correction?: string }): Promise<unknown> {
@@ -1283,48 +1286,25 @@ export class KnowledgeDbStore {
   }
 
   private async readLibrary(): Promise<KnowledgeLibrary> {
-    const sourceRows = this.db.prepare(`
-      SELECT id, display_name, mime_type, content_hash, original_uri, stored_uri,
-        page_count, imported_at, updated_at, size_bytes, extraction_status, metadata_json
-      FROM qe_knowledge_sources
-      ORDER BY imported_at DESC, rowid DESC
-    `).all() as Array<{
-      id: string; display_name: string; mime_type: string; content_hash: string;
-      original_uri: string; stored_uri: string; page_count: number; imported_at: string;
-      updated_at: string; size_bytes: number; extraction_status: KnowledgeSource["extractionStatus"];
-      metadata_json: string;
-    }>;
-    const pageRows = this.db.prepare(`
-      SELECT id, source_id, page_number, semantic_type, title, text_content,
-        extraction_status, structure_json, analysis_json
-      FROM qe_knowledge_pages ORDER BY source_id, page_number
-    `).all() as Array<{
-      id: string; source_id: string; page_number: number; semantic_type: KnowledgeSemanticType;
-      title: string | null; text_content: string; extraction_status: KnowledgePage["extractionStatus"];
-      structure_json: string; analysis_json: string;
-    }>;
-    const pagesBySource = new Map<string, KnowledgePage[]>();
-    for (const row of pageRows) {
-      let extra: Partial<KnowledgePage> = {};
-      try { extra = JSON.parse(row.analysis_json) as Partial<KnowledgePage>; } catch { /* malformed optional metadata is ignored */ }
-      let structureBlocks: KnowledgeStructureBlock[] = [];
-      try { structureBlocks = JSON.parse(row.structure_json) as KnowledgeStructureBlock[]; } catch { /* malformed structure metadata is ignored */ }
-      const page: KnowledgePage = {
-        ...extra,
-        id: row.id,
-        sourceId: row.source_id,
-        pageNumber: row.page_number,
-        semanticType: row.semantic_type,
-        ...(row.title !== null ? { title: row.title } : {}),
-        ...(row.text_content || Object.prototype.hasOwnProperty.call(extra, "text") ? { text: row.text_content } : {}),
-        ...(row.extraction_status ? { extractionStatus: row.extraction_status } : {}),
-        structureBlocks,
-      };
-      const pages = pagesBySource.get(row.source_id) ?? [];
-      pages.push(page);
-      pagesBySource.set(row.source_id, pages);
-    }
-    const sources: KnowledgeSource[] = sourceRows.map((row) => {
+    const persisted = this.knowledgeRepository.load();
+    const sources: KnowledgeSource[] = persisted.sources.map((row) => {
+      const pages: KnowledgePage[] = row.pages.map((pageRow) => {
+        let extra: Partial<KnowledgePage> = {};
+        try { extra = JSON.parse(pageRow.analysis_json) as Partial<KnowledgePage>; } catch { /* malformed optional metadata is ignored */ }
+        let structureBlocks: KnowledgeStructureBlock[] = [];
+        try { structureBlocks = JSON.parse(pageRow.structure_json) as KnowledgeStructureBlock[]; } catch { /* malformed structure metadata is ignored */ }
+        return {
+          ...extra,
+          id: pageRow.id,
+          sourceId: pageRow.source_id,
+          pageNumber: pageRow.page_number,
+          semanticType: pageRow.semantic_type as KnowledgeSemanticType,
+          ...(pageRow.title !== null ? { title: pageRow.title } : {}),
+          ...(pageRow.text_content || Object.prototype.hasOwnProperty.call(extra, "text") ? { text: pageRow.text_content } : {}),
+          ...(pageRow.extraction_status ? { extractionStatus: pageRow.extraction_status as KnowledgePage["extractionStatus"] } : {}),
+          structureBlocks,
+        };
+      });
       let metadata: { indexedAt?: string; indexError?: string } = {};
       try { metadata = JSON.parse(row.metadata_json) as typeof metadata; } catch { /* optional metadata */ }
       return {
@@ -1338,94 +1318,60 @@ export class KnowledgeDbStore {
         importedAt: row.imported_at,
         updatedAt: row.updated_at,
         contentHash: row.content_hash || undefined,
-        pages: pagesBySource.get(row.id) ?? [],
-        extractionStatus: row.extraction_status,
+        pages,
+        extractionStatus: row.extraction_status as KnowledgeSource["extractionStatus"],
         ...(metadata.indexedAt ? { indexedAt: metadata.indexedAt } : {}),
         ...(metadata.indexError ? { indexError: metadata.indexError } : {}),
       };
     });
     const library: KnowledgeLibrary = { version: 3, sources };
-    const revisionRow = this.db.prepare("SELECT revision FROM qe_knowledge_state WHERE id = 1").get() as { revision: number };
-    Object.defineProperty(library, "__fingerprint", { value: String(revisionRow.revision), enumerable: false, writable: true });
+    Object.defineProperty(library, "__fingerprint", { value: String(persisted.revision), enumerable: false, writable: true });
     return library;
   }
 
   private async writeLibrary(library: KnowledgeLibrary): Promise<void> {
-    const sourceIds = library.sources.map((source) => source.id);
-    this.db.exec("BEGIN IMMEDIATE");
-    try {
-      const revisionRow = this.db.prepare("SELECT revision FROM qe_knowledge_state WHERE id = 1").get() as { revision: number };
-      const currentRevision = Number(revisionRow.revision);
-      if (library.__fingerprint !== undefined && Number(library.__fingerprint) !== currentRevision) {
-        throw new Error("Knowledge DB changed concurrently; the operation was not written. Please retry.");
-      }
-      if (sourceIds.length) {
-        const placeholders = sourceIds.map(() => "?").join(", ");
-        this.db.prepare(`DELETE FROM qe_knowledge_sources WHERE id NOT IN (${placeholders})`).run(...sourceIds);
-      } else {
-        this.db.exec("DELETE FROM qe_knowledge_sources");
-      }
-
-      const upsertSource = this.db.prepare(`
-        INSERT INTO qe_knowledge_sources
-          (id, display_name, original_uri, stored_uri, mime_type, size_bytes, content_hash,
-           page_count, extraction_status, imported_at, updated_at, metadata_json)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        ON CONFLICT(id) DO UPDATE SET
-          display_name = excluded.display_name,
-          original_uri = excluded.original_uri,
-          stored_uri = excluded.stored_uri,
-          mime_type = excluded.mime_type,
-          size_bytes = excluded.size_bytes,
-          content_hash = excluded.content_hash,
-          page_count = excluded.page_count,
-          extraction_status = excluded.extraction_status,
-          imported_at = excluded.imported_at,
-          updated_at = excluded.updated_at,
-          metadata_json = excluded.metadata_json
-      `);
-      const insertPage = this.db.prepare(`
-        INSERT INTO qe_knowledge_pages
-          (id, source_id, page_number, semantic_type, title, text_content, extraction_status,
-           structure_json, analysis_json, updated_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-      `);
-
-      for (const source of library.sources) {
-        upsertSource.run(
-          source.id, source.name, source.originalPath, source.storedPath, source.mimeType,
-          source.sizeBytes, source.contentHash ?? "", source.pageCount,
-          source.extractionStatus ?? "ocr-needed", source.importedAt, source.updatedAt,
-          JSON.stringify({ indexedAt: source.indexedAt, indexError: source.indexError }),
-        );
-        this.db.prepare("DELETE FROM qe_knowledge_pages WHERE source_id = ?").run(source.id);
-        for (const page of source.pages) {
-          const pageMetadata = {
-            ...page,
-            id: undefined,
-            sourceId: undefined,
-            pageNumber: undefined,
-            semanticType: undefined,
-            title: undefined,
-            text: undefined,
-            extractionStatus: undefined,
-            structureBlocks: undefined,
-          };
-          insertPage.run(
-            page.id, source.id, page.pageNumber, page.semanticType, page.title ?? null,
-            page.text ?? "", page.extractionStatus ?? (page.text ? "text" : "empty"),
-            JSON.stringify(page.structureBlocks ?? []), JSON.stringify(pageMetadata), source.updatedAt,
-          );
-        }
-      }
-      const nextRevision = currentRevision + 1;
-      this.db.prepare("UPDATE qe_knowledge_state SET revision = ? WHERE id = 1").run(nextRevision);
-      this.db.exec("COMMIT");
-      library.__fingerprint = String(nextRevision);
-    } catch (error) {
-      this.db.exec("ROLLBACK");
-      throw error;
-    }
+    const persistedSources = library.sources.map((source) => ({
+      id: source.id,
+      display_name: source.name,
+      original_uri: source.originalPath,
+      stored_uri: source.storedPath,
+      mime_type: source.mimeType,
+      size_bytes: source.sizeBytes,
+      content_hash: source.contentHash ?? "",
+      page_count: source.pageCount,
+      extraction_status: source.extractionStatus ?? "ocr-needed",
+      imported_at: source.importedAt,
+      updated_at: source.updatedAt,
+      metadata_json: JSON.stringify({ indexedAt: source.indexedAt, indexError: source.indexError }),
+      pages: source.pages.map((page) => {
+        const pageMetadata = {
+          ...page,
+          id: undefined,
+          sourceId: undefined,
+          pageNumber: undefined,
+          semanticType: undefined,
+          title: undefined,
+          text: undefined,
+          extractionStatus: undefined,
+          structureBlocks: undefined,
+        };
+        return {
+          id: page.id,
+          source_id: source.id,
+          page_number: page.pageNumber,
+          semantic_type: page.semanticType,
+          title: page.title ?? null,
+          text_content: page.text ?? "",
+          extraction_status: page.extractionStatus ?? (page.text ? "text" : "empty"),
+          structure_json: JSON.stringify(page.structureBlocks ?? []),
+          analysis_json: JSON.stringify(pageMetadata),
+          updated_at: source.updatedAt,
+        };
+      }),
+    }));
+    const expectedRevision = library.__fingerprint === undefined ? undefined : Number(library.__fingerprint);
+    const nextRevision = this.knowledgeRepository.save(persistedSources, expectedRevision);
+    library.__fingerprint = String(nextRevision);
   }
 
   private paths() {
