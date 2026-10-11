@@ -1,6 +1,6 @@
 # Vector Store Separation
 
-Status: proposed implementation baseline; runtime integration and CI verification are pending.
+Status: the initial separate-file SQLite vector store and legacy-row importer are implemented in this branch; runtime tests and CI verification are pending. LanceDB remains a candidate and has not been added.
 
 ## Decision
 
@@ -28,7 +28,7 @@ Do not introduce a cloud service or require a separately managed server for the 
 Keep the existing shared SQLite database at the application data directory. Store LanceDB in a sibling directory, for example:
 
 - data/knowledge-db/sigma-studio.sqlite
-- data/knowledge-db/vector-index/
+- data/knowledge-db/vector-index.sqlite (initial isolated SQLite-backed vector store; replaceable behind the vector-store boundary)
 
 The exact paths must be resolved from the existing Electron user-data path and covered by tests. They must not depend on the current workspace or process working directory.
 
@@ -60,7 +60,7 @@ The implementation must not silently report a successful index when vector write
 
 ## Migration from the current same-database vector table
 
-Current code in apps/desktop/electron/local-vector-index.ts reads and writes qe_vector_records in the shared SQLite connection, storing vectors as JSON and scanning rows for cosine similarity. The schema currently declares that table in packages/question-engine/src/storage/sqlite-schema.ts.
+Before this change, apps/desktop/electron/local-vector-index.ts read and wrote qe_vector_records in the shared SQLite connection, storing vectors as JSON and scanning rows for cosine similarity. The branch now opens a separate vector-index.sqlite file, writes new vectors there, and performs a one-time idempotent copy of legacy rows from the relational database. The old table remains for rollback; LanceDB/native package integration and indexed ANN search are not yet implemented.
 
 Migration requirements:
 - Add a versioned SQLite migration that stops using the legacy vector table for new writes. Do not drop the table until a tested export/import path and rollback strategy exist.
@@ -88,4 +88,4 @@ Do not remove the old vector implementation or its table until:
 
 ## Current verification status
 
-This document records a design decision and implementation checklist only. It does not claim that LanceDB is installed, that the adapter is implemented, or that tests/builds have passed.
+The branch now contains the initial separate-file implementation and a migration test, but this session has not run the test suite, typecheck, lint, desktop build, or packaged Electron smoke tests. LanceDB is not installed and no performance improvement from approximate-nearest-neighbor indexing is claimed.
