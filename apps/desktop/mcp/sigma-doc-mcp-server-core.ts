@@ -42,7 +42,7 @@ import {
 } from "../electron/ai-edit-run-context";
 import { LocalMaterialStore } from "../electron/local-material-store";
 import { KnowledgeDbStore } from "../electron/knowledge-db-store";
-import { KnowledgeLearningStore } from "../electron/knowledge-learning-store";
+import { KnowledgeLearningStore } from "../../../packages/sigma-core/src/storage/sqlite-knowledge-learning-store";
 import {
   openSigmaCoreDatabase,
   SqliteConversationMemoryStore,
