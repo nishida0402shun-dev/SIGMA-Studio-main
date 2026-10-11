@@ -19,14 +19,14 @@ export interface SqliteSchemaDriver {
 export const QUESTION_ENGINE_SCHEMA_VERSION = 6;
 
 const MIGRATION_TABLE = `
-  CREATE TABLE IF NOT EXISTS qe_schema_migrations (
+  CREATE TABLE IF NOT EXISTS sigma_core_schema_migrations (
     version INTEGER PRIMARY KEY,
     applied_at TEXT NOT NULL
   );
 `;
 
 const CORE_SCHEMA = `
-  CREATE TABLE IF NOT EXISTS qe_sources (
+  CREATE TABLE IF NOT EXISTS sigma_core_sources (
     id TEXT PRIMARY KEY,
     display_name TEXT NOT NULL,
     mime_type TEXT NOT NULL,
@@ -37,9 +37,9 @@ const CORE_SCHEMA = `
     metadata_json TEXT NOT NULL DEFAULT '{}'
   );
 
-  CREATE INDEX IF NOT EXISTS qe_sources_hash_idx ON qe_sources(content_hash);
+  CREATE INDEX IF NOT EXISTS sigma_core_sources_hash_idx ON sigma_core_sources(content_hash);
 
-  CREATE TABLE IF NOT EXISTS qe_questions (
+  CREATE TABLE IF NOT EXISTS sigma_core_questions (
     id TEXT PRIMARY KEY,
     title TEXT NOT NULL DEFAULT '',
     body_format TEXT NOT NULL CHECK (body_format IN ('sigma-document', 'markdown', 'plain-text')),
@@ -52,33 +52,33 @@ const CORE_SCHEMA = `
     updated_at TEXT NOT NULL
   );
 
-  CREATE INDEX IF NOT EXISTS qe_questions_review_idx ON qe_questions(review_status);
-  CREATE INDEX IF NOT EXISTS qe_questions_difficulty_idx ON qe_questions(difficulty);
+  CREATE INDEX IF NOT EXISTS sigma_core_questions_review_idx ON sigma_core_questions(review_status);
+  CREATE INDEX IF NOT EXISTS sigma_core_questions_difficulty_idx ON sigma_core_questions(difficulty);
 
-  CREATE TABLE IF NOT EXISTS qe_tags (
+  CREATE TABLE IF NOT EXISTS sigma_core_tags (
     id TEXT PRIMARY KEY,
     label TEXT NOT NULL,
     taxonomy_path_json TEXT NOT NULL DEFAULT '[]',
     UNIQUE(label, taxonomy_path_json)
   );
 
-  CREATE TABLE IF NOT EXISTS qe_question_tags (
-    question_id TEXT NOT NULL REFERENCES qe_questions(id) ON DELETE CASCADE,
-    tag_id TEXT NOT NULL REFERENCES qe_tags(id) ON DELETE CASCADE,
+  CREATE TABLE IF NOT EXISTS sigma_core_question_tags (
+    question_id TEXT NOT NULL REFERENCES sigma_core_questions(id) ON DELETE CASCADE,
+    tag_id TEXT NOT NULL REFERENCES sigma_core_tags(id) ON DELETE CASCADE,
     PRIMARY KEY(question_id, tag_id)
   );
 
-  CREATE TABLE IF NOT EXISTS qe_question_sources (
-    question_id TEXT NOT NULL REFERENCES qe_questions(id) ON DELETE CASCADE,
-    source_id TEXT NOT NULL REFERENCES qe_sources(id) ON DELETE RESTRICT,
+  CREATE TABLE IF NOT EXISTS sigma_core_question_sources (
+    question_id TEXT NOT NULL REFERENCES sigma_core_questions(id) ON DELETE CASCADE,
+    source_id TEXT NOT NULL REFERENCES sigma_core_sources(id) ON DELETE RESTRICT,
     page_number INTEGER,
     region_json TEXT,
     evidence_role TEXT NOT NULL DEFAULT 'source',
     PRIMARY KEY(question_id, source_id, page_number, evidence_role)
   );
 
-  CREATE TABLE IF NOT EXISTS qe_question_versions (
-    question_id TEXT NOT NULL REFERENCES qe_questions(id) ON DELETE CASCADE,
+  CREATE TABLE IF NOT EXISTS sigma_core_question_versions (
+    question_id TEXT NOT NULL REFERENCES sigma_core_questions(id) ON DELETE CASCADE,
     version INTEGER NOT NULL,
     snapshot_json TEXT NOT NULL,
     changed_at TEXT NOT NULL,
@@ -86,7 +86,7 @@ const CORE_SCHEMA = `
     PRIMARY KEY(question_id, version)
   );
 
-  CREATE TABLE IF NOT EXISTS qe_import_jobs (
+  CREATE TABLE IF NOT EXISTS sigma_core_import_jobs (
     id TEXT PRIMARY KEY,
     source_name TEXT NOT NULL,
     status TEXT NOT NULL CHECK (status IN ('queued', 'running', 'completed', 'failed', 'cancelled')),
@@ -97,10 +97,10 @@ const CORE_SCHEMA = `
     updated_at TEXT NOT NULL
   );
 
-  CREATE TABLE IF NOT EXISTS qe_import_proposals (
+  CREATE TABLE IF NOT EXISTS sigma_core_import_proposals (
     id TEXT PRIMARY KEY,
-    job_id TEXT NOT NULL REFERENCES qe_import_jobs(id) ON DELETE CASCADE,
-    source_id TEXT NOT NULL REFERENCES qe_sources(id) ON DELETE RESTRICT,
+    job_id TEXT NOT NULL REFERENCES sigma_core_import_jobs(id) ON DELETE CASCADE,
+    source_id TEXT NOT NULL REFERENCES sigma_core_sources(id) ON DELETE RESTRICT,
     page_refs_json TEXT NOT NULL,
     draft_json TEXT NOT NULL,
     confidence REAL CHECK (confidence IS NULL OR (confidence >= 0 AND confidence <= 1)),
@@ -110,11 +110,11 @@ const CORE_SCHEMA = `
     reviewed_at TEXT
   );
 
-  CREATE INDEX IF NOT EXISTS qe_proposals_job_status_idx ON qe_import_proposals(job_id, status);
+  CREATE INDEX IF NOT EXISTS sigma_core_proposals_job_status_idx ON sigma_core_import_proposals(job_id, status);
 
-  CREATE TABLE IF NOT EXISTS qe_question_attempts (
+  CREATE TABLE IF NOT EXISTS sigma_core_question_attempts (
     id TEXT PRIMARY KEY,
-    question_id TEXT NOT NULL REFERENCES qe_questions(id) ON DELETE RESTRICT,
+    question_id TEXT NOT NULL REFERENCES sigma_core_questions(id) ON DELETE RESTRICT,
     answered_at TEXT NOT NULL,
     response_json TEXT,
     is_correct INTEGER CHECK (is_correct IN (0, 1)),
@@ -122,16 +122,16 @@ const CORE_SCHEMA = `
     metadata_json TEXT NOT NULL DEFAULT '{}'
   );
 
-  CREATE INDEX IF NOT EXISTS qe_attempts_question_time_idx ON qe_question_attempts(question_id, answered_at);
+  CREATE INDEX IF NOT EXISTS sigma_core_attempts_question_time_idx ON sigma_core_question_attempts(question_id, answered_at);
 
-  CREATE TABLE IF NOT EXISTS qe_knowledge_state (
+  CREATE TABLE IF NOT EXISTS sigma_core_knowledge_state (
     id INTEGER PRIMARY KEY CHECK (id = 1),
     revision INTEGER NOT NULL CHECK (revision >= 0)
   );
 
-  INSERT OR IGNORE INTO qe_knowledge_state(id, revision) VALUES (1, 0);
+  INSERT OR IGNORE INTO sigma_core_knowledge_state(id, revision) VALUES (1, 0);
 
-  CREATE TABLE IF NOT EXISTS qe_knowledge_sources (
+  CREATE TABLE IF NOT EXISTS sigma_core_knowledge_sources (
     id TEXT PRIMARY KEY,
     display_name TEXT NOT NULL,
     original_uri TEXT NOT NULL,
@@ -146,9 +146,9 @@ const CORE_SCHEMA = `
     metadata_json TEXT NOT NULL DEFAULT '{}'
   );
 
-  CREATE INDEX IF NOT EXISTS qe_knowledge_source_hash_idx ON qe_knowledge_sources(content_hash);
+  CREATE INDEX IF NOT EXISTS sigma_core_knowledge_source_hash_idx ON sigma_core_knowledge_sources(content_hash);
 
-  CREATE TABLE IF NOT EXISTS qe_knowledge_staging (
+  CREATE TABLE IF NOT EXISTS sigma_core_knowledge_staging (
     id TEXT PRIMARY KEY,
     status TEXT NOT NULL CHECK (status IN ('draft', 'approved', 'rejected')),
     source_path TEXT NOT NULL,
@@ -162,9 +162,9 @@ const CORE_SCHEMA = `
     segments_json TEXT NOT NULL
   );
 
-  CREATE INDEX IF NOT EXISTS qe_knowledge_staging_status_idx ON qe_knowledge_staging(status, updated_at);
+  CREATE INDEX IF NOT EXISTS sigma_core_knowledge_staging_status_idx ON sigma_core_knowledge_staging(status, updated_at);
 
-  CREATE TABLE IF NOT EXISTS qe_knowledge_learning_feedback (
+  CREATE TABLE IF NOT EXISTS sigma_core_knowledge_learning_feedback (
     id TEXT PRIMARY KEY,
     query_text TEXT NOT NULL,
     source_id TEXT,
@@ -175,11 +175,11 @@ const CORE_SCHEMA = `
     metadata_json TEXT NOT NULL DEFAULT '{}'
   );
 
-  CREATE INDEX IF NOT EXISTS qe_learning_feedback_created_idx ON qe_knowledge_learning_feedback(created_at);
+  CREATE INDEX IF NOT EXISTS sigma_core_learning_feedback_created_idx ON sigma_core_knowledge_learning_feedback(created_at);
 
-  CREATE TABLE IF NOT EXISTS qe_knowledge_pages (
+  CREATE TABLE IF NOT EXISTS sigma_core_knowledge_pages (
     id TEXT PRIMARY KEY,
-    source_id TEXT NOT NULL REFERENCES qe_knowledge_sources(id) ON DELETE CASCADE,
+    source_id TEXT NOT NULL REFERENCES sigma_core_knowledge_sources(id) ON DELETE CASCADE,
     page_number INTEGER NOT NULL CHECK (page_number > 0),
     semantic_type TEXT NOT NULL DEFAULT 'unknown',
     title TEXT,
@@ -191,9 +191,9 @@ const CORE_SCHEMA = `
     UNIQUE(source_id, page_number)
   );
 
-  CREATE INDEX IF NOT EXISTS qe_knowledge_pages_source_idx ON qe_knowledge_pages(source_id, page_number);
+  CREATE INDEX IF NOT EXISTS sigma_core_knowledge_pages_source_idx ON sigma_core_knowledge_pages(source_id, page_number);
 
-  CREATE VIRTUAL TABLE IF NOT EXISTS qe_knowledge_pages_fts USING fts5(
+  CREATE VIRTUAL TABLE IF NOT EXISTS sigma_core_knowledge_pages_fts USING fts5(
     page_id UNINDEXED,
     source_id UNINDEXED,
     page_number UNINDEXED,
@@ -203,7 +203,7 @@ const CORE_SCHEMA = `
 
   -- Vector persistence is owned by @sigma-studio/sigma-core (sigma_core_vector_records).
 
-  CREATE TABLE IF NOT EXISTS qe_conversation_entries (
+  CREATE TABLE IF NOT EXISTS sigma_core_conversation_entries (
     id TEXT PRIMARY KEY,
     conversation_id TEXT NOT NULL,
     role TEXT NOT NULL CHECK (role IN ('user', 'assistant', 'system', 'tool')),
@@ -213,14 +213,14 @@ const CORE_SCHEMA = `
     metadata_json TEXT NOT NULL DEFAULT '{}'
   );
 
-  CREATE INDEX IF NOT EXISTS qe_conversation_recent_idx ON qe_conversation_entries(conversation_id, created_at);
-  CREATE VIRTUAL TABLE IF NOT EXISTS qe_conversation_entries_fts USING fts5(
+  CREATE INDEX IF NOT EXISTS sigma_core_conversation_recent_idx ON sigma_core_conversation_entries(conversation_id, created_at);
+  CREATE VIRTUAL TABLE IF NOT EXISTS sigma_core_conversation_entries_fts USING fts5(
     entry_id UNINDEXED,
     conversation_id UNINDEXED,
     content
   );
 
-  CREATE TABLE IF NOT EXISTS qe_long_term_memories (
+  CREATE TABLE IF NOT EXISTS sigma_core_long_term_memories (
     id TEXT PRIMARY KEY,
     content TEXT NOT NULL,
     conversation_id TEXT NOT NULL,
@@ -232,9 +232,9 @@ const CORE_SCHEMA = `
     UNIQUE(content, conversation_id)
   );
 
-  CREATE INDEX IF NOT EXISTS qe_long_term_memories_updated_idx ON qe_long_term_memories(updated_at);
+  CREATE INDEX IF NOT EXISTS sigma_core_long_term_memories_updated_idx ON sigma_core_long_term_memories(updated_at);
 
-  CREATE TABLE IF NOT EXISTS qe_research_sessions (
+  CREATE TABLE IF NOT EXISTS sigma_core_research_sessions (
     id TEXT PRIMARY KEY,
     title TEXT NOT NULL,
     query_text TEXT NOT NULL,
@@ -243,57 +243,57 @@ const CORE_SCHEMA = `
     updated_at TEXT NOT NULL
   );
 
-  CREATE INDEX IF NOT EXISTS qe_research_sessions_updated_idx ON qe_research_sessions(updated_at);
+  CREATE INDEX IF NOT EXISTS sigma_core_research_sessions_updated_idx ON sigma_core_research_sessions(updated_at);
 
-  CREATE VIRTUAL TABLE IF NOT EXISTS qe_questions_fts USING fts5(
+  CREATE VIRTUAL TABLE IF NOT EXISTS sigma_core_questions_fts USING fts5(
     question_id UNINDEXED,
     title,
     body_text,
     tags_text
   );
 
-  CREATE TRIGGER IF NOT EXISTS qe_questions_fts_ai AFTER INSERT ON qe_questions BEGIN
-    INSERT INTO qe_questions_fts(question_id, title, body_text, tags_text)
+  CREATE TRIGGER IF NOT EXISTS sigma_core_questions_fts_ai AFTER INSERT ON sigma_core_questions BEGIN
+    INSERT INTO sigma_core_questions_fts(question_id, title, body_text, tags_text)
     VALUES (new.id, new.title, new.body_json, '');
   END;
 
-  CREATE TRIGGER IF NOT EXISTS qe_questions_fts_ad AFTER DELETE ON qe_questions BEGIN
-    DELETE FROM qe_questions_fts WHERE question_id = old.id;
+  CREATE TRIGGER IF NOT EXISTS sigma_core_questions_fts_ad AFTER DELETE ON sigma_core_questions BEGIN
+    DELETE FROM sigma_core_questions_fts WHERE question_id = old.id;
   END;
 
-  CREATE TRIGGER IF NOT EXISTS qe_questions_fts_au AFTER UPDATE ON qe_questions BEGIN
-    DELETE FROM qe_questions_fts WHERE question_id = old.id;
-    INSERT INTO qe_questions_fts(question_id, title, body_text, tags_text)
+  CREATE TRIGGER IF NOT EXISTS sigma_core_questions_fts_au AFTER UPDATE ON sigma_core_questions BEGIN
+    DELETE FROM sigma_core_questions_fts WHERE question_id = old.id;
+    INSERT INTO sigma_core_questions_fts(question_id, title, body_text, tags_text)
     VALUES (new.id, new.title, new.body_json, '');
   END;
 
-  CREATE TRIGGER IF NOT EXISTS qe_knowledge_pages_fts_ai AFTER INSERT ON qe_knowledge_pages BEGIN
-    INSERT INTO qe_knowledge_pages_fts(page_id, source_id, page_number, title, text_content)
+  CREATE TRIGGER IF NOT EXISTS sigma_core_knowledge_pages_fts_ai AFTER INSERT ON sigma_core_knowledge_pages BEGIN
+    INSERT INTO sigma_core_knowledge_pages_fts(page_id, source_id, page_number, title, text_content)
     VALUES (new.id, new.source_id, new.page_number, COALESCE(new.title, ''), new.text_content);
   END;
 
-  CREATE TRIGGER IF NOT EXISTS qe_knowledge_pages_fts_ad AFTER DELETE ON qe_knowledge_pages BEGIN
-    DELETE FROM qe_knowledge_pages_fts WHERE page_id = old.id;
+  CREATE TRIGGER IF NOT EXISTS sigma_core_knowledge_pages_fts_ad AFTER DELETE ON sigma_core_knowledge_pages BEGIN
+    DELETE FROM sigma_core_knowledge_pages_fts WHERE page_id = old.id;
   END;
 
-  CREATE TRIGGER IF NOT EXISTS qe_knowledge_pages_fts_au AFTER UPDATE ON qe_knowledge_pages BEGIN
-    DELETE FROM qe_knowledge_pages_fts WHERE page_id = old.id;
-    INSERT INTO qe_knowledge_pages_fts(page_id, source_id, page_number, title, text_content)
+  CREATE TRIGGER IF NOT EXISTS sigma_core_knowledge_pages_fts_au AFTER UPDATE ON sigma_core_knowledge_pages BEGIN
+    DELETE FROM sigma_core_knowledge_pages_fts WHERE page_id = old.id;
+    INSERT INTO sigma_core_knowledge_pages_fts(page_id, source_id, page_number, title, text_content)
     VALUES (new.id, new.source_id, new.page_number, COALESCE(new.title, ''), new.text_content);
   END;
 
-  CREATE TRIGGER IF NOT EXISTS qe_conversation_entries_fts_ai AFTER INSERT ON qe_conversation_entries BEGIN
-    INSERT INTO qe_conversation_entries_fts(entry_id, conversation_id, content)
+  CREATE TRIGGER IF NOT EXISTS sigma_core_conversation_entries_fts_ai AFTER INSERT ON sigma_core_conversation_entries BEGIN
+    INSERT INTO sigma_core_conversation_entries_fts(entry_id, conversation_id, content)
     VALUES (new.id, new.conversation_id, new.content);
   END;
 
-  CREATE TRIGGER IF NOT EXISTS qe_conversation_entries_fts_ad AFTER DELETE ON qe_conversation_entries BEGIN
-    DELETE FROM qe_conversation_entries_fts WHERE entry_id = old.id;
+  CREATE TRIGGER IF NOT EXISTS sigma_core_conversation_entries_fts_ad AFTER DELETE ON sigma_core_conversation_entries BEGIN
+    DELETE FROM sigma_core_conversation_entries_fts WHERE entry_id = old.id;
   END;
 
-  CREATE TRIGGER IF NOT EXISTS qe_conversation_entries_fts_au AFTER UPDATE ON qe_conversation_entries BEGIN
-    DELETE FROM qe_conversation_entries_fts WHERE entry_id = old.id;
-    INSERT INTO qe_conversation_entries_fts(entry_id, conversation_id, content)
+  CREATE TRIGGER IF NOT EXISTS sigma_core_conversation_entries_fts_au AFTER UPDATE ON sigma_core_conversation_entries BEGIN
+    DELETE FROM sigma_core_conversation_entries_fts WHERE entry_id = old.id;
+    INSERT INTO sigma_core_conversation_entries_fts(entry_id, conversation_id, content)
     VALUES (new.id, new.conversation_id, new.content);
   END;
 `;
@@ -301,7 +301,7 @@ const CORE_SCHEMA = `
 export function initializeQuestionEngineSchema(db: SqliteSchemaDriver, now = new Date().toISOString()): void {
   db.exec("PRAGMA foreign_keys = ON;");
   db.exec(MIGRATION_TABLE);
-  const current = db.prepare("SELECT MAX(version) AS version FROM qe_schema_migrations").get() as
+  const current = db.prepare("SELECT MAX(version) AS version FROM sigma_core_schema_migrations").get() as
     | { version?: number | null }
     | undefined;
   const version = Number(current?.version ?? 0);
@@ -314,8 +314,8 @@ export function initializeQuestionEngineSchema(db: SqliteSchemaDriver, now = new
     db.exec(CORE_SCHEMA);
     // The legacy Question Engine vector table is retired; SIGMA Core owns vector persistence.
     // This intentionally drops only obsolete vector rows, not knowledge pages or source metadata.
-    db.exec("DROP TABLE IF EXISTS qe_vector_records;");
-    db.prepare("INSERT INTO qe_schema_migrations(version, applied_at) VALUES (?, ?)").run(
+    db.exec("DROP TABLE IF EXISTS sigma_core_vector_records;");
+    db.prepare("INSERT INTO sigma_core_schema_migrations(version, applied_at) VALUES (?, ?)").run(
       QUESTION_ENGINE_SCHEMA_VERSION,
       now,
     );
