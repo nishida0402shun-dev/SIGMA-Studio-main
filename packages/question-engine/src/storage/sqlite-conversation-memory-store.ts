@@ -40,7 +40,7 @@ export class SqliteConversationMemoryStore {
       createdAt: new Date().toISOString(),
     };
     this.insert(entry);
-    this.prune(entry.conversationId);
+    this.prune();
     return entry;
   }
 
@@ -97,13 +97,21 @@ export class SqliteConversationMemoryStore {
         rows = [];
       }
     }
-    if (rows.length === 0) {
+    // Always add a LIKE-based candidate pass: unicode61 does not reliably segment
+    // Japanese text, and an FTS partial hit must not hide other matching entries.
+    const likeTokens = [...new Set([normalized, ...tokens])].slice(0, 65);
+    if (likeTokens.length) {
+      const predicate = likeTokens.map(() => "content LIKE ? ESCAPE '\\\\'").join(" OR ");
       const sql = conversationId
-        ? "SELECT * FROM qe_conversation_entries WHERE conversation_id = ? AND content LIKE ? ORDER BY created_at DESC LIMIT 500"
-        : "SELECT * FROM qe_conversation_entries WHERE content LIKE ? ORDER BY created_at DESC LIMIT 500";
-      rows = (conversationId
-        ? this.db.prepare(sql).all(conversationId, "%" + escapeLike(normalized) + "%")
-        : this.db.prepare(sql).all("%" + escapeLike(normalized) + "%")) as EntryRow[];
+        ? `SELECT * FROM qe_conversation_entries WHERE conversation_id = ? AND (${predicate}) ORDER BY created_at DESC LIMIT 500`
+        : `SELECT * FROM qe_conversation_entries WHERE ${predicate} ORDER BY created_at DESC LIMIT 500`;
+      const parameters = likeTokens.map((token) => "%" + escapeLike(token) + "%");
+      const likeRows = (conversationId
+        ? this.db.prepare(sql).all(conversationId, ...parameters)
+        : this.db.prepare(sql).all(...parameters)) as EntryRow[];
+      const merged = new Map(rows.map((row) => [row.id, row]));
+      for (const row of likeRows) merged.set(row.id, row);
+      rows = [...merged.values()];
     }
 
     const now = Date.now();
@@ -135,16 +143,15 @@ export class SqliteConversationMemoryStore {
     );
   }
 
-  private prune(conversationId: string): void {
+  private prune(): void {
     this.db.prepare(`
       DELETE FROM qe_conversation_entries
       WHERE id IN (
         SELECT id FROM qe_conversation_entries
-        WHERE conversation_id = ?
         ORDER BY created_at DESC, rowid DESC
         LIMIT -1 OFFSET ?
       )
-    `).run(conversationId, MAX_ENTRIES);
+    `).run(MAX_ENTRIES);
   }
 }
 
