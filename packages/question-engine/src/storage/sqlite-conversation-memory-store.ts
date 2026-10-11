@@ -65,7 +65,7 @@ export class SqliteConversationMemoryStore {
       metadata: { ...entryInput.metadata, captureKey },
     };
     this.insert(entry);
-    this.prune(entry.conversationId);
+    this.prune();
     return entry;
   }
 
