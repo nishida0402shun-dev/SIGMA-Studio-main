@@ -1,6 +1,7 @@
 import os from "node:os";
 import path from "node:path";
 import type { DatabaseSync } from "node:sqlite";
+import { SqliteVectorIndex, type VectorRecord as CoreVectorRecord } from "../../../packages/sigma-core/src/index";
 
 export interface VectorRecord {
   id: string;
@@ -114,7 +115,11 @@ async function embedDocuments(texts: string[]): Promise<number[][]> {
 }
 
 export class LocalVectorIndex {
-  constructor(private readonly db: DatabaseSync) {}
+  private readonly coreIndex: SqliteVectorIndex;
+
+  constructor(db: DatabaseSync) {
+    this.coreIndex = new SqliteVectorIndex(db);
+  }
 
   async upsert(record: Omit<VectorRecord, "vector">): Promise<void> {
     await this.upsertMany([record]);
@@ -126,72 +131,53 @@ export class LocalVectorIndex {
     for (let start = 0; start < records.length; start += 32) {
       vectors.push(...await embedDocuments(records.slice(start, start + 32).map((record) => record.text)));
     }
-    const now = new Date().toISOString();
-    const upsert = this.db.prepare(`
-      INSERT INTO qe_vector_records
-        (id, source_id, page_number, chunk_index, model, dimensions, vector_json, text_content, updated_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-      ON CONFLICT(source_id, page_number, chunk_index, model) DO UPDATE SET
-        id = excluded.id,
-        dimensions = excluded.dimensions,
-        vector_json = excluded.vector_json,
-        text_content = excluded.text_content,
-        updated_at = excluded.updated_at
-    `);
-    this.db.exec("BEGIN IMMEDIATE");
-    try {
-      records.forEach((record, index) => {
-        const vector = vectors[index];
-        if (!vector || vector.length !== DIMENSIONS || vector.some((value) => !Number.isFinite(value))) {
-          throw new Error("Embedding model returned an invalid vector");
-        }
-        upsert.run(record.id, record.sourceId, record.pageNumber, record.chunkIndex, MODEL,
-          DIMENSIONS, JSON.stringify(vector), record.text, now);
-      });
-      this.db.exec("COMMIT");
-    } catch (error) {
-      this.db.exec("ROLLBACK");
-      throw error;
-    }
+    const coreRecords: CoreVectorRecord[] = records.map((record, index) => {
+      const vector = vectors[index];
+      if (!vector || vector.length !== DIMENSIONS || vector.some((value) => !Number.isFinite(value))) {
+        throw new Error("Embedding model returned an invalid vector");
+      }
+      return {
+        id: record.id,
+        text: record.text,
+        source: {
+          sourceId: record.sourceId,
+          displayName: record.sourceId,
+          pageNumber: record.pageNumber,
+          chunkIndex: record.chunkIndex,
+        },
+        embeddingModel: MODEL,
+        dimensions: DIMENSIONS,
+        vector,
+      };
+    });
+    await this.coreIndex.upsertMany(coreRecords);
   }
 
   async hasSource(sourceId: string): Promise<boolean> {
-    const row = this.db.prepare("SELECT 1 AS found FROM qe_vector_records WHERE source_id = ? LIMIT 1").get(sourceId) as { found?: number } | undefined;
-    return Boolean(row?.found);
+    return this.coreIndex.hasSource(sourceId);
   }
 
   async removeSource(sourceId: string): Promise<void> {
-    this.db.prepare("DELETE FROM qe_vector_records WHERE source_id = ?").run(sourceId);
+    await this.coreIndex.removeSource(sourceId);
   }
 
   async search(query: string, limit = 12): Promise<VectorSearchResult[]> {
     const normalized = query.trim();
     if (!normalized) return [];
     const queryVector = await embedText(normalized, "query");
-    const rows = this.db.prepare(
-      "SELECT id, source_id, page_number, chunk_index, text_content, vector_json FROM qe_vector_records WHERE model = ? AND dimensions = ?",
-    ).all(MODEL, DIMENSIONS) as Array<{
-      id: string; source_id: string; page_number: number; chunk_index: number; text_content: string; vector_json: string;
-    }>;
-    return rows.map((row) => {
-      const { vector_json: vectorJson, ...record } = row;
-      const vector = JSON.parse(vectorJson) as number[];
-      return {
-        id: record.id,
-        sourceId: record.source_id,
-        pageNumber: record.page_number,
-        chunkIndex: record.chunk_index,
-        text: record.text_content,
-        score: cosine(queryVector, vector),
-      };
-    }).filter((item) => item.score > 0)
-      .sort((a, b) => b.score - a.score)
-      .slice(0, Math.max(1, Math.min(Math.trunc(limit) || 1, 50)));
+    const matches = await this.coreIndex.searchWithScores({ vector: queryVector, limit: Math.max(1, Math.min(Math.trunc(limit) || 1, 50)) });
+    return matches.map(({ record, score }) => ({
+      id: record.id,
+      sourceId: record.source.sourceId,
+      pageNumber: record.source.pageNumber ?? 1,
+      chunkIndex: record.source.chunkIndex ?? 0,
+      text: record.text,
+      score,
+    })).filter((item) => item.score > 0);
   }
 
   async hasRecords(): Promise<boolean> {
-    const row = this.db.prepare("SELECT 1 AS found FROM qe_vector_records LIMIT 1").get() as { found?: number } | undefined;
-    return Boolean(row?.found);
+    return this.coreIndex.hasRecords();
   }
 }
 
