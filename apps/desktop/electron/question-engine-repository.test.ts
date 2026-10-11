@@ -2,7 +2,7 @@ import { mkdtemp, rm } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
-import { openSigmaCoreDatabase, SqliteQuestionRepository, type SigmaCoreDatabase } from "../../../packages/sigma-core/src/index";
+import { openSigmaCoreDatabase, SqliteQuestionRepository, SIGMA_CORE_SCHEMA_VERSION, type SigmaCoreDatabase } from "../../../packages/sigma-core/src/index";
 
 describe("SqliteQuestionRepository", () => {
   let dir: string | undefined;
@@ -46,7 +46,7 @@ describe("SqliteQuestionRepository", () => {
     const migration = database.raw.prepare(
       "SELECT MAX(version) AS version FROM sigma_core_schema_migrations",
     ).get() as { version: number };
-    expect(migration.version).toBe(6);
+    expect(migration.version).toBe(SIGMA_CORE_SCHEMA_VERSION);
   });
 
   it("creates, searches, updates with optimistic locking, and deletes questions", async () => {
