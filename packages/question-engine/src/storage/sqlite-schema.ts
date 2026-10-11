@@ -16,7 +16,7 @@ export interface SqliteSchemaDriver {
   transaction<T extends (...args: never[]) => unknown>(operation: T): T;
 }
 
-export const QUESTION_ENGINE_SCHEMA_VERSION = 5;
+export const QUESTION_ENGINE_SCHEMA_VERSION = 6;
 
 const MIGRATION_TABLE = `
   CREATE TABLE IF NOT EXISTS qe_schema_migrations (
@@ -312,6 +312,9 @@ export function initializeQuestionEngineSchema(db: SqliteSchemaDriver, now = new
 
   const apply = () => {
     db.exec(CORE_SCHEMA);
+    // The legacy Question Engine vector table is retired; SIGMA Core owns vector persistence.
+    // This intentionally drops only obsolete vector rows, not knowledge pages or source metadata.
+    db.exec("DROP TABLE IF EXISTS qe_vector_records;");
     db.prepare("INSERT INTO qe_schema_migrations(version, applied_at) VALUES (?, ?)").run(
       QUESTION_ENGINE_SCHEMA_VERSION,
       now,
