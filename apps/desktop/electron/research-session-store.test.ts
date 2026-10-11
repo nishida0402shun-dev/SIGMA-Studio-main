@@ -3,7 +3,7 @@ import os from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import { openSigmaCoreDatabase } from "../../../packages/sigma-core/src/index";
-import { ResearchSessionStore } from "./research-session-store";
+import { SqliteResearchSessionStore as ResearchSessionStore } from "../../../packages/sigma-core/src/storage/sqlite-research-session-store";
 
 let dir: string | undefined;
 let database: ReturnType<typeof openSigmaCoreDatabase> | undefined;
