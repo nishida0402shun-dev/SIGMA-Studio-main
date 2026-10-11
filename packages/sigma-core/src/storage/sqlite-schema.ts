@@ -312,6 +312,38 @@ const CORE_SCHEMA = `
   END;
 `;
 
+const RETIRED_QUESTION_ENGINE_TABLES = [
+  "qe_vector_records",
+  "qe_knowledge_pages_fts",
+  "qe_conversation_entries_fts",
+  "qe_questions_fts",
+  "qe_question_tags",
+  "qe_question_sources",
+  "qe_question_versions",
+  "qe_import_proposals",
+  "qe_question_attempts",
+  "qe_knowledge_pages",
+  "qe_knowledge_sources",
+  "qe_knowledge_staging",
+  "qe_knowledge_learning_feedback",
+  "qe_conversation_entries",
+  "qe_long_term_memories",
+  "qe_research_sessions",
+  "qe_questions",
+  "qe_sources",
+  "qe_tags",
+  "qe_import_jobs",
+  "qe_knowledge_state",
+  "qe_schema_migrations",
+] as const;
+
+function dropRetiredQuestionEngineTables(db: SqliteSchemaDriver): void {
+  // These records belong to the explicitly retired implementation and are not migrated.
+  for (const table of RETIRED_QUESTION_ENGINE_TABLES) {
+    db.exec(`DROP TABLE IF EXISTS ${table};`);
+  }
+}
+
 export function initializeSigmaCoreSchema(db: SqliteSchemaDriver, now = new Date().toISOString()): void {
   db.exec("PRAGMA foreign_keys = ON;");
   db.exec(MIGRATION_TABLE);
@@ -322,41 +354,18 @@ export function initializeSigmaCoreSchema(db: SqliteSchemaDriver, now = new Date
   if (version > SIGMA_CORE_SCHEMA_VERSION) {
     throw new Error(`SIGMA Core DB schema version ${version} is newer than this application supports (${SIGMA_CORE_SCHEMA_VERSION})`);
   }
-  if (version === SIGMA_CORE_SCHEMA_VERSION) return;
+
+  if (version === SIGMA_CORE_SCHEMA_VERSION) {
+    // Enforce retirement even for databases that were stamped with the current version
+    // before all legacy cleanup had landed.
+    db.transaction(() => dropRetiredQuestionEngineTables(db))();
+    return;
+  }
 
   const apply = () => {
     db.exec(CORE_SCHEMA);
-    // The legacy Question Engine vector table is retired; SIGMA Core owns vector persistence.
-    // This intentionally drops only obsolete vector rows, not knowledge pages or source metadata.
-    db.exec("DROP TABLE IF EXISTS qe_vector_records;");
-
-    // Retire the former Question Engine schema completely. Existing local DB data is intentionally not migrated.
-    for (const table of [
-      "qe_knowledge_pages_fts",
-      "qe_conversation_entries_fts",
-      "qe_questions_fts",
-      "qe_question_tags",
-      "qe_question_sources",
-      "qe_question_versions",
-      "qe_import_proposals",
-      "qe_question_attempts",
-      "qe_knowledge_pages",
-      "qe_knowledge_sources",
-      "qe_knowledge_staging",
-      "qe_knowledge_learning_feedback",
-      "qe_conversation_entries",
-      "qe_long_term_memories",
-      "qe_research_sessions",
-      "qe_questions",
-      "qe_sources",
-      "qe_tags",
-      "qe_import_jobs",
-      "qe_knowledge_state",
-      "qe_schema_migrations",
-    ]) {
-      db.exec(`DROP TABLE IF EXISTS ${table};`);
-    }
-
+    // Existing local Question Engine records are intentionally not migrated.
+    dropRetiredQuestionEngineTables(db);
     db.prepare("INSERT INTO sigma_core_schema_migrations(version, applied_at) VALUES (?, ?)").run(
       SIGMA_CORE_SCHEMA_VERSION,
       now,
