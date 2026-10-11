@@ -67,15 +67,15 @@ function seedLibrary(dataDir: string, fixture: { version?: number; sources: Fixt
   const db = getDatabase(dataDir).raw;
   db.exec("BEGIN IMMEDIATE");
   try {
-    db.exec("DELETE FROM qe_knowledge_sources");
+    db.exec("DELETE FROM sigma_core_knowledge_sources");
     const insertSource = db.prepare(`
-      INSERT INTO qe_knowledge_sources
+      INSERT INTO sigma_core_knowledge_sources
         (id, display_name, original_uri, stored_uri, mime_type, size_bytes, content_hash,
          page_count, extraction_status, imported_at, updated_at, metadata_json)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
     const insertPage = db.prepare(`
-      INSERT INTO qe_knowledge_pages
+      INSERT INTO sigma_core_knowledge_pages
         (id, source_id, page_number, semantic_type, title, text_content, extraction_status,
          structure_json, analysis_json, updated_at)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
