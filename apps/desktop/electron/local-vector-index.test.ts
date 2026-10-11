@@ -14,7 +14,7 @@ describe("LocalVectorIndex", () => {
     await Promise.all(tempDirs.splice(0).map((dir) => rm(dir, { recursive: true, force: true })));
   });
 
-  async function createIndex(sourceIds: string[]) {
+  async function createIndex() {
     const root = await mkdtemp(path.join(os.tmpdir(), "sigma-vector-"));
     tempDirs.push(root);
     const database = openSigmaCoreDatabase({ dataDir: root });
@@ -31,7 +31,7 @@ describe("LocalVectorIndex", () => {
   });
 
   it("serializes concurrent upserts from independent index instances", async () => {
-    const { database, index } = await createIndex(["source-a", "source-b"]);
+    const { database, index } = await createIndex();
     const second = new LocalVectorIndex(database.raw);
     await Promise.all([
       index.upsert({ id: "page-a", sourceId: "source-a", pageNumber: 1, chunkIndex: 0, text: "二次関数の頂点" }),
