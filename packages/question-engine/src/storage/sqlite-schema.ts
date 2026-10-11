@@ -124,6 +124,93 @@ const CORE_SCHEMA = `
 
   CREATE INDEX IF NOT EXISTS qe_attempts_question_time_idx ON qe_question_attempts(question_id, answered_at);
 
+  CREATE TABLE IF NOT EXISTS qe_knowledge_sources (
+    id TEXT PRIMARY KEY,
+    display_name TEXT NOT NULL,
+    original_uri TEXT NOT NULL,
+    stored_uri TEXT NOT NULL,
+    mime_type TEXT NOT NULL,
+    size_bytes INTEGER NOT NULL CHECK (size_bytes >= 0),
+    content_hash TEXT NOT NULL,
+    page_count INTEGER NOT NULL CHECK (page_count >= 0),
+    extraction_status TEXT NOT NULL CHECK (extraction_status IN ('complete', 'partial', 'ocr-needed', 'failed')),
+    imported_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    metadata_json TEXT NOT NULL DEFAULT '{}'
+  );
+
+  CREATE INDEX IF NOT EXISTS qe_knowledge_source_hash_idx ON qe_knowledge_sources(content_hash);
+
+  CREATE TABLE IF NOT EXISTS qe_knowledge_pages (
+    id TEXT PRIMARY KEY,
+    source_id TEXT NOT NULL REFERENCES qe_knowledge_sources(id) ON DELETE CASCADE,
+    page_number INTEGER NOT NULL CHECK (page_number > 0),
+    semantic_type TEXT NOT NULL DEFAULT 'unknown',
+    title TEXT,
+    text_content TEXT NOT NULL DEFAULT '',
+    extraction_status TEXT NOT NULL CHECK (extraction_status IN ('text', 'ocr-needed', 'empty')),
+    structure_json TEXT NOT NULL DEFAULT '[]',
+    analysis_json TEXT NOT NULL DEFAULT '{}',
+    updated_at TEXT NOT NULL,
+    UNIQUE(source_id, page_number)
+  );
+
+  CREATE INDEX IF NOT EXISTS qe_knowledge_pages_source_idx ON qe_knowledge_pages(source_id, page_number);
+
+  CREATE VIRTUAL TABLE IF NOT EXISTS qe_knowledge_pages_fts USING fts5(
+    page_id UNINDEXED,
+    source_id UNINDEXED,
+    page_number UNINDEXED,
+    title,
+    text_content
+  );
+
+  CREATE TABLE IF NOT EXISTS qe_vector_records (
+    id TEXT PRIMARY KEY,
+    source_id TEXT NOT NULL REFERENCES qe_knowledge_sources(id) ON DELETE CASCADE,
+    page_number INTEGER NOT NULL CHECK (page_number > 0),
+    chunk_index INTEGER NOT NULL CHECK (chunk_index >= 0),
+    model TEXT NOT NULL,
+    dimensions INTEGER NOT NULL CHECK (dimensions > 0),
+    vector_json TEXT NOT NULL,
+    text_content TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    UNIQUE(source_id, page_number, chunk_index, model)
+  );
+
+  CREATE INDEX IF NOT EXISTS qe_vector_records_source_idx ON qe_vector_records(source_id, page_number);
+
+  CREATE TABLE IF NOT EXISTS qe_conversation_entries (
+    id TEXT PRIMARY KEY,
+    conversation_id TEXT NOT NULL,
+    role TEXT NOT NULL CHECK (role IN ('user', 'assistant', 'system', 'tool')),
+    content TEXT NOT NULL,
+    provider TEXT,
+    created_at TEXT NOT NULL,
+    metadata_json TEXT NOT NULL DEFAULT '{}'
+  );
+
+  CREATE INDEX IF NOT EXISTS qe_conversation_recent_idx ON qe_conversation_entries(conversation_id, created_at);
+  CREATE VIRTUAL TABLE IF NOT EXISTS qe_conversation_entries_fts USING fts5(
+    entry_id UNINDEXED,
+    conversation_id UNINDEXED,
+    content
+  );
+
+  CREATE TABLE IF NOT EXISTS qe_long_term_memories (
+    id TEXT PRIMARY KEY,
+    content TEXT NOT NULL,
+    conversation_id TEXT NOT NULL,
+    source_entry_id TEXT NOT NULL,
+    provider TEXT,
+    confidence REAL NOT NULL CHECK (confidence >= 0 AND confidence <= 1),
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    UNIQUE(content, conversation_id)
+  );
+
+  CREATE INDEX IF NOT EXISTS qe_long_term_memories_updated_idx ON qe_long_term_memories(updated_at);
+
   CREATE VIRTUAL TABLE IF NOT EXISTS qe_questions_fts USING fts5(
     question_id UNINDEXED,
     title,
