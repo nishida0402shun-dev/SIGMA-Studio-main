@@ -16,7 +16,7 @@ export interface SqliteSchemaDriver {
   transaction<T extends (...args: never[]) => unknown>(operation: T): T;
 }
 
-export const SIGMA_CORE_SCHEMA_VERSION = 7;
+export const SIGMA_CORE_SCHEMA_VERSION = 8;
 
 const MIGRATION_TABLE = `
   CREATE TABLE IF NOT EXISTS sigma_core_schema_migrations (
@@ -41,10 +41,7 @@ const CORE_SCHEMA = `
 
   CREATE TABLE IF NOT EXISTS sigma_core_questions (
     id TEXT PRIMARY KEY,
-    title TEXT NOT NULL DEFAULT '',
-    body_format TEXT NOT NULL CHECK (body_format IN ('sigma-document', 'markdown', 'plain-text')),
-    body_json TEXT NOT NULL,
-    answer_json TEXT,
+    title TEXT NOT NULL,
     difficulty INTEGER CHECK (difficulty BETWEEN 1 AND 5),
     review_status TEXT NOT NULL CHECK (review_status IN ('draft', 'needs-review', 'approved', 'rejected')),
     version INTEGER NOT NULL DEFAULT 1 CHECK (version > 0),
@@ -54,6 +51,22 @@ const CORE_SCHEMA = `
 
   CREATE INDEX IF NOT EXISTS sigma_core_questions_review_idx ON sigma_core_questions(review_status);
   CREATE INDEX IF NOT EXISTS sigma_core_questions_difficulty_idx ON sigma_core_questions(difficulty);
+
+  CREATE TABLE IF NOT EXISTS sigma_core_question_contents (
+    question_id TEXT PRIMARY KEY REFERENCES sigma_core_questions(id) ON DELETE CASCADE,
+    body_format TEXT NOT NULL CHECK (body_format IN ('sigma-document', 'markdown', 'plain-text')),
+    body_json TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+  );
+
+  CREATE TABLE IF NOT EXISTS sigma_core_question_answers (
+    question_id TEXT PRIMARY KEY REFERENCES sigma_core_questions(id) ON DELETE CASCADE,
+    answer_content_json TEXT NOT NULL,
+    verification TEXT NOT NULL CHECK (verification IN ('unverified', 'ai-proposed', 'source-checked', 'human-verified')),
+    evidence_source_ids_json TEXT NOT NULL DEFAULT '[]',
+    explanation_json TEXT,
+    updated_at TEXT NOT NULL
+  );
 
   CREATE TABLE IF NOT EXISTS sigma_core_tags (
     id TEXT PRIMARY KEY,
@@ -220,22 +233,24 @@ const CORE_SCHEMA = `
   CREATE TABLE IF NOT EXISTS sigma_core_conversation_entries (
     id TEXT PRIMARY KEY,
     conversation_id TEXT NOT NULL,
+    sequence_no INTEGER NOT NULL CHECK (sequence_no > 0),
     role TEXT NOT NULL CHECK (role IN ('user', 'assistant', 'system', 'tool')),
     content TEXT NOT NULL,
     provider TEXT,
+    capture_key TEXT UNIQUE,
     created_at TEXT NOT NULL,
-    metadata_json TEXT NOT NULL DEFAULT '{}'
+    metadata_json TEXT NOT NULL DEFAULT '{}',
+    UNIQUE(conversation_id, sequence_no)
   );
 
-  CREATE INDEX IF NOT EXISTS sigma_core_conversation_recent_idx ON sigma_core_conversation_entries(conversation_id, created_at);
-  CREATE VIRTUAL TABLE IF NOT EXISTS sigma_core_conversation_entries_fts USING fts5(
-    entry_id UNINDEXED,
-    conversation_id UNINDEXED,
-    content
-  );
+  CREATE INDEX IF NOT EXISTS sigma_core_conversation_recent_idx
+    ON sigma_core_conversation_entries(conversation_id, sequence_no DESC);
 
   CREATE TABLE IF NOT EXISTS sigma_core_long_term_memories (
     id TEXT PRIMARY KEY,
+    memory_key TEXT NOT NULL UNIQUE,
+    content_hash TEXT NOT NULL,
+    normalized_content TEXT NOT NULL,
     content TEXT NOT NULL,
     conversation_id TEXT NOT NULL,
     source_entry_id TEXT NOT NULL,
@@ -243,21 +258,38 @@ const CORE_SCHEMA = `
     confidence REAL NOT NULL CHECK (confidence >= 0 AND confidence <= 1),
     created_at TEXT NOT NULL,
     updated_at TEXT NOT NULL,
-    UNIQUE(content, conversation_id)
+    metadata_json TEXT NOT NULL DEFAULT '{}'
   );
 
-  CREATE INDEX IF NOT EXISTS sigma_core_long_term_memories_updated_idx ON sigma_core_long_term_memories(updated_at);
+  CREATE INDEX IF NOT EXISTS sigma_core_long_term_memories_updated_idx
+    ON sigma_core_long_term_memories(updated_at DESC);
+  CREATE INDEX IF NOT EXISTS sigma_core_long_term_memories_hash_idx
+    ON sigma_core_long_term_memories(content_hash);
 
   CREATE TABLE IF NOT EXISTS sigma_core_research_sessions (
     id TEXT PRIMARY KEY,
     title TEXT NOT NULL,
     query_text TEXT NOT NULL,
-    source_references_json TEXT NOT NULL DEFAULT '[]',
     created_at TEXT NOT NULL,
     updated_at TEXT NOT NULL
   );
 
-  CREATE INDEX IF NOT EXISTS sigma_core_research_sessions_updated_idx ON sigma_core_research_sessions(updated_at);
+  CREATE INDEX IF NOT EXISTS sigma_core_research_sessions_updated_idx
+    ON sigma_core_research_sessions(updated_at DESC);
+
+  CREATE TABLE IF NOT EXISTS sigma_core_research_references (
+    session_id TEXT NOT NULL REFERENCES sigma_core_research_sessions(id) ON DELETE CASCADE,
+    source_id TEXT NOT NULL,
+    source_name TEXT NOT NULL,
+    page_number INTEGER NOT NULL CHECK (page_number > 0),
+    page_id TEXT,
+    position INTEGER NOT NULL CHECK (position >= 0),
+    PRIMARY KEY(session_id, source_id, page_number),
+    UNIQUE(session_id, position)
+  );
+
+  CREATE INDEX IF NOT EXISTS sigma_core_research_references_source_idx
+    ON sigma_core_research_references(source_id, page_number);
 
   CREATE VIRTUAL TABLE IF NOT EXISTS sigma_core_questions_fts USING fts5(
     question_id UNINDEXED,
@@ -265,21 +297,6 @@ const CORE_SCHEMA = `
     body_text,
     tags_text
   );
-
-  CREATE TRIGGER IF NOT EXISTS sigma_core_questions_fts_ai AFTER INSERT ON sigma_core_questions BEGIN
-    INSERT INTO sigma_core_questions_fts(question_id, title, body_text, tags_text)
-    VALUES (new.id, new.title, new.body_json, '');
-  END;
-
-  CREATE TRIGGER IF NOT EXISTS sigma_core_questions_fts_ad AFTER DELETE ON sigma_core_questions BEGIN
-    DELETE FROM sigma_core_questions_fts WHERE question_id = old.id;
-  END;
-
-  CREATE TRIGGER IF NOT EXISTS sigma_core_questions_fts_au AFTER UPDATE ON sigma_core_questions BEGIN
-    DELETE FROM sigma_core_questions_fts WHERE question_id = old.id;
-    INSERT INTO sigma_core_questions_fts(question_id, title, body_text, tags_text)
-    VALUES (new.id, new.title, new.body_json, '');
-  END;
 
   CREATE TRIGGER IF NOT EXISTS sigma_core_knowledge_pages_fts_ai AFTER INSERT ON sigma_core_knowledge_pages BEGIN
     INSERT INTO sigma_core_knowledge_pages_fts(page_id, source_id, page_number, title, text_content)
