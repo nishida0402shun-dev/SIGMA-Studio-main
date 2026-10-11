@@ -94,7 +94,7 @@ export class KnowledgeLearningStore {
     ).all(sourceId ?? null, sourceId ?? null, pageNumber ?? null, pageNumber ?? null,
       normalizedQuery, normalizedQuery) as Array<{ score_delta: number }>;
     const boost = rows.reduce((total, row) => total + row.score_delta, 0);
-    return Math.max(-0.2, Math.min(0.2, score));
+    return Math.max(-0.2, Math.min(0.2, boost));
   }
 }
 
