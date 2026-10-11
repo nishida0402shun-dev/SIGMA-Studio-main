@@ -117,11 +117,6 @@ ipcMain.handle("web-ai:get-preload-url", () => {
   return pathToFileURL(path.join(__dirname, "web-ai-preload.cjs")).toString();
 });
 
-electronIpcMain.handle("web-ai:get-conversation-capture-setting", (event) => {
-  if (!isTrustedWebAiFrame(event)) throw new Error("conversation capture setting is not available for this origin");
-  return readDesktopSettingsSync(SIGMA_STUDIO_DATA_PATH).webAiConversationCaptureEnabled !== false;
-});
-
 electronIpcMain.handle("web-ai:get-bridge-info", (event) => {
   if (!isTrustedWebAiFrame(event) || !webAiBridgeInfo) {
     throw new Error("Web AI bridge is unavailable for this origin");
