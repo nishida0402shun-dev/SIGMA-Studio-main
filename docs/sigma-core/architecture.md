@@ -66,6 +66,17 @@ On feat/question-engine-rebuild, the existing code already contains several piec
 
 These modules have different maturity and test coverage. Their presence is not proof that every path is wired, correct, or verified.
 
+## Implemented in the current foundation branch
+
+The following code is present in `packages/sigma-core/src`:
+
+- `retrieval/hybrid-retriever.ts`: weighted reciprocal-rank fusion for lexical and semantic backends, with source/domain filtering and trace metadata.
+- `knowledge/chunker.ts`: deterministic Unicode-code-point chunking with page/source offsets.
+- `knowledge/document-indexer.ts`: embedding batching, dimension/finite-value validation, cancellation checks, and a single vector-index upsert per page.
+- `knowledge/contracts.ts`: provider-neutral embedding and vector-index ports.
+
+These are Core-level implementations and contracts, not yet wired to the Electron runtime or production database. The vector index and embedding implementations remain injected adapters. The chunker and indexer have unit tests authored; the latest CI run must pass before they are considered verified.
+
 ## Delivery sequence
 
 1. Establish contract tests and module-to-existing-code inventory.
