@@ -69,7 +69,7 @@ import {
   SqliteLongTermMemoryStore,
 } from "../../../packages/sigma-core/src/index";
 import { registerKnowledgeDbIpc } from "./ipc/knowledge-db";
-import { ResearchSessionStore } from "./research-session-store";
+import { SqliteResearchSessionStore as ResearchSessionStore } from "../../../packages/sigma-core/src/storage/sqlite-research-session-store";
 import { registerResearchSessionIpc } from "./ipc/research-session";
 import { documentPathsFromArgv, ExternalDocumentOpenQueue } from "./external-document-open";
 import { registerMaterialsIpc } from "./ipc/materials";
