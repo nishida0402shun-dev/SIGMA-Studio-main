@@ -101,7 +101,7 @@ export class SqliteConversationMemoryStore {
     // Japanese text, and an FTS partial hit must not hide other matching entries.
     const likeTokens = [...new Set([normalized, ...tokens])].slice(0, 65);
     if (likeTokens.length) {
-      const predicate = likeTokens.map(() => "content LIKE ? ESCAPE '\\\\'").join(" OR ");
+      const predicate = likeTokens.map(() => "content LIKE ? ESCAPE '\\'").join(" OR ");
       const sql = conversationId
         ? `SELECT * FROM qe_conversation_entries WHERE conversation_id = ? AND (${predicate}) ORDER BY created_at DESC LIMIT 500`
         : `SELECT * FROM qe_conversation_entries WHERE ${predicate} ORDER BY created_at DESC LIMIT 500`;
