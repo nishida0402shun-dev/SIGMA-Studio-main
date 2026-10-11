@@ -15,14 +15,17 @@ import type { QuestionRepository, QuestionSearchResult } from "../../../question
 type QuestionRow = {
   id: string;
   title: string;
-  body_format: QuestionContent["format"];
-  body_json: string;
-  answer_json: string | null;
   difficulty: number | null;
   review_status: ReviewStatus;
   version: number;
   created_at: string;
   updated_at: string;
+  body_format: QuestionContent["format"];
+  body_json: string;
+  answer_content_json: string | null;
+  verification: QuestionAnswer["verification"] | null;
+  evidence_source_ids_json: string | null;
+  explanation_json: string | null;
 };
 
 type TagRow = { id: string; label: string; taxonomy_path_json: string };
@@ -62,13 +65,12 @@ export class SqliteQuestionRepository implements QuestionRepository {
     this.withTransaction(() => {
       this.database.prepare(
         `INSERT INTO sigma_core_questions
-          (id, title, body_format, body_json, answer_json, difficulty, review_status, version, created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      ).run(
-        record.id, record.title, record.body.format, JSON.stringify(record.body),
-        record.answer ? JSON.stringify(record.answer) : null, record.difficulty ?? null,
-        record.reviewStatus, record.version, record.createdAt, record.updatedAt,
-      );
+          (id, title, difficulty, review_status, version, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      ).run(record.id, record.title, record.difficulty ?? null, record.reviewStatus,
+        record.version, record.createdAt, record.updatedAt);
+      this.writeContent(record);
+      this.writeAnswer(record);
       this.replaceAssociations(record);
       this.writeRevision(record, "created");
     });
@@ -102,14 +104,13 @@ export class SqliteQuestionRepository implements QuestionRepository {
       };
       validateQuestion(next);
 
-      this.database.prepare(
-        `UPDATE sigma_core_questions SET title = ?, body_format = ?, body_json = ?, answer_json = ?,
-          difficulty = ?, review_status = ?, version = ?, updated_at = ? WHERE id = ? AND version = ?`,
-      ).run(
-        next.title, next.body.format, JSON.stringify(next.body),
-        next.answer ? JSON.stringify(next.answer) : null, next.difficulty ?? null,
-        next.reviewStatus, next.version, next.updatedAt, id, expectedVersion,
-      );
+      const updated = this.database.prepare(
+        `UPDATE sigma_core_questions SET title = ?, difficulty = ?, review_status = ?,
+          version = ?, updated_at = ? WHERE id = ? AND version = ?`,
+      ).run(next.title, next.difficulty ?? null, next.reviewStatus, next.version, next.updatedAt, id, expectedVersion) as { changes: number | bigint };
+      if (Number(updated.changes) !== 1) throw new Error("Question version conflict");
+      this.writeContent(next);
+      this.writeAnswer(next);
       this.replaceAssociations(next);
       this.writeRevision(next, "updated");
       result = next;
@@ -119,7 +120,10 @@ export class SqliteQuestionRepository implements QuestionRepository {
   }
 
   async delete(id: string): Promise<void> {
-    this.database.prepare("DELETE FROM sigma_core_questions WHERE id = ?").run(id);
+    this.withTransaction(() => {
+      this.database.prepare("DELETE FROM sigma_core_questions_fts WHERE question_id = ?").run(id);
+      this.database.prepare("DELETE FROM sigma_core_questions WHERE id = ?").run(id);
+    });
   }
 
   async search(query: QuestionSearchQuery): Promise<QuestionSearchResult> {
@@ -130,8 +134,8 @@ export class SqliteQuestionRepository implements QuestionRepository {
       const words = [...new Set(searchText.match(/[a-z0-9]+|[ぁ-んァ-ヶ一-龯]{2,}/giu) ?? [])].slice(0, 32);
       const ftsExpression = words.map((word) => '"' + word.replace(/"/gu, '""') + '"').join(" OR ");
       filters.push(ftsExpression
-        ? "(q.title LIKE ? OR q.body_json LIKE ? OR q.id IN (SELECT question_id FROM sigma_core_questions_fts WHERE sigma_core_questions_fts MATCH ?))"
-        : "(q.title LIKE ? OR q.body_json LIKE ?)");
+        ? "(q.title LIKE ? OR EXISTS (SELECT 1 FROM sigma_core_question_contents qc WHERE qc.question_id = q.id AND qc.body_json LIKE ?) OR q.id IN (SELECT question_id FROM sigma_core_questions_fts WHERE sigma_core_questions_fts MATCH ?))"
+        : "(q.title LIKE ? OR EXISTS (SELECT 1 FROM sigma_core_question_contents qc WHERE qc.question_id = q.id AND qc.body_json LIKE ?))");
       parameters.push(`%${searchText}%`, `%${searchText}%`);
       if (ftsExpression) parameters.push(ftsExpression);
     }
@@ -180,7 +184,7 @@ export class SqliteQuestionRepository implements QuestionRepository {
     const predicates: string[] = [];
     const values: Array<string | number> = [];
     if (query.text?.trim()) {
-      predicates.push("(q.title LIKE ? OR q.body_json LIKE ?)");
+      predicates.push("(q.title LIKE ? OR EXISTS (SELECT 1 FROM sigma_core_question_contents qc WHERE qc.question_id = q.id AND qc.body_json LIKE ?))");
       values.push(`%${query.text.trim()}%`, `%${query.text.trim()}%`);
     }
     if (query.difficultyMin !== undefined) { predicates.push("q.difficulty >= ?"); values.push(query.difficultyMin); }
@@ -212,7 +216,14 @@ export class SqliteQuestionRepository implements QuestionRepository {
   }
 
   private readQuestion(id: string): QuestionRecord | null {
-    const row = this.database.prepare("SELECT * FROM sigma_core_questions WHERE id = ?").get(id) as QuestionRow | undefined;
+    const row = this.database.prepare(
+      `SELECT q.*, c.body_format, c.body_json, a.answer_content_json, a.verification,
+              a.evidence_source_ids_json, a.explanation_json
+       FROM sigma_core_questions q
+       JOIN sigma_core_question_contents c ON c.question_id = q.id
+       LEFT JOIN sigma_core_question_answers a ON a.question_id = q.id
+       WHERE q.id = ?`,
+    ).get(id) as QuestionRow | undefined;
     if (!row) return null;
 
     const tags = this.database.prepare(
@@ -227,7 +238,14 @@ export class SqliteQuestionRepository implements QuestionRepository {
     ).all(id) as SourceRow[];
 
     const body = JSON.parse(row.body_json) as QuestionContent;
-    const answer = row.answer_json ? JSON.parse(row.answer_json) as QuestionAnswer : undefined;
+    const answer = row.answer_content_json && row.verification
+      ? {
+          content: JSON.parse(row.answer_content_json) as QuestionContent,
+          verification: row.verification,
+          evidenceSourceIds: JSON.parse(row.evidence_source_ids_json ?? "[]") as string[],
+          ...(row.explanation_json ? { explanation: JSON.parse(row.explanation_json) as QuestionContent } : {}),
+        } satisfies QuestionAnswer
+      : undefined;
     return {
       id: row.id,
       title: row.title,
@@ -294,7 +312,8 @@ export class SqliteQuestionRepository implements QuestionRepository {
     }
 
     const row = this.database.prepare(
-      "SELECT title, body_json FROM sigma_core_questions WHERE id = ?",
+      `SELECT q.title, c.body_json FROM sigma_core_questions q
+       JOIN sigma_core_question_contents c ON c.question_id = q.id WHERE q.id = ?`,
     ).get(record.id) as { title: string; body_json: string };
     const labels = (this.database.prepare(
       `SELECT group_concat(t.label, ' ') AS labels FROM sigma_core_question_tags qt
@@ -304,6 +323,40 @@ export class SqliteQuestionRepository implements QuestionRepository {
     this.database.prepare(
       "INSERT INTO sigma_core_questions_fts(question_id, title, body_text, tags_text) VALUES (?, ?, ?, ?)",
     ).run(record.id, row.title, row.body_json, labels);
+  }
+
+  private writeContent(record: QuestionRecord): void {
+    this.database.prepare(
+      `INSERT INTO sigma_core_question_contents(question_id, body_format, body_json, updated_at)
+       VALUES (?, ?, ?, ?)
+       ON CONFLICT(question_id) DO UPDATE SET
+         body_format = excluded.body_format, body_json = excluded.body_json, updated_at = excluded.updated_at`,
+    ).run(record.id, record.body.format, JSON.stringify(record.body), record.updatedAt);
+  }
+
+  private writeAnswer(record: QuestionRecord): void {
+    if (!record.answer) {
+      this.database.prepare("DELETE FROM sigma_core_question_answers WHERE question_id = ?").run(record.id);
+      return;
+    }
+    this.database.prepare(
+      `INSERT INTO sigma_core_question_answers
+        (question_id, answer_content_json, verification, evidence_source_ids_json, explanation_json, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?)
+       ON CONFLICT(question_id) DO UPDATE SET
+         answer_content_json = excluded.answer_content_json,
+         verification = excluded.verification,
+         evidence_source_ids_json = excluded.evidence_source_ids_json,
+         explanation_json = excluded.explanation_json,
+         updated_at = excluded.updated_at`,
+    ).run(
+      record.id,
+      JSON.stringify(record.answer.content),
+      record.answer.verification,
+      JSON.stringify(record.answer.evidenceSourceIds),
+      record.answer.explanation ? JSON.stringify(record.answer.explanation) : null,
+      record.updatedAt,
+    );
   }
 
   private writeRevision(record: QuestionRecord, reason: string): void {
