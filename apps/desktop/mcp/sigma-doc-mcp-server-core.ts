@@ -42,9 +42,12 @@ import {
 } from "../electron/ai-edit-run-context";
 import { LocalMaterialStore } from "../electron/local-material-store";
 import { KnowledgeDbStore } from "../electron/knowledge-db-store";
-import { ConversationMemoryStore } from "../electron/conversation-memory-store";
 import { KnowledgeLearningStore } from "../electron/knowledge-learning-store";
-import { LongTermMemoryStore } from "../electron/long-term-memory-store";
+import {
+  openQuestionEngineDatabase,
+  SqliteConversationMemoryStore,
+  SqliteLongTermMemoryStore,
+} from "../../../packages/question-engine/src/index";
 import { LocalAiResourceStore } from "../electron/ai-resource-store";
 import { isAiWebSearchEnabled, readDesktopSettingsSync, writeDesktopSettings } from "../electron/desktop-settings";
 import {
@@ -1102,13 +1105,16 @@ function resolveUserDataPath(): string {
   return existing ?? candidates[0];
 }
 
-function createStore(): { store: LocalSigmaDocStore; userDataPath: string; dataDir: string } {
+function createStore(): { store: LocalSigmaDocStore; userDataPath: string; dataDir: string; database: ReturnType<typeof openQuestionEngineDatabase> } {
   const userDataPath = resolveUserDataPath();
   const store = new LocalSigmaDocStore(userDataPath);
+  const dataDir = store.getDataDir();
+  const database = openQuestionEngineDatabase({ dataDir: path.join(dataDir, "knowledge-db") });
   return {
     store,
     userDataPath,
-    dataDir: store.getDataDir(),
+    dataDir,
+    database,
   };
 }
 
@@ -3035,7 +3041,7 @@ registerTool(
     inputSchema: {},
   },
   async () => withToolErrorHandling(async () => {
-    const status = await new KnowledgeDbStore(storeContext.dataDir).getAnalysisStatus();
+    const status = await new KnowledgeDbStore(storeContext.dataDir, storeContext.database.raw).getAnalysisStatus();
     return { ok: true, status };
   }),
 );
@@ -3050,7 +3056,7 @@ registerTool(
     },
   },
   async ({ sourceIds }) => withToolErrorHandling(async () => {
-    const status = await new KnowledgeDbStore(storeContext.dataDir).reanalyze(sourceIds);
+    const status = await new KnowledgeDbStore(storeContext.dataDir, storeContext.database.raw).reanalyze(sourceIds);
     return { ok: true, status };
   }),
 );
@@ -3063,7 +3069,7 @@ registerTool(
     inputSchema: {},
   },
   async () => withToolErrorHandling(async () => {
-    const sources = await new KnowledgeDbStore(storeContext.dataDir).listSources();
+    const sources = await new KnowledgeDbStore(storeContext.dataDir, storeContext.database.raw).listSources();
     return { ok: true, sources: sources.map((source) => ({
       id: source.id,
       name: source.name,
@@ -3084,7 +3090,7 @@ registerTool(
     },
   },
   async ({ sourcePath }) => withToolErrorHandling(async () => {
-    const staging = await new KnowledgeDbStore(storeContext.dataDir).previewPdfImport(sourcePath);
+    const staging = await new KnowledgeDbStore(storeContext.dataDir, storeContext.database.raw).previewPdfImport(sourcePath);
     return {
       ok: true,
       staging: {
@@ -3111,7 +3117,7 @@ registerTool(
     inputSchema: {},
   },
   async () => withToolErrorHandling(async () => {
-    const staging = await new KnowledgeDbStore(storeContext.dataDir).listPdfImportStaging();
+    const staging = await new KnowledgeDbStore(storeContext.dataDir, storeContext.database.raw).listPdfImportStaging();
     return { ok: true, staging };
   }),
 );
@@ -3126,7 +3132,7 @@ registerTool(
     },
   },
   async ({ stagingId }) => withToolErrorHandling(async () => {
-    const staging = await new KnowledgeDbStore(storeContext.dataDir).getPdfImportStaging(stagingId);
+    const staging = await new KnowledgeDbStore(storeContext.dataDir, storeContext.database.raw).getPdfImportStaging(stagingId);
     if (!staging) throw new Error("PDF import staging not found.");
     return { ok: true, staging };
   }),
@@ -3152,7 +3158,7 @@ registerTool(
     },
   },
   async ({ stagingId, segments }) => withToolErrorHandling(async () => {
-    const staging = await new KnowledgeDbStore(storeContext.dataDir).updatePdfImportStaging({ stagingId, segments });
+    const staging = await new KnowledgeDbStore(storeContext.dataDir, storeContext.database.raw).updatePdfImportStaging({ stagingId, segments });
     return { ok: true, staging };
   }),
 );
@@ -3167,7 +3173,7 @@ registerTool(
     },
   },
   async ({ stagingId }) => withToolErrorHandling(async () => {
-    const result = await new KnowledgeDbStore(storeContext.dataDir).approvePdfImport(stagingId);
+    const result = await new KnowledgeDbStore(storeContext.dataDir, storeContext.database.raw).approvePdfImport(stagingId);
     return { ok: true, ...result };
   }),
 );
@@ -3182,7 +3188,7 @@ registerTool(
     },
   },
   async ({ stagingId }) => withToolErrorHandling(async () => {
-    const result = await new KnowledgeDbStore(storeContext.dataDir).rejectPdfImport(stagingId);
+    const result = await new KnowledgeDbStore(storeContext.dataDir, storeContext.database.raw).rejectPdfImport(stagingId);
     return { ok: true, ...result };
   }),
 );
@@ -3201,7 +3207,7 @@ registerTool(
     },
   },
   async ({ conversationId, role, content, provider, metadata }) => withToolErrorHandling(async () => {
-    const entry = await new ConversationMemoryStore(storeContext.dataDir).append({
+    const entry = await new SqliteConversationMemoryStore(storeContext.database.raw).append({
       conversationId,
       role,
       content,
@@ -3226,8 +3232,8 @@ registerTool(
   async ({ query, conversationId, limit }) => withToolErrorHandling(async () => ({
     ok: true,
     query,
-    memories: await new ConversationMemoryStore(storeContext.dataDir).search(query, conversationId, limit ?? 8),
-    longTermMemories: await new LongTermMemoryStore(storeContext.dataDir).search(query, limit ?? 8),
+    memories: await new SqliteConversationMemoryStore(storeContext.database.raw).search(query, conversationId, limit ?? 8),
+    longTermMemories: await new SqliteLongTermMemoryStore(storeContext.database.raw).search(query, limit ?? 8),
   })),
 );
 
@@ -3243,8 +3249,8 @@ registerTool(
   },
   async ({ conversationId, limit }) => withToolErrorHandling(async () => ({
     ok: true,
-    memories: await new ConversationMemoryStore(storeContext.dataDir).recent(conversationId, limit ?? 20),
-    longTermMemories: await new LongTermMemoryStore(storeContext.dataDir).recent(limit ?? 20),
+    memories: await new SqliteConversationMemoryStore(storeContext.database.raw).recent(conversationId, limit ?? 20),
+    longTermMemories: await new SqliteLongTermMemoryStore(storeContext.database.raw).recent(limit ?? 20),
   })),
 );
 
@@ -3260,7 +3266,7 @@ registerTool(
     },
   },
   async ({ query, limit, runId }) => withToolErrorHandling(async () => {
-    const results = await new KnowledgeDbStore(storeContext.dataDir).search(query, limit ?? 8);
+    const results = await new KnowledgeDbStore(storeContext.dataDir, storeContext.database.raw).search(query, limit ?? 8);
     for (const result of results) {
       recordKnowledgeDbPageReference(runId, {
         sourceId: result.sourceId,
@@ -3331,7 +3337,7 @@ registerTool(
         citations: [],
       };
     }
-    const context = await new KnowledgeDbStore(storeContext.dataDir).getContext(
+    const context = await new KnowledgeDbStore(storeContext.dataDir, storeContext.database.raw).getContext(
       query,
       limit ?? 8,
       sourceIds,
@@ -3377,7 +3383,7 @@ registerTool(
     },
   },
   async ({ query, sourceId, pageNumber, label, correction }) => withToolErrorHandling(async () => {
-    const store = new KnowledgeLearningStore(storeContext.dataDir);
+    const store = new KnowledgeLearningStore(storeContext.database.raw);
     const entry = await store.record({ query, sourceId, pageNumber, label, correction });
     return { ok: true, entry };
   }),
@@ -3394,7 +3400,7 @@ registerTool(
     },
   },
   async ({ status, limit }) => withToolErrorHandling(async () => {
-    const sources = await new KnowledgeDbStore(storeContext.dataDir).listSources();
+    const sources = await new KnowledgeDbStore(storeContext.dataDir, storeContext.database.raw).listSources();
     const reviews = sources.flatMap((source) => source.pages
       .filter((page) => {
         const current = page.classificationReviewStatus;
@@ -3428,7 +3434,7 @@ registerTool(
     },
   },
   async ({ sourceId, pageNumber }) => withToolErrorHandling(async () => {
-    const { page } = await new KnowledgeDbStore(storeContext.dataDir).getPage(sourceId, pageNumber);
+    const { page } = await new KnowledgeDbStore(storeContext.dataDir, storeContext.database.raw).getPage(sourceId, pageNumber);
     const structureText = page.structureBlocks?.map((block) => `[${block.type}] ${block.text}`).join("\n") ?? "";
     const content = [page.text?.trim() ?? "", structureText].filter(Boolean).join("\n").slice(0, 30000);
     const candidates = (page.taxonomyPaths ?? []).map((path, index) => ({
@@ -3461,7 +3467,7 @@ registerTool(
     },
   },
   async ({ sourceId, pageNumber, paths, confidence, reason, evidence }) => withToolErrorHandling(async () => {
-    const result = await new KnowledgeDbStore(storeContext.dataDir).applyClassificationReview({
+    const result = await new KnowledgeDbStore(storeContext.dataDir, storeContext.database.raw).applyClassificationReview({
       sourceId,
       pageNumber,
       paths,
@@ -3495,7 +3501,7 @@ registerTool(
     },
   },
   async ({ query, limit, maxChars, sourceIds, runId }) => withToolErrorHandling(async () => {
-    const context = await new KnowledgeDbStore(storeContext.dataDir).getContext(query, limit ?? 8, sourceIds, maxChars ?? 16000);
+    const context = await new KnowledgeDbStore(storeContext.dataDir, storeContext.database.raw).getContext(query, limit ?? 8, sourceIds, maxChars ?? 16000);
     for (const item of context) {
       recordKnowledgeDbPageReference(runId, {
         sourceId: item.sourceId,
@@ -3523,7 +3529,7 @@ registerTool(
     },
   },
   async ({ sourceId, limit }) => withToolErrorHandling(async () => {
-    const related = await new KnowledgeDbStore(storeContext.dataDir).getRelatedSources(sourceId, limit ?? 6);
+    const related = await new KnowledgeDbStore(storeContext.dataDir, storeContext.database.raw).getRelatedSources(sourceId, limit ?? 6);
     return { ok: true, sourceId, related };
   }),
 );
@@ -3540,7 +3546,7 @@ registerTool(
     },
   },
   async ({ sourceId, pageNumber, runId }) => withToolErrorHandling(async () => {
-    const { source, page } = await new KnowledgeDbStore(storeContext.dataDir).getPage(sourceId, pageNumber);
+    const { source, page } = await new KnowledgeDbStore(storeContext.dataDir, storeContext.database.raw).getPage(sourceId, pageNumber);
     recordKnowledgeDbPageReference(runId, {
       sourceId: source.id,
       sourceName: source.name,
@@ -3566,8 +3572,8 @@ registerTool(
     },
   },
   async ({ sourceId, pageNumber, x, y, width, height, runId }) => withToolErrorHandling(async () => {
-    const filePath = await new KnowledgeDbStore(storeContext.dataDir).extractRegion(sourceId, pageNumber, { x, y, width, height });
-    const sources = await new KnowledgeDbStore(storeContext.dataDir).listSources();
+    const filePath = await new KnowledgeDbStore(storeContext.dataDir, storeContext.database.raw).extractRegion(sourceId, pageNumber, { x, y, width, height });
+    const sources = await new KnowledgeDbStore(storeContext.dataDir, storeContext.database.raw).listSources();
     const source = sources.find((item) => item.id === sourceId);
     if (source) {
       recordKnowledgeDbPageReference(runId, {
