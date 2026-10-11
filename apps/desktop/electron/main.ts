@@ -63,8 +63,11 @@ import { registerAiEditIpc } from "./ipc/ai-edit";
 import { registerAiResourcesIpc } from "./ipc/ai-resources";
 import { registerFileIpc } from "./ipc/file";
 import { KnowledgeDbStore } from "./knowledge-db-store";
-import { ConversationMemoryStore } from "./conversation-memory-store";
-import { LongTermMemoryStore } from "./long-term-memory-store";
+import {
+  openQuestionEngineDatabase,
+  SqliteConversationMemoryStore,
+  SqliteLongTermMemoryStore,
+} from "../../packages/question-engine/src/index";
 import { registerKnowledgeDbIpc } from "./ipc/knowledge-db";
 import { ResearchSessionStore } from "./research-session-store";
 import { registerResearchSessionIpc } from "./ipc/research-session";
@@ -273,9 +276,10 @@ const localAiEditRunLogStore = new LocalAiEditRunLogStore(USER_DATA_PATH);
 const localAiEditChatRoomStore = new LocalAiEditChatRoomStore(USER_DATA_PATH);
 const localAiResourceStore = new LocalAiResourceStore(USER_DATA_PATH);
 const SIGMA_STUDIO_DATA_PATH = path.join(USER_DATA_PATH, "data");
+const questionEngineDatabase = openQuestionEngineDatabase({ dataDir: SIGMA_STUDIO_DATA_PATH });
 const knowledgeDbStore = new KnowledgeDbStore(SIGMA_STUDIO_DATA_PATH);
-const conversationMemoryStore = new ConversationMemoryStore(SIGMA_STUDIO_DATA_PATH);
-const longTermMemoryStore = new LongTermMemoryStore(SIGMA_STUDIO_DATA_PATH);
+const conversationMemoryStore = new SqliteConversationMemoryStore(questionEngineDatabase.raw);
+const longTermMemoryStore = new SqliteLongTermMemoryStore(questionEngineDatabase.raw);
 const researchSessionStore = new ResearchSessionStore(SIGMA_STUDIO_DATA_PATH);
 const appUpdateController = new AppUpdateController({ releaseUrl: RELEASE_PAGE_URL });
 const desktopSettings = readDesktopSettingsSync(SIGMA_STUDIO_DATA_PATH);
