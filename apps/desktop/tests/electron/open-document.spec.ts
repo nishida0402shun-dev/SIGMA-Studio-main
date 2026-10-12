@@ -55,6 +55,14 @@ test("opens startup/second-instance/macOS files through real storage and preserv
     await page.locator(BODY).first().click();
     await page.keyboard.press("End");
     await page.keyboard.type(" EDIT_BEFORE_OPEN");
+    // Let the autosave settle before the second process arrives. The OS-open assertion below is
+    // about single-instance forwarding and queue draining; racing the independent debounce timer
+    // makes this smoke test nondeterministic and can turn a transient save boundary into a false
+    // failure before the second-instance transport is even exercised.
+    await expect.poll(async () => {
+      const saved = await page.evaluate((fileId) => window.desktopAPI!.storage.loadDocument(fileId), imported.fileId);
+      return JSON.stringify(saved).includes("EDIT_BEFORE_OPEN");
+    }, { timeout: 30_000 }).toBe(true);
 
     // A real second process exercises Electron's lock and additionalData transport.
     const executable = app.process().spawnfile;
