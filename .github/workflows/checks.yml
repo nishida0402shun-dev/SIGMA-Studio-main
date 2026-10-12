@@ -14,10 +14,12 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  desktop:
-    name: Desktop build and checks
-    runs-on: windows-latest
-    timeout-minutes: 30
+  desktop-tests:
+    name: Desktop build and unit checks
+    # Unit tests assert POSIX path spellings in several architecture contracts.
+    # Keep this platform-neutral validation on Linux; desktop support remains Windows-only.
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
     env:
       NODE_OPTIONS: --max-old-space-size=4096
     steps:
@@ -33,10 +35,24 @@ jobs:
       - run: npm exec --workspace @sigma-studio/desktop -- next typegen
       - run: npm run typecheck
       - run: npm run lint
-      # Electron smoke tests exercise the shipped desktop build on the supported OS.
       - run: npm --workspace @sigma-studio/desktop run electron:prepare
       - run: npm --workspace @sigma-studio/desktop run test -- --maxWorkers=2 --testTimeout=30000
-      - name: Run Electron smoke test
+
+  windows-desktop-smoke:
+    name: Windows desktop build and Electron smoke test
+    runs-on: windows-latest
+    timeout-minutes: 30
+    env:
+      NODE_OPTIONS: --max-old-space-size=4096
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: "24"
+          cache: npm
+      - run: npm ci
+      - run: npm --workspace @sigma-studio/desktop run electron:prepare
+      - name: Run Electron smoke test on the supported desktop OS
         run: npm --workspace @sigma-studio/desktop run test:e2e:electron -- tests/electron/open-document.spec.ts
 
   public-packages:
