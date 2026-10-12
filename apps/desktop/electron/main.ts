@@ -108,8 +108,11 @@ const hasSingleInstanceLock = app.requestSingleInstanceLock({ documentPaths: sta
 if (!hasSingleInstanceLock) {
   if (DEV_SERVER_URL && startupDocumentPaths.length === 0) {
     console.error("[desktop] This development data directory is already open in another instance.");
-    app.exit(1);
-  } else app.exit(0);
+    process.exitCode = 1;
+  }
+  // Let Electron finish forwarding the second-instance notification before exiting.
+  // app.exit() terminates immediately and can race the additionalData transport on Windows.
+  app.quit();
 }
 let mainWindow: BrowserWindow | null = null;
 const WEB_AI_ALLOWED_HOSTS = new Set([
