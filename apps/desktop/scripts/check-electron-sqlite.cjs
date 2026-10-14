@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+/* eslint @typescript-eslint/no-require-imports: "off" -- This smoke script intentionally runs as CommonJS inside Electron. */
 "use strict";
 
 // Run with ELECTRON_RUN_AS_NODE=1 using the exact Electron version from the
