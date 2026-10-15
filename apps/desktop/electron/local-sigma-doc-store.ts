@@ -2148,7 +2148,10 @@ export class LocalSigmaDocStore {
    * 一時的に効かなくなるだけで、正しさには影響しない。
    */
   private async touchLibraryMtimeAfterCreate(): Promise<void> {
-    const now = new Date();
+    // Date stores whole milliseconds, while filesystem mtime can retain sub-millisecond
+    // precision. Move the ledger timestamp slightly ahead of the current clock so it
+    // cannot remain fractionally older than the document written immediately before it.
+    const now = new Date(Date.now() + 2);
     await fs.utimes(this.libraryPath, now, now).catch(() => undefined);
   }
 
