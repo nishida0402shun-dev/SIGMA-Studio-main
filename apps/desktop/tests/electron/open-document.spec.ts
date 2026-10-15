@@ -96,7 +96,7 @@ test("opens startup/second-instance/macOS files through real storage and preserv
         status: document.querySelector(".save-state")?.textContent ?? null,
         pending: pending ? { filePath: pending.filePath, error: pending.error ?? null } : null,
       };
-    }), { timeout: 15_000 }).toMatchObject({ titles: ["既存 教材", "追加 教材"] });
+    }), { timeout: 15_000 }).toEqual({ titles: ["既存 教材", "追加 教材"] });
     await expect(page.locator(BODY).first()).toContainText("THIRD_CONTENT");
     const files = await page.evaluate(() => window.desktopAPI!.storage.listFiles());
     expect(files.filter((file) => ["既存 教材", "追加 教材"].includes(file.title))).toHaveLength(2);
