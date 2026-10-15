@@ -4,7 +4,7 @@ import { createInterface } from "node:readline";
 import { resolveDevServerUrl, isDevServerNavigation } from "./dev-server";
 import http from "node:http";
 import path from "node:path";
-import { existsSync, readFileSync, watch, type FSWatcher } from "node:fs";
+import { appendFileSync, existsSync, readFileSync, watch, type FSWatcher } from "node:fs";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
 import { LocalAiEditChatRoomStore } from "./ai-edit-chat-room-store";
@@ -102,9 +102,24 @@ if (DEV_SERVER_URL) {
 }
 const USER_DATA_PATH = resolveUserDataPath();
 const SHARED_WORKSPACE_PATH = resolveSharedWorkspacePath();
-const startupDocumentPaths = documentPathsFromArgv(process.argv, process.cwd(), Boolean(process.defaultApp));
+const startupDocumentPaths = documentPathsFromArgv(process.argv, process.cwd());
+function traceExternalOpen(event: string, details: Record<string, unknown> = {}): void {
+  const tracePath = process.env.SIGMA_STUDIO_EXTERNAL_OPEN_TRACE?.trim();
+  if (!tracePath) return;
+  try {
+    appendFileSync(tracePath, `${JSON.stringify({ event, pid: process.pid, argv: process.argv, cwd: process.cwd(), ...details })}\n`, "utf8");
+  } catch {
+    // Diagnostics must never interfere with normal file opening.
+  }
+}
+traceExternalOpen("startup", {
+  startupDocumentPaths,
+  defaultApp: process.defaultApp ?? false,
+  packaged: app.isPackaged,
+});
 // A secondary launch only forwards files. It must not clear active AI contexts or start stores.
 const hasSingleInstanceLock = app.requestSingleInstanceLock({ documentPaths: startupDocumentPaths });
+traceExternalOpen("single-instance-lock", { hasSingleInstanceLock, startupDocumentPaths });
 if (!hasSingleInstanceLock) {
   if (DEV_SERVER_URL && startupDocumentPaths.length === 0) {
     console.error("[desktop] This development data directory is already open in another instance.");
@@ -271,6 +286,7 @@ const externalDocumentOpenQueue = new ExternalDocumentOpenQueue(() => {
   }
 });
 externalDocumentOpenQueue.enqueue(startupDocumentPaths);
+traceExternalOpen("initial-queue", { startupDocumentPaths });
 // macOS can deliver open-file before ready (including a cold Finder/Dock launch).
 app.on("open-file", (event, filePath) => {
   event.preventDefault();
@@ -279,9 +295,16 @@ app.on("open-file", (event, filePath) => {
 });
 app.on("second-instance", (_event, argv, workingDirectory, additionalData) => {
   const forwarded = (additionalData as { documentPaths?: unknown } | undefined)?.documentPaths;
-  externalDocumentOpenQueue.enqueue(Array.isArray(forwarded)
+  const forwardedPaths = Array.isArray(forwarded)
     ? forwarded.filter((value): value is string => typeof value === "string")
-    : documentPathsFromArgv(argv, workingDirectory, Boolean(process.defaultApp)));
+    : [];
+  // The primary process must not rely exclusively on secondary-instance metadata:
+  // Electron versions/platforms can provide an empty or incomplete additionalData payload.
+  // Parse the actual second-instance argv as a fallback and let the queue deduplicate overlap.
+  const argvPaths = documentPathsFromArgv(argv, workingDirectory);
+  traceExternalOpen("second-instance", { argv, workingDirectory, additionalData, forwardedPaths, argvPaths });
+  externalDocumentOpenQueue.enqueue([...forwardedPaths, ...argvPaths]);
+  traceExternalOpen("second-instance-enqueued", { paths: [...forwardedPaths, ...argvPaths] });
   focusDocumentWindow();
 });
 

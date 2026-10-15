@@ -39,6 +39,8 @@ test("opens startup/second-instance/macOS files through real storage and preserv
   const env = Object.fromEntries(Object.entries(process.env).filter((entry): entry is [string, string] => entry[1] !== undefined));
   delete env.ELECTRON_RUN_AS_NODE;
   env.SIGMA_STUDIO_USER_DATA_DIR = path.join(root, "profile");
+  const tracePath = path.join(root, "external-open-trace.jsonl");
+  env.SIGMA_STUDIO_EXTERNAL_OPEN_TRACE = tracePath;
   let app: ElectronApplication | undefined;
   try {
     app = await electron.launch({ args: [APP_ROOT, first, first, ordinary], cwd: APP_ROOT, env });
@@ -63,6 +65,9 @@ test("opens startup/second-instance/macOS files through real storage and preserv
       const saved = await page.evaluate((fileId) => window.desktopAPI!.storage.loadDocument(fileId), imported.fileId);
       return JSON.stringify(saved).includes("EDIT_BEFORE_OPEN");
     }, { timeout: 30_000 }).toBe(true);
+    // Storage can become readable just before the renderer finishes updating its save boundary
+    // refs. Wait for the UI's saved state as well, so this test isolates external-open behavior.
+    await expect(page.locator(".save-state.saved")).toBeVisible({ timeout: 15_000 });
 
     // A real second process exercises Electron's lock and additionalData transport.
     const executable = app.process().spawnfile;
@@ -81,6 +86,23 @@ test("opens startup/second-instance/macOS files through real storage and preserv
         else reject(new Error(`Secondary exit code=${code} signal=${signal}; output=${childOutput.slice(-4000)}`));
       });
     });
+    // Separate queue/import persistence from the renderer's active-document transition.
+    // If the second-instance request is lost, this fails with the actual stored titles instead
+    // of only reporting that the previous document remains visible.
+    await expect.poll(async () => {
+      const state = await page.evaluate(async () => {
+        const files = await window.desktopAPI!.storage.listFiles();
+        const titles = files.filter((file) => ["既存 教材", "追加 教材"].includes(file.title)).map((file) => file.title).sort();
+        const pending = await window.desktopAPI!.file.getPendingOpenDocument!();
+        return JSON.stringify({
+          titles,
+          status: document.querySelector(".save-state")?.textContent ?? null,
+          pending: pending ? { filePath: pending.filePath, error: pending.error ?? null } : null,
+        });
+      });
+      const trace = existsSync(tracePath) ? readFileSync(tracePath, "utf8") : "(trace file missing)";
+      return `${state}\\nEXTERNAL-OPEN TRACE:\\n${trace}`;
+    }, { timeout: 15_000 }).toContain('"titles":["既存 教材","追加 教材"]');
     await expect(page.locator(BODY).first()).toContainText("THIRD_CONTENT");
     const files = await page.evaluate(() => window.desktopAPI!.storage.listFiles());
     expect(files.filter((file) => ["既存 教材", "追加 教材"].includes(file.title))).toHaveLength(2);

@@ -14,16 +14,24 @@ describe("OS document arguments", () => {
     expect(documentPathsFromArgv([
       "C:\\Sigma Studio.exe", "C:\\Downloads\\数学 1.sigma", "..\\旧.sigma.json", "C:\\Downloads\\数学 1.sigma",
       "--inspect=9222", "--config=settings.sigma", "settings.json", "https://example.com/file.txt",
-    ], "C:\\Downloads\\folder", false, "win32")).toEqual([
+    ], "C:\\Downloads\\folder", "win32")).toEqual([
       "C:\\Downloads\\数学 1.sigma", "C:\\Downloads\\旧.sigma.json",
     ]);
   });
 
   it.each(["linux", "darwin"] as const)("handles initial and second-instance %s argv without importing the dev entry", (platform) => {
     expect(documentPathsFromArgv([
-      "/Electron", "/dev-entry.sigma", "./数学 2.SIGMA", "../旧.sigmadoc.json", "--", "ordinary.json",
-    ], "/tmp/downloads", true, platform)).toEqual([
+      "/Electron", "/dev-entry.js", "./数学 2.SIGMA", "../旧.sigmadoc.json", "--", "ordinary.json",
+    ], "/tmp/downloads", platform)).toEqual([
       "/tmp/downloads/数学 2.SIGMA", "/tmp/旧.sigmadoc.json",
+    ]);
+  });
+
+  it("handles second-instance argv when the executable is omitted", () => {
+    expect(documentPathsFromArgv([
+      "/dev-entry.js", "/tmp/既存 教材.sigma.json", "/tmp/追加 教材.sigmadoc.json",
+    ], "/workspace", "linux")).toEqual([
+      "/tmp/既存 教材.sigma.json", "/tmp/追加 教材.sigmadoc.json",
     ]);
   });
 });
