@@ -279,9 +279,14 @@ app.on("open-file", (event, filePath) => {
 });
 app.on("second-instance", (_event, argv, workingDirectory, additionalData) => {
   const forwarded = (additionalData as { documentPaths?: unknown } | undefined)?.documentPaths;
-  externalDocumentOpenQueue.enqueue(Array.isArray(forwarded)
+  const forwardedPaths = Array.isArray(forwarded)
     ? forwarded.filter((value): value is string => typeof value === "string")
-    : documentPathsFromArgv(argv, workingDirectory, Boolean(process.defaultApp)));
+    : [];
+  // The primary process must not rely exclusively on secondary-instance metadata:
+  // Electron versions/platforms can provide an empty or incomplete additionalData payload.
+  // Parse the actual second-instance argv as a fallback and let the queue deduplicate overlap.
+  const argvPaths = documentPathsFromArgv(argv, workingDirectory, Boolean(process.defaultApp));
+  externalDocumentOpenQueue.enqueue([...forwardedPaths, ...argvPaths]);
   focusDocumentWindow();
 });
 
