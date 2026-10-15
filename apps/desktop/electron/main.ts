@@ -102,7 +102,7 @@ if (DEV_SERVER_URL) {
 }
 const USER_DATA_PATH = resolveUserDataPath();
 const SHARED_WORKSPACE_PATH = resolveSharedWorkspacePath();
-const startupDocumentPaths = documentPathsFromArgv(process.argv, process.cwd(), Boolean(process.defaultApp));
+const startupDocumentPaths = documentPathsFromArgv(process.argv, process.cwd());
 // A secondary launch only forwards files. It must not clear active AI contexts or start stores.
 const hasSingleInstanceLock = app.requestSingleInstanceLock({ documentPaths: startupDocumentPaths });
 if (!hasSingleInstanceLock) {
@@ -285,7 +285,7 @@ app.on("second-instance", (_event, argv, workingDirectory, additionalData) => {
   // The primary process must not rely exclusively on secondary-instance metadata:
   // Electron versions/platforms can provide an empty or incomplete additionalData payload.
   // Parse the actual second-instance argv as a fallback and let the queue deduplicate overlap.
-  const argvPaths = documentPathsFromArgv(argv, workingDirectory, Boolean(process.defaultApp));
+  const argvPaths = documentPathsFromArgv(argv, workingDirectory);
   externalDocumentOpenQueue.enqueue([...forwardedPaths, ...argvPaths]);
   focusDocumentWindow();
 });
