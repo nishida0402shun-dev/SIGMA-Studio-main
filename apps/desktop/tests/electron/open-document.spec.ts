@@ -63,6 +63,9 @@ test("opens startup/second-instance/macOS files through real storage and preserv
       const saved = await page.evaluate((fileId) => window.desktopAPI!.storage.loadDocument(fileId), imported.fileId);
       return JSON.stringify(saved).includes("EDIT_BEFORE_OPEN");
     }, { timeout: 30_000 }).toBe(true);
+    // Storage can become readable just before the renderer finishes updating its save boundary
+    // refs. Wait for the UI's saved state as well, so this test isolates external-open behavior.
+    await expect(page.locator(".save-state.saved")).toBeVisible({ timeout: 15_000 });
 
     // A real second process exercises Electron's lock and additionalData transport.
     const executable = app.process().spawnfile;
