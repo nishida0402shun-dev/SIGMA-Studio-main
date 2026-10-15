@@ -107,7 +107,7 @@ function traceExternalOpen(event: string, details: Record<string, unknown> = {})
   const tracePath = process.env.SIGMA_STUDIO_EXTERNAL_OPEN_TRACE?.trim();
   if (!tracePath) return;
   try {
-    appendFileSync(tracePath, `${JSON.stringify({ event, pid: process.pid, argv: process.argv, cwd: process.cwd(), ...details })}\\n`, "utf8");
+    appendFileSync(tracePath, `${JSON.stringify({ event, pid: process.pid, argv: process.argv, cwd: process.cwd(), ...details })}\n`, "utf8");
   } catch {
     // Diagnostics must never interfere with normal file opening.
   }
