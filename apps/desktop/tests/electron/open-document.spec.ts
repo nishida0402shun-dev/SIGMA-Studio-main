@@ -91,12 +91,12 @@ test("opens startup/second-instance/macOS files through real storage and preserv
       const files = await window.desktopAPI!.storage.listFiles();
       const titles = files.filter((file) => ["既存 教材", "追加 教材"].includes(file.title)).map((file) => file.title).sort();
       const pending = await window.desktopAPI!.file.getPendingOpenDocument!();
-      return {
+      return JSON.stringify({
         titles,
         status: document.querySelector(".save-state")?.textContent ?? null,
         pending: pending ? { filePath: pending.filePath, error: pending.error ?? null } : null,
-      };
-    }), { timeout: 15_000 }).toEqual({ titles: ["既存 教材", "追加 教材"] });
+      });
+    }), { timeout: 15_000 }).toContain('"titles":["既存 教材","追加 教材"]');
     await expect(page.locator(BODY).first()).toContainText("THIRD_CONTENT");
     const files = await page.evaluate(() => window.desktopAPI!.storage.listFiles());
     expect(files.filter((file) => ["既存 教材", "追加 教材"].includes(file.title))).toHaveLength(2);
