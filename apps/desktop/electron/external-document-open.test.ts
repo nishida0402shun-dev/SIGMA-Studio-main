@@ -26,6 +26,14 @@ describe("OS document arguments", () => {
       "/tmp/downloads/数学 2.SIGMA", "/tmp/旧.sigmadoc.json",
     ]);
   });
+
+  it("handles second-instance argv when the executable is omitted", () => {
+    expect(documentPathsFromArgv([
+      "/dev-entry.js", "/tmp/既存 教材.sigma.json", "/tmp/追加 教材.sigmadoc.json",
+    ], "/workspace", "linux")).toEqual([
+      "/tmp/既存 教材.sigma.json", "/tmp/追加 教材.sigmadoc.json",
+    ]);
+  });
 });
 
 describe("OS open queue", () => {
