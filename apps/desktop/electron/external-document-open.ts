@@ -10,11 +10,13 @@ export function isSigmaDocumentPath(filePath: string): boolean {
 export function documentPathsFromArgv(
   argv: readonly string[],
   workingDirectory: string,
-  defaultApp: boolean,
   platform: NodeJS.Platform = process.platform,
 ): string[] {
   const paths = platform === "win32" ? path.win32 : path.posix;
-  return [...new Set(argv.slice(defaultApp ? 2 : 1)
+  // Electron's second-instance argv shape can differ from process.argv: the executable and
+  // app entry may or may not be included. Identify supported documents by extension rather
+  // than dropping a fixed number of leading arguments.
+  return [...new Set(argv
     .filter((argument) => !argument.startsWith("-") && isSigmaDocumentPath(argument))
     .map((argument) => paths.resolve(workingDirectory, argument)))];
 }
