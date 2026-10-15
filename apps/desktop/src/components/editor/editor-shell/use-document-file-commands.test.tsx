@@ -90,6 +90,19 @@ describe("document file commands", () => {
     expect(f.create.mock.calls[0][0].content).toEqual(original.content);
   });
 
+  it("keeps an external request unacknowledged when persistence fails", async () => {
+    const f = fixture();
+    vi.mocked(f.create).mockRejectedValueOnce(new Error("disk write failed"));
+    render(f.options);
+    const pending = { id: 3, filePath: "/Downloads/再試行教材.sigma.json", data: JSON.stringify(sigma()) };
+
+    expect(await actions.openExternalDocument(pending)).toBe(false);
+    expect(f.create).toHaveBeenCalledOnce();
+    expect(f.options.setSaveState).toHaveBeenLastCalledWith("error");
+    expect(f.options.setStatusMessage).toHaveBeenLastCalledWith("disk write failed");
+    expect(f.options.openDocumentAsTab).not.toHaveBeenCalled();
+  });
+
   it("reports unreadable or invalid OS files without saving or replacing the active material", async () => {
     const f = fixture();
     render(f.options);
