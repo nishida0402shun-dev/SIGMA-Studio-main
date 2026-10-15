@@ -140,6 +140,9 @@ export function useDocumentFileCommands({
   };
 
   const importDocumentFileWithResult = async (file: File): Promise<boolean> => {
+    // Parsing/validation failures are terminal for this file and must not block later queue entries.
+    // Persistence/open failures are retryable, so the OS request must remain pending.
+    let persistenceStarted = false;
     try {
       const request = planDocumentFileImport(file);
       const { document: importedDocument, recoveryIssues, successMessageKey } = await prepareDocumentFileImport(request, {
@@ -159,15 +162,16 @@ export function useDocumentFileCommands({
       if (workspaceReady && !(await saveCurrentDocumentBeforeReplacement())) {
         return false;
       }
+      persistenceStarted = true;
       const importedRecord = await createDocumentFromSigmaDocument(importedDocument);
       await openDocumentAsTab(importedRecord, tEditor(successMessageKey));
       announceRecovery(recoveryIssues);
     } catch (error) {
       setSaveState("error");
       setStatusMessage(error instanceof Error ? error.message : tEditor("status.fileReadFailed"));
-      // 外部ファイルの取り込みが失敗した場合はキューを acknowledge しない。
-      // 呼び出し側が true と解釈すると、保存・変換エラーでも要求だけが消えてしまう。
-      return false;
+      // Invalid input should be consumed so it cannot block later files; persistence failures
+      // stay pending so the user can retry without losing the external-open request.
+      return !persistenceStarted;
     }
     return true;
   };
