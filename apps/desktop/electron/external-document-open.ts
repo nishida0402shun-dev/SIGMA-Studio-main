@@ -16,7 +16,7 @@ export function traceExternalDocumentOpen(event: string, details: Record<string,
       pid: process.pid,
       event,
       ...details,
-    })}\\n`, "utf8");
+    })}\n`, "utf8");
   } catch {
     // Diagnostics must never change document-open behavior.
   }
