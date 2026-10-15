@@ -165,6 +165,9 @@ export function useDocumentFileCommands({
     } catch (error) {
       setSaveState("error");
       setStatusMessage(error instanceof Error ? error.message : tEditor("status.fileReadFailed"));
+      // 外部ファイルの取り込みが失敗した場合はキューを acknowledge しない。
+      // 呼び出し側が true と解釈すると、保存・変換エラーでも要求だけが消えてしまう。
+      return false;
     }
     return true;
   };
