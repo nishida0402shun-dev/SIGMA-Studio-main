@@ -105,14 +105,11 @@ const SHARED_WORKSPACE_PATH = resolveSharedWorkspacePath();
 const startupDocumentPaths = documentPathsFromArgv(process.argv, process.cwd(), Boolean(process.defaultApp));
 // A secondary launch only forwards files. It must not clear active AI contexts or start stores.
 const hasSingleInstanceLock = app.requestSingleInstanceLock({ documentPaths: startupDocumentPaths });
-if (!hasSingleInstanceLock) {
-  if (DEV_SERVER_URL && startupDocumentPaths.length === 0) {
-    console.error("[desktop] This development data directory is already open in another instance.");
-    process.exitCode = 1;
-  }
-  // Let Electron finish forwarding the second-instance notification before exiting.
-  // app.exit() terminates immediately and can race the additionalData transport on Windows.
-  app.quit();
+if (!hasSingleInstanceLock && DEV_SERVER_URL && startupDocumentPaths.length === 0) {
+  console.error("[desktop] This development data directory is already open in another instance.");
+  process.exitCode = 1;
+  // Do not quit before Electron reaches ready: on Windows that can terminate the
+  // secondary process before its second-instance notification reaches the primary.
 }
 let mainWindow: BrowserWindow | null = null;
 const WEB_AI_ALLOWED_HOSTS = new Set([
@@ -1766,6 +1763,13 @@ function registerIpc() {
 }
 
 app.whenReady().then(async () => {
+  // A secondary launch must stay alive until Electron has forwarded its argv and
+  // additionalData to the primary instance, but must never initialize stores/windows.
+  if (!hasSingleInstanceLock) {
+    app.quit();
+    return;
+  }
+
   codexAppServerClient.on("statusChanged", broadcastCodexStatusChange);
   claudeStreamClient.on("statusChanged", broadcastClaudeStatusChange);
   registerIpc();
