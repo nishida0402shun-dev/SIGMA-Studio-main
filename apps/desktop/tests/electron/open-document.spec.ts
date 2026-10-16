@@ -1,4 +1,5 @@
 import { spawn } from "node:child_process";
+import { createRequire } from "node:module";
 import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -6,9 +7,21 @@ import { _electron as electron, expect, test, type ElectronApplication } from "@
 
 const APP_ROOT = path.resolve(__dirname, "../..");
 const MAIN_ENTRY = path.join(APP_ROOT, "dist-electron/main.cjs");
+const require = createRequire(__filename);
+const ELECTRON_EXECUTABLE = require("electron") as string;
 const DEV_URL = process.env.SIGMA_STUDIO_DEV_SERVER_URL;
 const PREPARED = existsSync(MAIN_ENTRY) && (Boolean(DEV_URL) || existsSync(path.join(APP_ROOT, "out/index.html")));
 const BODY = ".page-flow .ProseMirror";
+
+type SecondInstanceDiagnostic = {
+  argv: string[];
+  workingDirectory: string;
+  additionalData: unknown;
+};
+
+type SecondInstanceDiagnosticGlobal = typeof globalThis & {
+  __sigmaSecondInstanceDiagnostics?: SecondInstanceDiagnostic[];
+};
 
 function source(text: string) {
   return {
@@ -64,8 +77,19 @@ test("opens startup/second-instance/macOS files through real storage and preserv
       return JSON.stringify(saved).includes("EDIT_BEFORE_OPEN");
     }, { timeout: 30_000 }).toBe(true);
 
+    // Observe the primary process event directly so CI distinguishes event delivery from
+    // argument parsing, queueing, IPC notification, and renderer import failures.
+    await app.evaluate(({ app }) => {
+      const diagnostics: SecondInstanceDiagnostic[] = [];
+      (globalThis as SecondInstanceDiagnosticGlobal).__sigmaSecondInstanceDiagnostics = diagnostics;
+      app.on("second-instance", (_event, argv, workingDirectory, additionalData) => {
+        diagnostics.push({ argv, workingDirectory, additionalData });
+      });
+    });
+
     // A real second process exercises Electron's lock and additionalData transport.
-    const executable = app.process().spawnfile;
+    const executable = ELECTRON_EXECUTABLE;
+    expect(existsSync(executable), `Electron executable does not exist: ${executable}`).toBe(true);
     await new Promise<void>((resolve, reject) => {
       const child = spawn(executable, [APP_ROOT, second, third], {
         cwd: root, env: { ...env, NODE_ENV: process.env.NODE_ENV }, stdio: ["ignore", "pipe", "pipe"],
@@ -77,10 +101,20 @@ test("opens startup/second-instance/macOS files through real storage and preserv
       child.once("error", (error) => { clearTimeout(timer); reject(error); });
       child.once("exit", (code, signal) => {
         clearTimeout(timer);
+        console.log("[electron-smoke] secondary process output:", childOutput.slice(-4000));
         if (code === 0) resolve();
         else reject(new Error(`Secondary exit code=${code} signal=${signal}; output=${childOutput.slice(-4000)}`));
       });
     });
+    const secondInstanceDiagnostics = await app.evaluate(() =>
+      (globalThis as SecondInstanceDiagnosticGlobal).__sigmaSecondInstanceDiagnostics ?? []);
+    console.log("[electron-smoke] second-instance diagnostics:", JSON.stringify(secondInstanceDiagnostics));
+
+    // Distinguish a missing second-instance delivery from a tab-activation failure.
+    await expect.poll(async () => {
+      const records = await page.evaluate(() => window.desktopAPI!.storage.listFiles());
+      return records.filter((file) => ["既存 教材", "追加 教材"].includes(file.title)).length;
+    }, { timeout: 15_000 }).toBe(2);
     await expect(page.locator(BODY).first()).toContainText("THIRD_CONTENT");
     const files = await page.evaluate(() => window.desktopAPI!.storage.listFiles());
     expect(files.filter((file) => ["既存 教材", "追加 教材"].includes(file.title))).toHaveLength(2);
