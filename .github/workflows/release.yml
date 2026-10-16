@@ -158,6 +158,24 @@ jobs:
         env:
           NODE_OPTIONS: --max-old-space-size=4096
 
+      # electron-builder publishes the installer and blockmap concurrently. Ensure the
+      # release exists first so both publisher tasks cannot race to create the same tag.
+      - name: Ensure GitHub Release exists before publishing artifacts
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          version="$(node -p "require('./package.json').version")"
+          tag="v${version}"
+          if ! gh release view "${tag}" --repo "${GITHUB_REPOSITORY}" >/dev/null 2>&1; then
+            args=(--repo "${GITHUB_REPOSITORY}" --title "${tag}" --notes "Automated release for Sigma Studio ${version}.")
+            if [[ "${{ steps.channel.outputs.channel }}" == "beta" ]]; then
+              args+=(--prerelease)
+            fi
+            gh release create "${tag}" "${args[@]}" --target "${{ needs.prepare.outputs.ref }}"
+          fi
+
       - name: Build and publish Windows installer
         working-directory: apps/desktop
         run: npx --no-install electron-builder --win --publish always --config electron-builder.config.cjs
