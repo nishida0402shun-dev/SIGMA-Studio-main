@@ -64,6 +64,15 @@ test("opens startup/second-instance/macOS files through real storage and preserv
       return JSON.stringify(saved).includes("EDIT_BEFORE_OPEN");
     }, { timeout: 30_000 }).toBe(true);
 
+    // Observe the primary process event directly so CI distinguishes event delivery from
+    // argument parsing, queueing, IPC notification, and renderer import failures.
+    await app.evaluate(({ app }) => {
+      const diagnostics = ((globalThis as any).__sigmaSecondInstanceDiagnostics = [] as unknown[]);
+      app.on("second-instance", (_event, argv, workingDirectory, additionalData) => {
+        diagnostics.push({ argv, workingDirectory, additionalData });
+      });
+    });
+
     // A real second process exercises Electron's lock and additionalData transport.
     const executable = app.process().spawnfile;
     await new Promise<void>((resolve, reject) => {
@@ -81,6 +90,10 @@ test("opens startup/second-instance/macOS files through real storage and preserv
         else reject(new Error(`Secondary exit code=${code} signal=${signal}; output=${childOutput.slice(-4000)}`));
       });
     });
+    const secondInstanceDiagnostics = await app.evaluate(() =>
+      ((globalThis as any).__sigmaSecondInstanceDiagnostics ?? []) as unknown[]);
+    console.log("[electron-smoke] second-instance diagnostics:", JSON.stringify(secondInstanceDiagnostics));
+
     // Distinguish a missing second-instance delivery from a tab-activation failure.
     await expect.poll(async () => {
       const records = await page.evaluate(() => window.desktopAPI!.storage.listFiles());
