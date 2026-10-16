@@ -1,4 +1,5 @@
 import { spawn } from "node:child_process";
+import { createRequire } from "node:module";
 import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -6,6 +7,8 @@ import { _electron as electron, expect, test, type ElectronApplication } from "@
 
 const APP_ROOT = path.resolve(__dirname, "../..");
 const MAIN_ENTRY = path.join(APP_ROOT, "dist-electron/main.cjs");
+const require = createRequire(__filename);
+const ELECTRON_EXECUTABLE = require("electron") as string;
 const DEV_URL = process.env.SIGMA_STUDIO_DEV_SERVER_URL;
 const PREPARED = existsSync(MAIN_ENTRY) && (Boolean(DEV_URL) || existsSync(path.join(APP_ROOT, "out/index.html")));
 const BODY = ".page-flow .ProseMirror";
@@ -85,7 +88,8 @@ test("opens startup/second-instance/macOS files through real storage and preserv
     });
 
     // A real second process exercises Electron's lock and additionalData transport.
-    const executable = app.process().spawnfile;
+    const executable = ELECTRON_EXECUTABLE;
+    expect(existsSync(executable), `Electron executable does not exist: ${executable}`).toBe(true);
     await new Promise<void>((resolve, reject) => {
       const child = spawn(executable, [APP_ROOT, second, third], {
         cwd: root, env: { ...env, NODE_ENV: process.env.NODE_ENV }, stdio: ["ignore", "pipe", "pipe"],
