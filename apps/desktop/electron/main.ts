@@ -279,9 +279,13 @@ app.on("open-file", (event, filePath) => {
 });
 app.on("second-instance", (_event, argv, workingDirectory, additionalData) => {
   const forwarded = (additionalData as { documentPaths?: unknown } | undefined)?.documentPaths;
-  externalDocumentOpenQueue.enqueue(Array.isArray(forwarded)
+  // additionalData is the preferred transport, but an empty/stale payload must not
+  // suppress paths that Electron also supplies in argv. The queue de-duplicates paths.
+  const forwardedPaths = Array.isArray(forwarded)
     ? forwarded.filter((value): value is string => typeof value === "string")
-    : documentPathsFromArgv(argv, workingDirectory, Boolean(process.defaultApp)));
+    : [];
+  const argvPaths = documentPathsFromArgv(argv, workingDirectory, Boolean(process.defaultApp));
+  externalDocumentOpenQueue.enqueue([...forwardedPaths, ...argvPaths]);
   focusDocumentWindow();
 });
 
