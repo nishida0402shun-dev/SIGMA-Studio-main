@@ -105,6 +105,7 @@ const SHARED_WORKSPACE_PATH = resolveSharedWorkspacePath();
 const startupDocumentPaths = documentPathsFromArgv(process.argv, process.cwd(), Boolean(process.defaultApp));
 // A secondary launch only forwards files. It must not clear active AI contexts or start stores.
 const hasSingleInstanceLock = app.requestSingleInstanceLock({ documentPaths: startupDocumentPaths });
+console.error("[electron-single-instance] startup", JSON.stringify({ pid: process.pid, argv: process.argv, cwd: process.cwd(), userDataPath: app.getPath("userData"), hasSingleInstanceLock, documentPaths: startupDocumentPaths }));
 if (!hasSingleInstanceLock && DEV_SERVER_URL && startupDocumentPaths.length === 0) {
   console.error("[desktop] This development data directory is already open in another instance.");
   process.exitCode = 1;
