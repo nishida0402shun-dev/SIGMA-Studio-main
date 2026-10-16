@@ -81,6 +81,11 @@ test("opens startup/second-instance/macOS files through real storage and preserv
         else reject(new Error(`Secondary exit code=${code} signal=${signal}; output=${childOutput.slice(-4000)}`));
       });
     });
+    // Distinguish a missing second-instance delivery from a tab-activation failure.
+    await expect.poll(async () => {
+      const records = await page.evaluate(() => window.desktopAPI!.storage.listFiles());
+      return records.filter((file) => ["既存 教材", "追加 教材"].includes(file.title)).length;
+    }, { timeout: 15_000 }).toBe(2);
     await expect(page.locator(BODY).first()).toContainText("THIRD_CONTENT");
     const files = await page.evaluate(() => window.desktopAPI!.storage.listFiles());
     expect(files.filter((file) => ["既存 教材", "追加 教材"].includes(file.title))).toHaveLength(2);
