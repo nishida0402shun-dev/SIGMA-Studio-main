@@ -97,6 +97,7 @@ test("opens startup/second-instance/macOS files through real storage and preserv
       child.once("error", (error) => { clearTimeout(timer); reject(error); });
       child.once("exit", (code, signal) => {
         clearTimeout(timer);
+        console.log("[electron-smoke] secondary process output:", childOutput.slice(-4000));
         if (code === 0) resolve();
         else reject(new Error(`Secondary exit code=${code} signal=${signal}; output=${childOutput.slice(-4000)}`));
       });
