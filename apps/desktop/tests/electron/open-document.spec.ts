@@ -10,6 +10,16 @@ const DEV_URL = process.env.SIGMA_STUDIO_DEV_SERVER_URL;
 const PREPARED = existsSync(MAIN_ENTRY) && (Boolean(DEV_URL) || existsSync(path.join(APP_ROOT, "out/index.html")));
 const BODY = ".page-flow .ProseMirror";
 
+type SecondInstanceDiagnostic = {
+  argv: string[];
+  workingDirectory: string;
+  additionalData: unknown;
+};
+
+type SecondInstanceDiagnosticGlobal = typeof globalThis & {
+  __sigmaSecondInstanceDiagnostics?: SecondInstanceDiagnostic[];
+};
+
 function source(text: string) {
   return {
     version: "2.0", docId: "shared-source-id", metadata: { title: "Original" },
@@ -67,7 +77,8 @@ test("opens startup/second-instance/macOS files through real storage and preserv
     // Observe the primary process event directly so CI distinguishes event delivery from
     // argument parsing, queueing, IPC notification, and renderer import failures.
     await app.evaluate(({ app }) => {
-      const diagnostics = ((globalThis as any).__sigmaSecondInstanceDiagnostics = [] as unknown[]);
+      const diagnostics: SecondInstanceDiagnostic[] = [];
+      (globalThis as SecondInstanceDiagnosticGlobal).__sigmaSecondInstanceDiagnostics = diagnostics;
       app.on("second-instance", (_event, argv, workingDirectory, additionalData) => {
         diagnostics.push({ argv, workingDirectory, additionalData });
       });
@@ -91,7 +102,7 @@ test("opens startup/second-instance/macOS files through real storage and preserv
       });
     });
     const secondInstanceDiagnostics = await app.evaluate(() =>
-      ((globalThis as any).__sigmaSecondInstanceDiagnostics ?? []) as unknown[]);
+      (globalThis as SecondInstanceDiagnosticGlobal).__sigmaSecondInstanceDiagnostics ?? []);
     console.log("[electron-smoke] second-instance diagnostics:", JSON.stringify(secondInstanceDiagnostics));
 
     // Distinguish a missing second-instance delivery from a tab-activation failure.
