@@ -76,6 +76,9 @@ test("opens startup/second-instance/macOS files through real storage and preserv
       const saved = await page.evaluate((fileId) => window.desktopAPI!.storage.loadDocument(fileId), imported.fileId);
       return JSON.stringify(saved).includes("EDIT_BEFORE_OPEN");
     }, { timeout: 30_000 }).toBe(true);
+    // The file may reach disk just before the editor finishes updating its save-boundary refs.
+    // Wait for the UI's settled state as well so the second-instance open does not race that boundary.
+    await expect(page.locator(".save-state.saved")).toBeVisible({ timeout: 30_000 });
 
     // Observe the primary process event directly so CI distinguishes event delivery from
     // argument parsing, queueing, IPC notification, and renderer import failures.
