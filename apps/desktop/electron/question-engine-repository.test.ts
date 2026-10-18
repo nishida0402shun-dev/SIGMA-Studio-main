@@ -2,7 +2,12 @@ import { mkdtemp, rm } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
-import { QUESTION_ENGINE_SCHEMA_VERSION, openQuestionEngineDatabase, SqliteQuestionRepository, type QuestionEngineDatabase } from "../../../packages/question-engine/src/index";
+import {
+  QUESTION_ENGINE_SCHEMA_VERSION,
+  openQuestionEngineDatabase,
+  SqliteQuestionRepository,
+  type QuestionEngineDatabase,
+} from "../../../packages/question-engine/src/index";
 
 describe("SqliteQuestionRepository", () => {
   let dir: string | undefined;
