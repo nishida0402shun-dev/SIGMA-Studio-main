@@ -321,6 +321,11 @@ export function initializeQuestionEngineSchema(db: SqliteSchemaDriver, now = new
   if (version > QUESTION_ENGINE_SCHEMA_VERSION) {
     throw new Error(`Question Engine DB schema version ${version} is newer than this application supports (${QUESTION_ENGINE_SCHEMA_VERSION})`);
   }
+  if (version > 0 && version < QUESTION_ENGINE_SCHEMA_VERSION) {
+    throw new Error(
+      `Question Engine DB schema version ${version} cannot be upgraded automatically; a verified migration path to version ${QUESTION_ENGINE_SCHEMA_VERSION} is not available`,
+    );
+  }
   if (version === QUESTION_ENGINE_SCHEMA_VERSION) return;
 
   const apply = () => {
