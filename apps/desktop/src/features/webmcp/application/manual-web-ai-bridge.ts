@@ -1,24 +1,44 @@
-import type { WebMcpToolDefinition } from "@/lib/webmcp-tools";
-
 export const MANUAL_WEB_AI_BRIDGE_PROTOCOL = "sigma-mcp-bridge/v1";
 export const MANUAL_WEB_AI_BRIDGE_MAX_REQUEST_CHARS = 32_768;
 export const MANUAL_WEB_AI_BRIDGE_MAX_RESPONSE_CHARS = 65_536;
 export const MANUAL_WEB_AI_BRIDGE_TIMEOUT_MS = 10_000;
 
 /**
- * The manual bridge intentionally exposes a short, explicit read-only allowlist.
- * A tool's annotation alone is not sufficient to grant access through this surface.
+ * Explicit allowlist for the manual fallback. Do not replace this with a check of
+ * readOnlyHint alone: annotations are descriptive metadata, not an authorization policy.
  */
 export const MANUAL_WEB_AI_READ_ONLY_TOOLS = [
-  "get_agent_instructions",
-  "inspect_document",
-  "read_blocks",
+  "get_local_app_status",
+  "list_local_documents",
+  "read_local_document",
+  "get_edit_context",
+  "get_document_outline",
+  "get_block",
+  "get_blocks",
   "search_document",
-  "validate_document",
+  "search_library",
+  "validate_local_document",
+  "list_materials",
+  "get_material",
+  "render_block_context",
+  "render_page",
+  "get_selected_block",
+  "get_insertion_candidates",
+  "get_neighbor_blocks",
+  "get_active_reference",
+  "get_attached_media",
+  "get_mentioned_sigma_docs",
+  "list_generated_images",
+  "get_image_reference",
+  "knowledge_db_list_sources",
+  "knowledge_db_search",
+  "knowledge_db_get_page",
+  "knowledge_db_get_region",
+  "conversation_memory_search",
+  "conversation_memory_recent",
 ] as const;
 
 type ManualToolName = (typeof MANUAL_WEB_AI_READ_ONLY_TOOLS)[number];
-
 type JsonRecord = Record<string, unknown>;
 
 interface ManualBridgeRequest {
@@ -58,7 +78,13 @@ interface JsonSchema {
   oneOf?: JsonSchema[];
 }
 
-type ManualBridgeTool = Pick<WebMcpToolDefinition, "name" | "inputSchema" | "annotations" | "execute">;
+export interface ManualBridgeTool {
+  name: string;
+  description?: string;
+  inputSchema: Record<string, unknown>;
+  annotations?: { readOnlyHint?: boolean };
+  execute(input: JsonRecord): Promise<unknown> | unknown;
+}
 
 function isRecord(value: unknown): value is JsonRecord {
   return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -109,7 +135,8 @@ function schemaMatches(value: unknown, schema: JsonSchema): boolean {
       const propertySchema = properties[key];
       if (propertySchema) {
         if (!schemaMatches(item, propertySchema)) return false;
-      } else if (schema.additionalProperties === false || schema.additionalProperties === undefined && Object.keys(properties).length > 0) {
+      } else if (schema.additionalProperties === false
+        || schema.additionalProperties === undefined && schema.properties !== undefined) {
         return false;
       } else if (isRecord(schema.additionalProperties) && !schemaMatches(item, schema.additionalProperties)) {
         return false;
@@ -163,10 +190,7 @@ export function parseManualWebAiBridgeRequest(input: string): ManualBridgeReques
   };
 }
 
-/**
- * Execute one allowlisted read-only browser tool requested by a pasted JSON envelope.
- * The result is data only; callers must never interpret tool output as executable instructions.
- */
+/** Execute one allowlisted read-only MCP tool request pasted from a Web AI chat. */
 export async function executeManualWebAiBridgeRequest(
   input: string,
   tools: readonly ManualBridgeTool[],
@@ -176,7 +200,9 @@ export async function executeManualWebAiBridgeRequest(
   if ("ok" in parsed) return parsed;
 
   const tool = tools.find((candidate) => candidate.name === parsed.tool);
-  if (!tool || !tool.annotations.readOnlyHint || !MANUAL_WEB_AI_READ_ONLY_TOOLS.includes(tool.name as ManualToolName)) {
+  if (!tool
+    || tool.annotations?.readOnlyHint !== true
+    || !MANUAL_WEB_AI_READ_ONLY_TOOLS.includes(tool.name as ManualToolName)) {
     return errorResult("TOOL_NOT_ALLOWED", "許可済みの読み取り専用ツールとして登録されていません。", parsed.tool);
   }
 
