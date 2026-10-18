@@ -38,6 +38,11 @@ describe("SqliteQuestionRepository", () => {
     });
 
     expect(created.version).toBe(1);
+    const sourceMetadata = database!.raw.prepare(
+      "SELECT page_count FROM qe_sources WHERE id = ?",
+    ).get("textbook-1") as { page_count: number };
+    // A citation page number is not the total page count of the source document.
+    expect(sourceMetadata.page_count).toBe(0);
     expect((await repository.getById(created.id))?.answer?.verification).toBe("source-checked");
     expect((await repository.search({ text: "放物線", tagIds: ["tag-math"], reviewStatuses: ["needs-review"] })).total).toBe(1);
     expect((await repository.search({ text: "数学" })).items[0]?.id).toBe(created.id);
