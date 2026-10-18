@@ -70,6 +70,12 @@ const desktopAPI = {
     getPreloadUrl(): Promise<string> {
       return ipcRenderer.invoke("web-ai:get-preload-url");
     },
+    listManualMcpTools(workspaceId: string | null): Promise<unknown[]> {
+      return ipcRenderer.invoke("web-ai:list-manual-mcp-tools", workspaceId);
+    },
+    runManualMcpRequest(input: string, workspaceId: string | null): Promise<unknown> {
+      return ipcRenderer.invoke("web-ai:run-manual-mcp-request", input, workspaceId);
+    },
   },
 
   longTermMemory: {
