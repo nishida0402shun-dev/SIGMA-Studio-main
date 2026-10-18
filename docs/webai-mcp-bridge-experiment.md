@@ -74,9 +74,11 @@ This experiment does not claim that the free ChatGPT website can automatically i
 - Added main-process IPC methods that only accept calls from the main renderer, list an explicit allowlist of tools annotated read-only, and invoke the existing MCP gateway.
 - Added a manual request/result panel to `AiWebProviderPanel`, including a copyable ChatGPT instruction prompt, JSON request input, bounded result display, and result-copy action.
 - No API token is exposed to the renderer, and no webview page can trigger the manual execution path directly. Tool execution requires an explicit click in the host UI.
-- The last CI attempt caught a TypeScript syntax error in the translated fallback message. That expression has been corrected; the next CI run must confirm typecheck, lint, unit tests, build, and Electron smoke checks.
-- A real ChatGPT login/session round trip has not been manually verified in a running Electron app.
+- The latest GitHub Actions run for commit `8ef9072ef1445cc8b5966c341b30d77a500c5c63` completed successfully (run 1393): TypeScript typecheck, lint, Electron preparation, the desktop test suite, Windows Electron smoke test, public package/contracts, and Windows file-locking checks passed.
+- Desktop unit-test result from CI: 670 test files passed, 1 skipped; 9,123 tests passed, 4 expected failures, 2 skipped.
+- The Windows Electron smoke job passed (1 test). This is not the same as a manual UI round trip with a signed-in ChatGPT session.
+- A real ChatGPT login/session round trip has not been manually verified in a running Electron app. The actual tool request/rejection behavior still needs an interactive verification.
 
 ## Next implementation step
 
-Run the full CI suite on the corrected branch and fix any remaining failures. Then verify in Electron that the tool catalog loads for a selected Workspace, valid read-only requests return results, malformed/unknown/write-capable requests are rejected, and the copied result can be interpreted by ChatGPT. Do not merge to `main` until those checks pass.
+Run the Electron app in a real desktop session and verify that the tool catalog loads for a selected Workspace, a valid read-only request returns results, malformed/unknown/write-capable requests are rejected without invocation, and the copied result can be pasted back into ChatGPT. Record those observations separately from CI. Do not merge to `main` until that check is completed and reviewed.
