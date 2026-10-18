@@ -496,9 +496,10 @@ const webAiAgentRuntime = createWebAiAgentRuntime({
 
 function resolveSharedWorkspacePath(): string {
   const explicit = process.env.SIGMA_STUDIO_SHARED_WORKSPACE_DIR?.trim();
+  const defaultWorkspaceName = IS_BETA_BUILD ? "Sigma Studio Beta" : "Sigma Studio";
   return explicit
     ? path.resolve(explicit)
-    : path.join(app.getPath("appData"), "Sigma Studio", "Workspace");
+    : path.join(app.getPath("appData"), defaultWorkspaceName, "Workspace");
 }
 
 function resolveUserDataPath(): string {
