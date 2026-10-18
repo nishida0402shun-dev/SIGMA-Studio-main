@@ -313,11 +313,34 @@ const CORE_SCHEMA = `
 
 export function initializeQuestionEngineSchema(db: SqliteSchemaDriver, now = new Date().toISOString()): void {
   db.exec("PRAGMA foreign_keys = ON;");
+
+  // Never mistake an unversioned, pre-existing Question Engine database for a fresh one.
+  // CREATE TABLE IF NOT EXISTS cannot migrate columns and could otherwise stamp an old
+  // schema as current while silently leaving its tables unchanged.
+  const existingTables = db.prepare(
+    "SELECT COUNT(*) AS count FROM sqlite_master WHERE type = 'table' AND name GLOB 'qe_*' AND name <> 'qe_schema_migrations'",
+  ).get() as { count: number };
+  const migrationTableExists = db.prepare(
+    "SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'qe_schema_migrations'",
+  ).get();
+
+  if (!migrationTableExists && existingTables.count > 0) {
+    throw new Error(
+      "Question Engine DB contains existing tables without a schema version; automatic migration is unsafe and a verified migration path is not available",
+    );
+  }
+
   db.exec(MIGRATION_TABLE);
   const current = db.prepare("SELECT MAX(version) AS version FROM qe_schema_migrations").get() as
     | { version?: number | null }
     | undefined;
   const version = Number(current?.version ?? 0);
+
+  if (version === 0 && existingTables.count > 0) {
+    throw new Error(
+      "Question Engine DB contains existing tables without a schema version; automatic migration is unsafe and a verified migration path is not available",
+    );
+  }
   if (version > QUESTION_ENGINE_SCHEMA_VERSION) {
     throw new Error(`Question Engine DB schema version ${version} is newer than this application supports (${QUESTION_ENGINE_SCHEMA_VERSION})`);
   }
