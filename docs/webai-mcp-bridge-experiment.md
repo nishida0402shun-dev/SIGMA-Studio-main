@@ -25,7 +25,7 @@ Keep the existing local Web AI bridge and STDIO MCP gateway. Add a user-mediated
 1. SIGMA Studio lists only explicitly approved read-only MCP tools and their input schemas.
 2. The user copies a prompt containing those schemas into ChatGPT. ChatGPT responds with one strict JSON request envelope when local data is needed.
 3. The user pastes the JSON into the panel and explicitly clicks **Run**.
-4. The preload validates the protocol, tool allowlist, read-only annotation, and tool input schema, then invokes the existing authenticated localhost `/v1/mcp/call` endpoint.
+4. The Electron main process validates the protocol, explicit tool allowlist, read-only annotation, and tool input schema, then invokes the existing MCP gateway.
 5. The panel displays a bounded JSON result and lets the user copy it back into ChatGPT.
 
 This is deliberately semi-automatic. It does not rely on unsupported ChatGPT MCP support and does not create another MCP server or tool registry. Do not execute arbitrary tool names, shell commands, write-capable tools, or model-supplied paths.
@@ -71,12 +71,12 @@ This experiment does not claim that the free ChatGPT website can automatically i
 ## Current implementation status
 
 - Added a strict request parser/executor and focused tests under `features/webmcp/application`.
-- Added main-process IPC methods that only accept calls from the main renderer, list an explicit allowlist of tools annotated read-only, and invoke the existing MCP gateway.
+- Added main-process IPC methods that only accept calls from the main renderer's main frame, list an explicit allowlist of tools annotated read-only, and invoke the existing MCP gateway.
 - Added a manual request/result panel to `AiWebProviderPanel`, including a copyable ChatGPT instruction prompt, JSON request input, bounded result display, and result-copy action.
 - No API token is exposed to the renderer, and no webview page can trigger the manual execution path directly. Tool execution requires an explicit click in the host UI.
-- The latest GitHub Actions run for commit `8ef9072ef1445cc8b5966c341b30d77a500c5c63` completed successfully (run 1393): TypeScript typecheck, lint, Electron preparation, the desktop test suite, Windows Electron smoke test, public package/contracts, and Windows file-locking checks passed.
-- Desktop unit-test result from CI: 670 test files passed, 1 skipped; 9,123 tests passed, 4 expected failures, 2 skipped.
-- The Windows Electron smoke job passed (1 test). This is not the same as a manual UI round trip with a signed-in ChatGPT session.
+- Latest GitHub Actions run for commit `1ef372fd12bdea42ee606afc58dec5b13b468d1e` completed successfully (run 1396). All four jobs passed: desktop build/unit checks (including typecheck and lint), Windows Electron smoke test, public package/contracts checks, and Windows file-locking checks.
+- The desktop suite on the preceding CI run reported 670 test files passed, 1 skipped; 9,123 tests passed, 4 expected failures, 2 skipped. Do not treat those historical counts as a separately re-reported count for run 1396.
+- The Windows Electron smoke job passed in run 1396. This is not the same as a manual UI round trip with a signed-in ChatGPT session.
 - A real ChatGPT login/session round trip has not been manually verified in a running Electron app. The actual tool request/rejection behavior still needs an interactive verification.
 
 ## Next implementation step
