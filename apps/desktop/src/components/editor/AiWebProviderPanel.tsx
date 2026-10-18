@@ -99,7 +99,7 @@ export function AiWebProviderPanel({
       if (!cancelled) setManualStatus(error instanceof Error ? error.message : t("webAi.manualBridge.toolsLoadFailed"));
     });
     return () => { cancelled = true; };
-  }, [manualBridgeOpen, workspaceId]);
+  }, [manualBridgeOpen, t, workspaceId]);
 
   const selected = useMemo(
     () => PROVIDERS.find((item) => item.id === provider) ?? PROVIDERS[0],
