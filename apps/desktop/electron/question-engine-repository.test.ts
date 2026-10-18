@@ -165,6 +165,37 @@ describe("SqliteQuestionRepository", () => {
     expect(conversationSearch("asteroid")).toHaveLength(0);
   });
 
+  it("rolls back question creation and related records when version history fails", async () => {
+    const repository = await createRepository();
+    database!.raw.exec(`
+      CREATE TRIGGER qe_test_fail_version_insert
+      BEFORE INSERT ON qe_question_versions
+      BEGIN
+        SELECT RAISE(ABORT, 'forced version history failure');
+      END;
+    `);
+
+    await expect(repository.create({
+      title: "Rollback test",
+      body: { format: "plain-text", content: "This record must not persist." },
+      tags: [{ id: "rollback-tag", label: "rollback-tag", taxonomyPath: [] }],
+      sources: [{ id: "rollback-source", name: "Rollback source", pageNumber: 1 }],
+    })).rejects.toThrow("forced version history failure");
+
+    for (const table of [
+      "qe_questions",
+      "qe_question_tags",
+      "qe_question_sources",
+      "qe_question_versions",
+      "qe_questions_fts",
+    ]) {
+      const row = database!.raw.prepare(`SELECT COUNT(*) AS count FROM ${table}`).get() as { count: number };
+      expect(row.count, `expected ${table} to roll back`).toBe(0);
+    }
+    expect((database!.raw.prepare("SELECT COUNT(*) AS count FROM qe_tags").get() as { count: number }).count).toBe(0);
+    expect((database!.raw.prepare("SELECT COUNT(*) AS count FROM qe_sources").get() as { count: number }).count).toBe(0);
+  });
+
   it("creates, searches, updates with optimistic locking, and deletes questions", async () => {
     const repository = await createRepository();
     const created = await repository.create({
