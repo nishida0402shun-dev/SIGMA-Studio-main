@@ -89,7 +89,6 @@ export function AiWebProviderPanel({
     let cancelled = false;
     const api = getDesktopBridge()?.webAi;
     if (!api?.listManualMcpTools) {
-      setManualStatus("手動MCPブリッジは利用できません。");
       return;
     }
     void api.listManualMcpTools(workspaceId).then((tools) => {
@@ -97,7 +96,7 @@ export function AiWebProviderPanel({
       setManualTools(Array.isArray(tools) ? tools as ManualBridgeToolDescriptor[] : []);
       setManualStatus("");
     }).catch((error: unknown) => {
-      if (!cancelled) setManualStatus(error instanceof Error ? error.message : "MCPツール一覧を取得できませんでした。");
+      if (!cancelled) setManualStatus(error instanceof Error ? error.message : t("webAi.manualBridge.toolsLoadFailed"));
     });
     return () => { cancelled = true; };
   }, [manualBridgeOpen, workspaceId]);
@@ -183,27 +182,27 @@ export function AiWebProviderPanel({
     ].join("\n\n");
     try {
       await navigator.clipboard.writeText(prompt);
-      setManualStatus("ChatGPT向け指示をコピーしました。");
+      setManualStatus(t("webAi.manualBridge.instructionsCopied"));
     } catch {
-      setManualStatus("クリップボードにコピーできませんでした。");
+      setManualStatus(t("webAi.manualBridge.clipboardCopyFailed"));
     }
   };
 
   const runManualRequest = async () => {
     const api = getDesktopBridge()?.webAi;
     if (!api?.runManualMcpRequest) {
-      setManualStatus("手動MCPブリッジは利用できません。");
+      setManualStatus(t("webAi.manualBridge.unavailable"));
       return;
     }
     setManualBusy(true);
-    setManualStatus("読み取り専用ツールを実行しています…");
+    setManualStatus(t("webAi.manualBridge.requestRunning"));
     setManualResult("");
     try {
       const result = await api.runManualMcpRequest(manualRequest, workspaceId);
       setManualResult(JSON.stringify(result, null, 2) ?? String(result));
-      setManualStatus("実行結果を受け取りました。結果はデータとして確認してください。");
+      setManualStatus(t("webAi.manualBridge.requestSucceeded"));
     } catch (error) {
-      setManualStatus(error instanceof Error ? error.message : "MCPリクエストを実行できませんでした。");
+      setManualStatus(error instanceof Error ? error.message : t("webAi.manualBridge.requestFailed"));
     } finally {
       setManualBusy(false);
     }
@@ -213,9 +212,9 @@ export function AiWebProviderPanel({
     if (!manualResult) return;
     try {
       await navigator.clipboard.writeText(manualResult);
-      setManualStatus("ツール結果をコピーしました。ChatGPTに貼り付けてください。");
+      setManualStatus(t("webAi.manualBridge.resultCopied"));
     } catch {
-      setManualStatus("結果をクリップボードにコピーできませんでした。");
+      setManualStatus(t("webAi.manualBridge.resultCopyFailed"));
     }
   };
 
@@ -316,21 +315,21 @@ export function AiWebProviderPanel({
       </div>
       {manualBridgeOpen && (
         <section
-          aria-label="手動MCPブリッジ"
+          aria-label={t("webAi.manualBridge.ariaLabel")}
           style={{ display: "grid", gap: 8, padding: 10, borderBottom: "1px solid var(--border, #8884)", maxHeight: 330, overflow: "auto" }}
         >
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, flexWrap: "wrap" }}>
-            <strong>Web AI 手動MCPブリッジ</strong>
+            <strong>{t("webAi.manualBridge.title")}</strong>
             <span style={{ fontSize: 12, opacity: 0.8 }}>
-              {workspaceId ? "選択中のWorkspaceに限定" : "Workspace未選択：全体検索系ツールのみ"}
+              {workspaceId ? t("webAi.manualBridge.workspaceScoped") : t("webAi.manualBridge.workspaceUnselected")}
             </span>
           </div>
           <p style={{ margin: 0, fontSize: 12 }}>
-            ChatGPTがWebMCPに対応していない場合の手動経路です。許可済みの読み取り専用ツールだけを、実行ボタンを押したときに呼び出します。
+            {t("webAi.manualBridge.description")}
           </p>
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
             <button type="button" onClick={() => void copyManualInstructions()} disabled={manualTools.length === 0}>
-              ChatGPT向け指示をコピー
+              {t("webAi.manualBridge.copyInstructions")}
             </button>
             <button type="button" onClick={() => {
               const api = getDesktopBridge()?.webAi;
@@ -338,17 +337,17 @@ export function AiWebProviderPanel({
               void api.listManualMcpTools(workspaceId).then((tools) => {
                 setManualTools(Array.isArray(tools) ? tools as ManualBridgeToolDescriptor[] : []);
                 setManualStatus("");
-              }).catch((error: unknown) => setManualStatus(error instanceof Error ? error.message : "MCPツール一覧を取得できませんでした。"));
+              }).catch((error: unknown) => setManualStatus(error instanceof Error ? error.message : "t("webAi.manualBridge.toolsLoadFailed")"));
             }}>
-              ツール一覧を更新
+              {t("webAi.manualBridge.refreshTools")}
             </button>
           </div>
           <label style={{ display: "grid", gap: 4, fontSize: 12 }}>
-            ChatGPTが出力したJSONリクエスト
+            {t("webAi.manualBridge.requestLabel")}
             <textarea
               value={manualRequest}
               onChange={(event) => setManualRequest(event.target.value)}
-              placeholder={'{"protocol":"sigma-mcp-bridge/v1","tool":"search_document","arguments":{"query":"…"}}'}
+              placeholder={t("webAi.manualBridge.requestPlaceholder")}
               rows={3}
               spellCheck={false}
               style={{ width: "100%", resize: "vertical", fontFamily: "monospace", fontSize: 12 }}
@@ -356,16 +355,16 @@ export function AiWebProviderPanel({
           </label>
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
             <button type="button" onClick={() => void runManualRequest()} disabled={manualBusy || !manualRequest.trim()}>
-              {manualBusy ? "実行中…" : "読み取り専用ツールを実行"}
+              {manualBusy ? t("webAi.manualBridge.running") : t("webAi.manualBridge.runTool")}
             </button>
             <button type="button" onClick={() => void copyManualResult()} disabled={!manualResult}>
-              結果をコピー
+              {t("webAi.manualBridge.copyResult")}
             </button>
           </div>
           {manualStatus && <p role="status" style={{ margin: 0, fontSize: 12 }}>{manualStatus}</p>}
           {manualTools.length > 0 && (
             <details>
-              <summary>許可済みツール ({manualTools.length})</summary>
+              <summary>{t("webAi.manualBridge.toolCatalog", { count: manualTools.length })}</summary>
               <ul style={{ margin: "6px 0", paddingLeft: 20, fontSize: 12 }}>
                 {manualTools.map((tool) => <li key={tool.name}><code>{tool.name}</code> — {tool.description}</li>)}
               </ul>
@@ -373,7 +372,7 @@ export function AiWebProviderPanel({
           )}
           {manualResult && (
             <label style={{ display: "grid", gap: 4, fontSize: 12 }}>
-              MCPツールの結果（ChatGPTへ貼り付け可能）
+              {t("webAi.manualBridge.resultLabel")}
               <textarea
                 readOnly
                 value={manualResult}
