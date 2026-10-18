@@ -337,7 +337,7 @@ export function AiWebProviderPanel({
               void api.listManualMcpTools(workspaceId).then((tools) => {
                 setManualTools(Array.isArray(tools) ? tools as ManualBridgeToolDescriptor[] : []);
                 setManualStatus("");
-              }).catch((error: unknown) => setManualStatus(error instanceof Error ? error.message : "t("webAi.manualBridge.toolsLoadFailed")"));
+              }).catch((error: unknown) => setManualStatus(error instanceof Error ? error.message : t("webAi.manualBridge.toolsLoadFailed")));
             }}>
               {t("webAi.manualBridge.refreshTools")}
             </button>
