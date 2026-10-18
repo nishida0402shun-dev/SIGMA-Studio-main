@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import {
   executeManualWebAiBridgeRequest,
+  filterManualWebAiBridgeTools,
   MANUAL_WEB_AI_BRIDGE_PROTOCOL,
   MANUAL_WEB_AI_BRIDGE_MAX_REQUEST_CHARS,
   parseManualWebAiBridgeRequest,
@@ -60,6 +61,17 @@ describe("manual web AI bridge request parsing", () => {
   it("rejects requests above the size limit", () => {
     const result = parseManualWebAiBridgeRequest(" ".repeat(MANUAL_WEB_AI_BRIDGE_MAX_REQUEST_CHARS + 1));
     expect(result).toMatchObject({ ok: false, error: { code: "INVALID_REQUEST" } });
+  });
+});
+
+describe("manual web AI bridge catalog", () => {
+  it("exposes only allowlisted tools marked read-only", () => {
+    const catalog = filterManualWebAiBridgeTools([
+      { name: "search_document", description: "Search", inputSchema: { type: "object" }, annotations: { readOnlyHint: true } },
+      { name: "insert_markdown", description: "Write", inputSchema: { type: "object" }, annotations: { readOnlyHint: false } },
+      { name: "get_block", description: "Missing annotation", inputSchema: { type: "object" } },
+    ]);
+    expect(catalog.map((entry) => entry.name)).toEqual(["search_document"]);
   });
 });
 
