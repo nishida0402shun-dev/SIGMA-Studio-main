@@ -136,8 +136,8 @@ ipcMain.handle("web-ai:get-preload-url", (event) => {
 });
 
 ipcMain.handle("web-ai:list-manual-mcp-tools", async (event, workspaceIdInput: unknown) => {
-  if (event.sender !== mainWindow?.webContents) {
-    throw new Error("Manual MCP tool catalog is only available to the main renderer");
+  if (event.sender !== mainWindow?.webContents || event.senderFrame !== mainWindow.webContents.mainFrame) {
+    throw new Error("Manual MCP tool catalog is only available to the main renderer main frame");
   }
   if (workspaceIdInput !== null && typeof workspaceIdInput !== "string") {
     throw new Error("workspaceId must be a string or null");
@@ -156,8 +156,8 @@ ipcMain.handle("web-ai:list-manual-mcp-tools", async (event, workspaceIdInput: u
 });
 
 ipcMain.handle("web-ai:run-manual-mcp-request", async (event, input: unknown, workspaceIdInput: unknown) => {
-  if (event.sender !== mainWindow?.webContents) {
-    throw new Error("Manual MCP requests are only available to the main renderer");
+  if (event.sender !== mainWindow?.webContents || event.senderFrame !== mainWindow.webContents.mainFrame) {
+    throw new Error("Manual MCP requests are only available to the main renderer main frame");
   }
   if (typeof input !== "string") throw new Error("Manual MCP request must be a string");
   if (workspaceIdInput !== null && typeof workspaceIdInput !== "string") {
