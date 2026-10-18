@@ -74,10 +74,12 @@ This experiment does not claim that the free ChatGPT website can automatically i
 - Added main-process IPC methods that only accept calls from the main renderer's main frame, list an explicit allowlist of tools annotated read-only, and invoke the existing MCP gateway.
 - Added a manual request/result panel to `AiWebProviderPanel`, including a copyable ChatGPT instruction prompt, JSON request input, bounded result display, and result-copy action.
 - No API token is exposed to the renderer, and no webview page can trigger the manual execution path directly. Tool execution requires an explicit click in the host UI.
-- Latest GitHub Actions run for commit `1ef372fd12bdea42ee606afc58dec5b13b468d1e` completed successfully (run 1396). All four jobs passed: desktop build/unit checks (including typecheck and lint), Windows Electron smoke test, public package/contracts checks, and Windows file-locking checks.
-- The desktop suite on the preceding CI run reported 670 test files passed, 1 skipped; 9,123 tests passed, 4 expected failures, 2 skipped. Do not treat those historical counts as a separately re-reported count for run 1396.
-- The Windows Electron smoke job passed in run 1396. This is not the same as a manual UI round trip with a signed-in ChatGPT session.
-- A real ChatGPT login/session round trip has not been manually verified in a running Electron app. The actual tool request/rejection behavior still needs an interactive verification.
+- Latest GitHub Actions run 1403 passed all four jobs for current commit `75d7f3d047cea47aa89460ef37e64dadd79ecf65`: desktop build/unit checks, Windows Electron smoke test, public package/contracts, and Windows file-locking checks. See [run 1403](https://github.com/nishida0402shun-dev/SIGMA-Studio-main/actions/runs/39115494780).
+- Current implementation rejects unsupported JSON Schema validation keywords instead of silently ignoring them; regression tests cover this behavior and malicious-looking tool output. The UI reports a tool result as successful only when its result envelope has `ok === true`.
+- Run 1402 also passed all four jobs for commit `5e7191bb35a70e931ec55c3b2b52150a151c7297`. Earlier runs that were cancelled or failed before fixes are historical and are not the current verification result.
+- The preceding CI run reported 670 test files passed, 1 skipped; 9,123 tests passed, 4 expected failures, 2 skipped. Those historical counts are not separately confirmed for run 1403.
+- The Windows Electron smoke job passed in run 1403. This is not the same as a manual UI round trip with a signed-in ChatGPT session.
+- A real ChatGPT login/session round trip has not been manually verified in a running Electron app. The actual tool request/rejection behavior still needs interactive verification.
 
 ## Next implementation step
 
