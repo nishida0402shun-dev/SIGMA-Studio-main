@@ -176,7 +176,6 @@ describe("KnowledgeDbStore", () => {
       { id: sourceIds[2] + "_p1", sourceId: sourceIds[2], pageNumber: 1, semanticType: "unknown" as const, text: "数学 三角関数 共通説明 公式", extractionStatus: "text" as const, analysisStatus: "analyzed" as const, analysisVersion: 2 },
     ];
     seedLibrary(dataDir, {
-      version: 3,
       sources: sourceIds.map((id, index) => ({
         id, name: `hybrid-${index}.md`, originalPath: "", storedPath: "", mimeType: "text/markdown",
         sizeBytes: 0, pageCount: 1, importedAt: now, updatedAt: now, extractionStatus: "complete",
@@ -211,7 +210,6 @@ describe("KnowledgeDbStore", () => {
       analysisVersion: 2,
     });
     seedLibrary(dataDir, {
-      version: 3,
       sources: [
         { id: sourceA, name: "a.md", originalPath: "", storedPath: "", mimeType: "text/markdown", sizeBytes: 0, pageCount: 1, importedAt: now, updatedAt: now, extractionStatus: "complete", pages: [page(sourceA, 1, "exact phrase: 三角関数の加法定理")] },
         { id: sourceB, name: "b.md", originalPath: "", storedPath: "", mimeType: "text/markdown", sizeBytes: 0, pageCount: 1, importedAt: now, updatedAt: now, extractionStatus: "complete", pages: [page(sourceB, 1, "三角関数について一般的に説明する")] },
@@ -400,7 +398,7 @@ describe("Knowledge DB large-library resilience", () => {
         taxonomyVersion: KNOWLEDGE_TAXONOMY_VERSION,
       })),
     }));
-    seedLibrary(dataDir, { version: 3, sources });
+    seedLibrary(dataDir, { sources });
 
     const store = createStore(dataDir);
     const results = await store.search("三角関数 加法定理", 12);
