@@ -247,6 +247,7 @@ describe("SqliteQuestionRepository", () => {
     const updated = await repository.update(created.id, 1, {
       title: "二次関数の頂点（確認問題）",
       body: { format: "markdown", content: "頂点の座標を求めよ。" },
+      tags: [{ id: "tag-algebra", label: "代数", taxonomyPath: ["数学", "代数"] }],
       reviewStatus: "approved",
     });
     expect(updated.version).toBe(2);
@@ -258,9 +259,11 @@ describe("SqliteQuestionRepository", () => {
     expect(updatedFts[0]).toMatchObject({
       title: "二次関数の頂点（確認問題）",
       body_text: JSON.stringify({ format: "markdown", content: "頂点の座標を求めよ。" }),
-      tags_text: "数学",
+      tags_text: "代数",
     });
     expect((await repository.search({ text: "確認問題" })).total).toBe(1);
+    expect((await repository.search({ text: "代数" })).items[0]?.id).toBe(created.id);
+    expect((await repository.search({ text: "数学" })).total).toBe(0);
     expect((await repository.search({ text: "放物線" })).total).toBe(0);
     await expect(repository.update(created.id, 1, {
       title: "古い更新",
