@@ -349,7 +349,54 @@ export function initializeQuestionEngineSchema(db: SqliteSchemaDriver, now = new
       `Question Engine DB schema version ${version} cannot be upgraded automatically; a verified migration path to version ${QUESTION_ENGINE_SCHEMA_VERSION} is not available`,
     );
   }
-  if (version === QUESTION_ENGINE_SCHEMA_VERSION) return;
+  if (version === QUESTION_ENGINE_SCHEMA_VERSION) {
+    const requiredObjects = [
+      ["table", "qe_sources"],
+      ["table", "qe_questions"],
+      ["table", "qe_tags"],
+      ["table", "qe_question_tags"],
+      ["table", "qe_question_sources"],
+      ["table", "qe_question_versions"],
+      ["table", "qe_import_jobs"],
+      ["table", "qe_import_proposals"],
+      ["table", "qe_question_attempts"],
+      ["table", "qe_knowledge_state"],
+      ["table", "qe_knowledge_sources"],
+      ["table", "qe_knowledge_staging"],
+      ["table", "qe_knowledge_learning_feedback"],
+      ["table", "qe_knowledge_pages"],
+      ["table", "qe_vector_records"],
+      ["table", "qe_conversation_entries"],
+      ["table", "qe_long_term_memories"],
+      ["table", "qe_research_sessions"],
+      ["table", "qe_schema_migrations"],
+      ["table", "qe_knowledge_pages_fts"],
+      ["table", "qe_conversation_entries_fts"],
+      ["table", "qe_questions_fts"],
+      ["trigger", "qe_questions_fts_ai"],
+      ["trigger", "qe_questions_fts_ad"],
+      ["trigger", "qe_questions_fts_au"],
+      ["trigger", "qe_knowledge_pages_fts_ai"],
+      ["trigger", "qe_knowledge_pages_fts_ad"],
+      ["trigger", "qe_knowledge_pages_fts_au"],
+      ["trigger", "qe_conversation_entries_fts_ai"],
+      ["trigger", "qe_conversation_entries_fts_ad"],
+      ["trigger", "qe_conversation_entries_fts_au"],
+    ] as const;
+    const objects = db.prepare(
+      "SELECT type, name FROM sqlite_master WHERE (type = 'table' OR type = 'trigger') AND name GLOB 'qe_*'",
+    ).all() as Array<{ type: string; name: string }>;
+    const objectSet = new Set(objects.map((object) => `${object.type}:${object.name}`));
+    const missing = requiredObjects
+      .filter(([type, name]) => !objectSet.has(`${type}:${name}`))
+      .map(([type, name]) => `${type} ${name}`);
+    if (missing.length > 0) {
+      throw new Error(
+        `Question Engine DB schema version ${version} is incomplete; missing required objects: ${missing.join(", ")}`,
+      );
+    }
+    return;
+  }
 
   const apply = () => {
     db.exec(CORE_SCHEMA);
