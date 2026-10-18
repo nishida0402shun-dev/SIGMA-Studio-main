@@ -212,7 +212,7 @@ export class SqliteQuestionRepository implements QuestionRepository {
     `);
     for (const source of record.sources) {
       insertSource.run(source.id, source.name, "application/octet-stream", source.contentHash ?? "",
-        source.uri ?? null, source.pageNumber ?? 0, new Date().toISOString());
+        source.uri ?? null, 0, new Date().toISOString());
       linkSource.run(record.id, source.id, source.pageNumber ?? null, source.region ? JSON.stringify(source.region) : null);
     }
 
