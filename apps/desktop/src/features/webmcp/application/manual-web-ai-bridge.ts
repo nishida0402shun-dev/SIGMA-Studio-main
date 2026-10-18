@@ -175,14 +175,14 @@ function errorResult(
 
 export function parseManualWebAiBridgeRequest(input: string): ManualBridgeRequest | ManualBridgeResult {
   if (input.length > MANUAL_WEB_AI_BRIDGE_MAX_REQUEST_CHARS) {
-    return errorResult("INVALID_REQUEST", `リクエストが上限 (${MANUAL_WEB_AI_BRIDGE_MAX_REQUEST_CHARS} 文字) を超えています。`);
+    return errorResult("INVALID_REQUEST", `Request exceeds the maximum size (${MANUAL_WEB_AI_BRIDGE_MAX_REQUEST_CHARS} characters).`);
   }
 
   let value: unknown;
   try {
     value = JSON.parse(input);
   } catch {
-    return errorResult("INVALID_REQUEST", "JSONとして解析できません。ChatGPTの出力をJSONだけで貼り付けてください。");
+    return errorResult("INVALID_REQUEST", "Invalid JSON. Paste only the JSON object returned by ChatGPT.");
   }
 
   if (!isRecord(value)
@@ -190,11 +190,11 @@ export function parseManualWebAiBridgeRequest(input: string): ManualBridgeReques
     || value.protocol !== MANUAL_WEB_AI_BRIDGE_PROTOCOL
     || typeof value.tool !== "string"
     || !isRecord(value.arguments)) {
-    return errorResult("INVALID_REQUEST", "protocol、tool、argumentsを持つリクエスト形式ではありません。余分なキーも指定できません。");
+    return errorResult("INVALID_REQUEST", "Request must contain protocol, tool, and arguments, with no extra envelope properties.");
   }
 
   if (!MANUAL_WEB_AI_READ_ONLY_TOOLS.includes(value.tool as ManualToolName)) {
-    return errorResult("TOOL_NOT_ALLOWED", "このブリッジでは許可されていないツールです。読み取り専用の許可済みツールだけを実行できます。", value.tool);
+    return errorResult("TOOL_NOT_ALLOWED", "This tool is not allowed. Only explicitly allowlisted read-only tools can run.", value.tool);
   }
 
   return {
@@ -217,11 +217,11 @@ export async function executeManualWebAiBridgeRequest(
   if (!tool
     || tool.annotations?.readOnlyHint !== true
     || !MANUAL_WEB_AI_READ_ONLY_TOOLS.includes(tool.name as ManualToolName)) {
-    return errorResult("TOOL_NOT_ALLOWED", "許可済みの読み取り専用ツールとして登録されていません。", parsed.tool);
+    return errorResult("TOOL_NOT_ALLOWED", "Tool is not registered as an allowlisted read-only tool.", parsed.tool);
   }
 
   if (!schemaMatches(parsed.arguments, tool.inputSchema as JsonSchema)) {
-    return errorResult("INVALID_ARGUMENTS", "argumentsがツールの入力スキーマに一致しません。", parsed.tool);
+    return errorResult("INVALID_ARGUMENTS", "arguments do not match the tool input schema.", parsed.tool);
   }
 
   const timeoutMs = options.timeoutMs ?? MANUAL_WEB_AI_BRIDGE_TIMEOUT_MS;
@@ -237,20 +237,20 @@ export async function executeManualWebAiBridgeRequest(
     try {
       serialized = JSON.stringify(result);
     } catch {
-      return errorResult("TOOL_FAILED", "ツール結果をJSONに変換できませんでした。", parsed.tool);
+      return errorResult("TOOL_FAILED", "Tool result could not be serialized as JSON.", parsed.tool);
     }
     if (serialized === undefined) {
-      return errorResult("TOOL_FAILED", "ツールがJSON化できない結果を返しました。", parsed.tool);
+      return errorResult("TOOL_FAILED", "Tool returned a value that cannot be serialized as JSON.", parsed.tool);
     }
     if (serialized.length > (options.maxResponseChars ?? MANUAL_WEB_AI_BRIDGE_MAX_RESPONSE_CHARS)) {
-      return errorResult("RESPONSE_TOO_LARGE", "ツール結果が応答サイズの上限を超えました。", parsed.tool);
+      return errorResult("RESPONSE_TOO_LARGE", "Tool result exceeds the response size limit.", parsed.tool);
     }
     return { protocol: MANUAL_WEB_AI_BRIDGE_PROTOCOL, ok: true, tool: parsed.tool, data: JSON.parse(serialized) as unknown };
   } catch (error) {
     if (error instanceof Error && error.message === "SIGMA_WEB_AI_BRIDGE_TIMEOUT") {
-      return errorResult("TOOL_TIMEOUT", `ツールが${timeoutMs}ms以内に完了しませんでした。`, parsed.tool);
+      return errorResult("TOOL_TIMEOUT", `Tool did not complete within ${timeoutMs}ms.`, parsed.tool);
     }
-    return errorResult("TOOL_FAILED", error instanceof Error ? error.message : "ツールの実行に失敗しました。", parsed.tool);
+    return errorResult("TOOL_FAILED", error instanceof Error ? error.message : "Tool execution failed.", parsed.tool);
   } finally {
     if (timeout !== undefined) clearTimeout(timeout);
   }
