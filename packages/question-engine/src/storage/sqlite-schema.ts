@@ -383,12 +383,11 @@ export function initializeQuestionEngineSchema(db: SqliteSchemaDriver, now = new
       ["trigger", "qe_conversation_entries_fts_ad"],
       ["trigger", "qe_conversation_entries_fts_au"],
     ] as const;
-    const objects = db.prepare(
-      "SELECT type, name FROM sqlite_master WHERE (type = 'table' OR type = 'trigger') AND name GLOB 'qe_*'",
-    ).all() as Array<{ type: string; name: string }>;
-    const objectSet = new Set(objects.map((object) => `${object.type}:${object.name}`));
+    const findObject = db.prepare(
+      "SELECT name FROM sqlite_master WHERE type = ? AND name = ?",
+    );
     const missing = requiredObjects
-      .filter(([type, name]) => !objectSet.has(`${type}:${name}`))
+      .filter(([type, name]) => !findObject.get(type, name))
       .map(([type, name]) => `${type} ${name}`);
     if (missing.length > 0) {
       throw new Error(
