@@ -11,20 +11,24 @@ This document describes an experiment only. It does not claim that ChatGPT's web
 - The desktop workspace depends on `@modelcontextprotocol/sdk`.
 - `apps/desktop/mcp/sigma-doc-mcp-server.ts` starts the existing SigmaDoc MCP server using `StdioServerTransport`.
 - `apps/desktop/scripts/run-sigma-doc-mcp.mjs` bundles and launches that server.
-- `docs/architecture.md` describes a `features/webmcp` composition boundary, but its concrete implementation and current wiring still need to be inspected before editing it.
+- `apps/desktop/electron/web-ai-preload.ts` already attempts WebMCP registration through `document.modelContext` on ChatGPT, Claude, Gemini, and AI Studio origins. It registers a `sigma_mcp_call_tool` tool backed by SIGMA Studio's local bridge when the browser page exposes that API.
+- `apps/desktop/electron/web-ai-bridge.ts` already exposes authenticated localhost endpoints `GET /v1/mcp/tools` and `POST /v1/mcp/call`.
+- `apps/desktop/electron/web-ai-mcp-gateway.ts` reuses the existing STDIO MCP server and applies workspace scoping and permission checks. Its general tool-call endpoint can reach write-capable tools, so a manual fallback must impose its own explicit read-only allowlist rather than forwarding arbitrary tool names.
+- `apps/desktop/src/components/editor/AiWebProviderPanel.tsx` already displays separate local-bridge and WebMCP availability status.
+- The architecture document places WebMCP registration and proposal composition under `features/webmcp`; the existing implementation is `features/webmcp/view/WebMcpBridge.tsx` and the legacy component path is a re-export.
 - The repository guidance requires Electron desktop verification; a browser-only check is not sufficient.
 
 ## Proposed proof of concept
 
-Start with an explicit, user-mediated round trip rather than attempting to inject unsupported MCP support into ChatGPT:
+Keep the existing local Web AI bridge and STDIO MCP gateway. Add a user-mediated fallback to the existing `AiWebProviderPanel` for cases where `document.modelContext` is unavailable:
 
-1. SIGMA Studio provides a documented prompt that asks ChatGPT to emit one strict JSON tool-request envelope.
-2. The user copies the JSON response from ChatGPT into a dedicated SIGMA Studio test surface.
-3. SIGMA Studio validates the envelope against a small allowlist of read-only tools. Never execute arbitrary tool names, shell commands, file writes, or model-supplied paths.
-4. The bridge invokes the registered MCP tool and displays the structured result.
-5. SIGMA Studio produces a result envelope that the user can copy back to ChatGPT for interpretation.
+1. SIGMA Studio lists only explicitly approved read-only MCP tools and their input schemas.
+2. The user copies a prompt containing those schemas into ChatGPT. ChatGPT responds with one strict JSON request envelope when local data is needed.
+3. The user pastes the JSON into the panel and explicitly clicks **Run**.
+4. The preload validates the protocol, tool allowlist, read-only annotation, and tool input schema, then invokes the existing authenticated localhost `/v1/mcp/call` endpoint.
+5. The panel displays a bounded JSON result and lets the user copy it back into ChatGPT.
 
-This is deliberately a semi-automatic proof of concept. It tests the tool contract and MCP execution without pretending the ChatGPT web UI supports direct MCP calls. Only after this passes should automatic clipboard/DOM interaction be considered.
+This is deliberately semi-automatic. It does not rely on unsupported ChatGPT MCP support and does not create another MCP server or tool registry. Do not execute arbitrary tool names, shell commands, write-capable tools, or model-supplied paths.
 
 ## Request contract
 
@@ -64,6 +68,12 @@ The experiment is successful only when all of the following are demonstrated in 
 
 This experiment does not claim that the free ChatGPT website can automatically invoke arbitrary local MCP tools. Fully automatic tool selection requires a reliable supported integration surface or separately validated UI automation. If the semi-automatic round trip works, automatic interaction can be evaluated as a separate step.
 
+## Current implementation status
+
+- The request parser/executor and focused tests have been added on the experiment branch.
+- The helper is not yet connected to the Electron preload or `AiWebProviderPanel`; therefore no user-facing manual round trip is implemented yet.
+- CI is running for the current branch commit. Its final results must be checked before continuing.
+
 ## Next implementation step
 
-Inspect the concrete `features/webmcp` implementation, its tests, and the Electron UI composition point. Reuse the existing tool registry and authorization patterns where possible. Do not create a parallel MCP server or a second tool registry without evidence that the existing one cannot support the experiment.
+Connect the request handler to the existing preload/local bridge and add the manual request/result controls to `AiWebProviderPanel`. Keep tool execution behind an explicit user action and the read-only allowlist. Do not create a parallel MCP server or a second tool registry. Then run the full CI suite and verify the round trip in Electron.
