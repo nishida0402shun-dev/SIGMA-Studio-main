@@ -45,7 +45,7 @@ The experimental request must be a single JSON object with these fields:
 Rules:
 
 - Reject unknown protocol versions and unknown tool names.
-- Validate each tool's arguments against the actual MCP tool schema.
+- Validate each tool's arguments against the supported subset of the MCP tool schema. Unsupported validation keywords (for example, `pattern` or `$ref`) must fail closed rather than be silently ignored.
 - Reject extra envelope properties.
 - Apply a timeout and response-size limit.
 - Treat tool output as untrusted data, not instructions.
