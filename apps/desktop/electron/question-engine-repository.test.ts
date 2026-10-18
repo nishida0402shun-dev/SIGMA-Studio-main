@@ -2,7 +2,7 @@ import { mkdtemp, rm } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
-import { openQuestionEngineDatabase, SqliteQuestionRepository, type QuestionEngineDatabase } from "../../../packages/question-engine/src/index";
+import { QUESTION_ENGINE_SCHEMA_VERSION, openQuestionEngineDatabase, SqliteQuestionRepository, type QuestionEngineDatabase } from "../../../packages/question-engine/src/index";
 
 describe("SqliteQuestionRepository", () => {
   let dir: string | undefined;
@@ -20,6 +20,38 @@ describe("SqliteQuestionRepository", () => {
     database = openQuestionEngineDatabase({ dataDir: dir });
     return new SqliteQuestionRepository(database.raw);
   }
+
+  it("reopens an initialized database without duplicating the current migration record", async () => {
+    await createRepository();
+    const before = database!.raw.prepare(
+      "SELECT COUNT(*) AS count FROM qe_schema_migrations WHERE version = ?",
+    ).get(QUESTION_ENGINE_SCHEMA_VERSION) as { count: number };
+    expect(before.count).toBe(1);
+
+    database!.close();
+    database = undefined;
+    database = openQuestionEngineDatabase({ dataDir: dir! });
+
+    const after = database.raw.prepare(
+      "SELECT COUNT(*) AS count FROM qe_schema_migrations WHERE version = ?",
+    ).get(QUESTION_ENGINE_SCHEMA_VERSION) as { count: number };
+    expect(after.count).toBe(1);
+  });
+
+  it("rejects a database schema version newer than the application supports", async () => {
+    await createRepository();
+    const unsupportedVersion = QUESTION_ENGINE_SCHEMA_VERSION + 1;
+    database!.raw.prepare(
+      "INSERT INTO qe_schema_migrations(version, applied_at) VALUES (?, ?)",
+    ).run(unsupportedVersion, new Date().toISOString());
+
+    database!.close();
+    database = undefined;
+
+    expect(() => openQuestionEngineDatabase({ dataDir: dir! })).toThrow(
+      `Question Engine DB schema version ${unsupportedVersion} is newer than this application supports (${QUESTION_ENGINE_SCHEMA_VERSION})`,
+    );
+  });
 
   it("creates, searches, updates with optimistic locking, and deletes questions", async () => {
     const repository = await createRepository();
