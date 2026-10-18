@@ -59,8 +59,8 @@ jobs:
           $path = "apps/desktop/package.json"
           $pkg = Get-Content $path -Raw | ConvertFrom-Json
           $baseVersion = [string]$pkg.version
-          if ($baseVersion -match "-beta\\.") {
-            $baseVersion = $baseVersion -replace "-beta\\..*$", ""
+          if ($baseVersion -match "-beta\.") {
+            $baseVersion = $baseVersion -replace "-beta\..*$", ""
           }
           $pkg.version = "$baseVersion-beta.$env:GITHUB_RUN_NUMBER"
           $pkg | ConvertTo-Json -Depth 100 | Set-Content -Path $path -Encoding utf8
@@ -80,14 +80,14 @@ jobs:
           $app = Join-Path $release "sigma-studio-webai-test"
           if (Test-Path $app) { Remove-Item -Recurse -Force $app }
           New-Item -ItemType Directory -Force -Path (Join-Path $app "app") | Out-Null
-          Copy-Item -Path (Join-Path $release "win-unpacked\\*") -Destination (Join-Path $app "app") -Recurse -Force
+          Copy-Item -Path (Join-Path $release "win-unpacked\*") -Destination (Join-Path $app "app") -Recurse -Force
           $launcher = @'
           @echo off
           setlocal
           cd /d "%~dp0"
           set "SIGMA_STUDIO_USER_DATA_DIR=%~dp0user-data"
           if not exist "%SIGMA_STUDIO_USER_DATA_DIR%" mkdir "%SIGMA_STUDIO_USER_DATA_DIR%"
-          start "" "%~dp0app\\Sigma Studio Beta.exe"
+          start "" "%~dp0app\Sigma Studio Beta.exe"
           '@
           $launcher | Set-Content -Path (Join-Path $app "起動する.cmd") -Encoding ascii
           $readme = @'
@@ -108,7 +108,7 @@ jobs:
           - テスト版のフォルダーを削除すると、そのフォルダー内の user-data も削除されます。
           '@
           $readme | Set-Content -Path (Join-Path $app "README-テスト手順.txt") -Encoding utf8
-          if (-not (Test-Path (Join-Path $app "app\\Sigma Studio Beta.exe"))) {
+          if (-not (Test-Path (Join-Path $app "app\Sigma Studio Beta.exe"))) {
             throw "Expected beta executable was not packaged."
           }
 
