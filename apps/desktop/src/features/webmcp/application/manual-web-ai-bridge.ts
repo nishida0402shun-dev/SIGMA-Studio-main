@@ -20,16 +20,6 @@ export const MANUAL_WEB_AI_READ_ONLY_TOOLS = [
   "validate_local_document",
   "list_materials",
   "get_material",
-  "render_block_context",
-  "render_page",
-  "get_selected_block",
-  "get_insertion_candidates",
-  "get_neighbor_blocks",
-  "get_active_reference",
-  "get_attached_media",
-  "get_mentioned_sigma_docs",
-  "list_generated_images",
-  "get_image_reference",
   "knowledge_db_list_sources",
   "knowledge_db_search",
   "knowledge_db_get_page",
@@ -78,6 +68,12 @@ interface JsonSchema {
   oneOf?: JsonSchema[];
 }
 
+export interface ManualBridgeToolDescriptor {
+  name: string;
+  description: string;
+  inputSchema: Record<string, unknown>;
+}
+
 export interface ManualBridgeTool {
   name: string;
   description?: string;
@@ -88,6 +84,24 @@ export interface ManualBridgeTool {
 
 function isRecord(value: unknown): value is JsonRecord {
   return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+export function filterManualWebAiBridgeTools(
+  tools: readonly {
+    name: string;
+    description?: string;
+    inputSchema: Record<string, unknown>;
+    annotations?: { readOnlyHint?: boolean };
+  }[],
+): ManualBridgeToolDescriptor[] {
+  return tools
+    .filter((tool) => MANUAL_WEB_AI_READ_ONLY_TOOLS.includes(tool.name as ManualToolName)
+      && tool.annotations?.readOnlyHint === true)
+    .map((tool) => ({
+      name: tool.name,
+      description: tool.description ?? "",
+      inputSchema: tool.inputSchema,
+    }));
 }
 
 function schemaMatches(value: unknown, schema: JsonSchema): boolean {
