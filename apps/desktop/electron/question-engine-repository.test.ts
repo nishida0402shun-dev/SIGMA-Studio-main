@@ -135,6 +135,10 @@ describe("SqliteQuestionRepository", () => {
     expect(database!.raw.prepare(
       "SELECT page_id FROM qe_knowledge_pages_fts WHERE qe_knowledge_pages_fts MATCH ?",
     ).all("neutrino")).toHaveLength(1);
+    database!.raw.prepare("DELETE FROM qe_knowledge_pages WHERE id = ?").run("knowledge-page-1");
+    expect(database!.raw.prepare(
+      "SELECT page_id FROM qe_knowledge_pages_fts WHERE qe_knowledge_pages_fts MATCH ?",
+    ).all("neutrino")).toHaveLength(0);
 
     database!.raw.prepare(
       `INSERT INTO qe_conversation_entries (
