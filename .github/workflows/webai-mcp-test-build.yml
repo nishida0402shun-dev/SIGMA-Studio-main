@@ -86,7 +86,9 @@ jobs:
           setlocal
           cd /d "%~dp0"
           set "SIGMA_STUDIO_USER_DATA_DIR=%~dp0user-data"
+          set "SIGMA_STUDIO_SHARED_WORKSPACE_DIR=%~dp0user-data\Workspace"
           if not exist "%SIGMA_STUDIO_USER_DATA_DIR%" mkdir "%SIGMA_STUDIO_USER_DATA_DIR%"
+          if not exist "%SIGMA_STUDIO_SHARED_WORKSPACE_DIR%" mkdir "%SIGMA_STUDIO_SHARED_WORKSPACE_DIR%"
           start "" "%~dp0app\Sigma Studio Beta.exe"
           '@
           $launcher | Set-Content -Path (Join-Path $app "起動する.cmd") -Encoding ascii
@@ -96,8 +98,8 @@ jobs:
 
           1. ZIP を任意のフォルダーへ展開してください。
           2. 「起動する.cmd」を実行してください。
-          3. テスト用ユーザーデータは、このフォルダー内の user-data に保存されます。
-             通常版のユーザーデータフォルダーは使用しません。
+          3. テスト用ユーザーデータと共有 Workspace データは、このフォルダー内の user-data 以下に保存されます。
+             通常版のユーザーデータ・共有 Workspace フォルダーは使用しません。
           4. テスト版は検証用です。重要なデータを入力しないでください。
           5. Web AI / MCP の操作は、画面上で内容を確認し、明示的に実行してください。
 
@@ -105,7 +107,7 @@ jobs:
           - この配布物はインストーラーではなく、展開して起動するテスト用ビルドです。
           - ChatGPT Web と SIGMA Studio の実際のログイン済みセッションを使った往復操作は、
             CI では検証できません。起動後に手動で確認してください。
-          - テスト版のフォルダーを削除すると、そのフォルダー内の user-data も削除されます。
+          - テスト版のフォルダーを削除すると、そのフォルダー内の user-data と Workspace データも削除されます。
           '@
           $readme | Set-Content -Path (Join-Path $app "README-テスト手順.txt") -Encoding utf8
           if (-not (Test-Path (Join-Path $app "app\Sigma Studio Beta.exe"))) {
