@@ -200,7 +200,9 @@ export function AiWebProviderPanel({
     try {
       const result = await api.runManualMcpRequest(manualRequest, workspaceId);
       setManualResult(JSON.stringify(result, null, 2) ?? String(result));
-      setManualStatus(t("webAi.manualBridge.requestSucceeded"));
+      setManualStatus(result && typeof result === "object" && "ok" in result && result.ok === true
+        ? t("webAi.manualBridge.requestSucceeded")
+        : t("webAi.manualBridge.requestFailed"));
     } catch (error) {
       setManualStatus(error instanceof Error ? error.message : t("webAi.manualBridge.requestFailed"));
     } finally {
