@@ -224,6 +224,15 @@ describe("SqliteQuestionRepository", () => {
     });
 
     expect(created.version).toBe(1);
+    const createdFts = database!.raw.prepare(
+      "SELECT title, body_text, tags_text FROM qe_questions_fts WHERE question_id = ?",
+    ).all(created.id) as Array<{ title: string; body_text: string; tags_text: string }>;
+    expect(createdFts).toHaveLength(1);
+    expect(createdFts[0]).toMatchObject({
+      title: "二次関数の頂点",
+      body_text: JSON.stringify({ format: "markdown", content: "放物線の頂点を求める。" }),
+      tags_text: "数学",
+    });
     const sourceMetadata = database!.raw.prepare(
       "SELECT page_count FROM qe_sources WHERE id = ?",
     ).get("textbook-1") as { page_count: number };
@@ -242,6 +251,15 @@ describe("SqliteQuestionRepository", () => {
     });
     expect(updated.version).toBe(2);
     expect(updated.reviewStatus).toBe("approved");
+    const updatedFts = database!.raw.prepare(
+      "SELECT title, body_text, tags_text FROM qe_questions_fts WHERE question_id = ?",
+    ).all(created.id) as Array<{ title: string; body_text: string; tags_text: string }>;
+    expect(updatedFts).toHaveLength(1);
+    expect(updatedFts[0]).toMatchObject({
+      title: "二次関数の頂点（確認問題）",
+      body_text: JSON.stringify({ format: "markdown", content: "頂点の座標を求めよ。" }),
+      tags_text: "数学",
+    });
     expect((await repository.search({ text: "確認問題" })).total).toBe(1);
     expect((await repository.search({ text: "放物線" })).total).toBe(0);
     await expect(repository.update(created.id, 1, {
@@ -256,6 +274,9 @@ describe("SqliteQuestionRepository", () => {
 
     await repository.delete(created.id);
     expect(await repository.getById(created.id)).toBeNull();
+    expect((database!.raw.prepare(
+      "SELECT COUNT(*) AS count FROM qe_questions_fts WHERE question_id = ?",
+    ).get(created.id) as { count: number }).count).toBe(0);
     expect((await repository.search({ text: "確認問題" })).total).toBe(0);
     for (const table of ["qe_question_tags", "qe_question_sources", "qe_question_versions", "qe_questions_fts"]) {
       const row = database!.raw.prepare(`SELECT COUNT(*) AS count FROM ${table} WHERE question_id = ?`).get(created.id) as { count: number };
