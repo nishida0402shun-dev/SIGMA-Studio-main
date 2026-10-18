@@ -393,6 +393,12 @@ export interface DesktopGeminiAPI {
 
 export interface DesktopWebAiAPI {
   getPreloadUrl(): Promise<string>;
+  listManualMcpTools(workspaceId: string | null): Promise<Array<{
+    name: string;
+    description: string;
+    inputSchema: Record<string, unknown>;
+  }>>;
+  runManualMcpRequest(input: string, workspaceId: string | null): Promise<unknown>;
 }
 
 export interface DesktopLongTermMemoryAPI {
