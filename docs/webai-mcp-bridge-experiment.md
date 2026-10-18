@@ -70,10 +70,13 @@ This experiment does not claim that the free ChatGPT website can automatically i
 
 ## Current implementation status
 
-- The request parser/executor and focused tests have been added on the experiment branch.
-- The helper is not yet connected to the Electron preload or `AiWebProviderPanel`; therefore no user-facing manual round trip is implemented yet.
-- CI is running for the current branch commit. Its final results must be checked before continuing.
+- Added a strict request parser/executor and focused tests under `features/webmcp/application`.
+- Added main-process IPC methods that only accept calls from the main renderer, list an explicit allowlist of tools annotated read-only, and invoke the existing MCP gateway.
+- Added a manual request/result panel to `AiWebProviderPanel`, including a copyable ChatGPT instruction prompt, JSON request input, bounded result display, and result-copy action.
+- No API token is exposed to the renderer, and no webview page can trigger the manual execution path directly. Tool execution requires an explicit click in the host UI.
+- The last CI attempt caught a TypeScript syntax error in the translated fallback message. That expression has been corrected; the next CI run must confirm typecheck, lint, unit tests, build, and Electron smoke checks.
+- A real ChatGPT login/session round trip has not been manually verified in a running Electron app.
 
 ## Next implementation step
 
-Connect the request handler to the existing preload/local bridge and add the manual request/result controls to `AiWebProviderPanel`. Keep tool execution behind an explicit user action and the read-only allowlist. Do not create a parallel MCP server or a second tool registry. Then run the full CI suite and verify the round trip in Electron.
+Run the full CI suite on the corrected branch and fix any remaining failures. Then verify in Electron that the tool catalog loads for a selected Workspace, valid read-only requests return results, malformed/unknown/write-capable requests are rejected, and the copied result can be interpreted by ChatGPT. Do not merge to `main` until those checks pass.
