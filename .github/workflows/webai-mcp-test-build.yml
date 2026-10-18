@@ -69,55 +69,57 @@ jobs:
       - name: Build renderer and Electron bundle
         run: npm --workspace @sigma-studio/desktop run electron:prepare
 
-      - name: Package unpacked app without an installer or publishing
+      - name: Build beta Windows installer without publishing
         working-directory: apps/desktop
-        run: npx --no-install electron-builder --win --dir --publish never --config electron-builder.config.cjs
+        run: npx --no-install electron-builder --win nsis --x64 --publish never --config electron-builder.config.cjs
 
-      - name: Prepare isolated test folder and launcher
+      - name: Prepare installer handoff and checksum
         shell: pwsh
         run: |
           $release = "apps/desktop/release"
-          $app = Join-Path $release "sigma-studio-webai-test"
-          if (Test-Path $app) { Remove-Item -Recurse -Force $app }
-          New-Item -ItemType Directory -Force -Path (Join-Path $app "app") | Out-Null
-          Copy-Item -Path (Join-Path $release "win-unpacked\*") -Destination (Join-Path $app "app") -Recurse -Force
-          $launcher = @'
-          @echo off
-          setlocal
-          cd /d "%~dp0"
-          set "SIGMA_STUDIO_USER_DATA_DIR=%~dp0user-data"
-          set "SIGMA_STUDIO_SHARED_WORKSPACE_DIR=%~dp0user-data\Workspace"
-          if not exist "%SIGMA_STUDIO_USER_DATA_DIR%" mkdir "%SIGMA_STUDIO_USER_DATA_DIR%"
-          if not exist "%SIGMA_STUDIO_SHARED_WORKSPACE_DIR%" mkdir "%SIGMA_STUDIO_SHARED_WORKSPACE_DIR%"
-          start "" "%~dp0app\Sigma Studio Beta.exe"
-          '@
-          $launcher | Set-Content -Path (Join-Path $app "起動する.cmd") -Encoding ascii
-          $readme = @'
-          SIGMA Studio Web AI MCP テスト版
-          ================================
-
-          1. ZIP を任意のフォルダーへ展開してください。
-          2. 「起動する.cmd」を実行してください。
-          3. テスト用ユーザーデータと共有 Workspace データは、このフォルダー内の user-data 以下に保存されます。
-             通常版のユーザーデータ・共有 Workspace フォルダーは使用しません。
-          4. テスト版は検証用です。重要なデータを入力しないでください。
-          5. Web AI / MCP の操作は、画面上で内容を確認し、明示的に実行してください。
-
-          注意:
-          - この配布物はインストーラーではなく、展開して起動するテスト用ビルドです。
-          - ChatGPT Web と SIGMA Studio の実際のログイン済みセッションを使った往復操作は、
-            CI では検証できません。起動後に手動で確認してください。
-          - テスト版のフォルダーを削除すると、そのフォルダー内の user-data と Workspace データも削除されます。
-          '@
-          $readme | Set-Content -Path (Join-Path $app "README-テスト手順.txt") -Encoding utf8
-          if (-not (Test-Path (Join-Path $app "app\Sigma Studio Beta.exe"))) {
-            throw "Expected beta executable was not packaged."
+          $handoff = Join-Path $release "sigma-studio-webai-mcp-installer"
+          if (Test-Path $handoff) { Remove-Item -Recurse -Force $handoff }
+          New-Item -ItemType Directory -Force -Path $handoff | Out-Null
+          $installer = Get-ChildItem -Path $release -File -Filter "Sigma-Studio-Beta-*.exe" |
+            Where-Object { $_.Name -notlike "*.exe.blockmap" } |
+            Sort-Object LastWriteTime -Descending |
+            Select-Object -First 1
+          if (-not $installer) {
+            throw "Expected Sigma Studio Beta NSIS installer was not produced."
           }
+          Copy-Item -LiteralPath $installer.FullName -Destination $handoff
+          $hash = Get-FileHash -LiteralPath (Join-Path $handoff $installer.Name) -Algorithm SHA256
+          "$($hash.Hash)  $($installer.Name)" | Set-Content -Path (Join-Path $handoff "SHA256SUMS.txt") -Encoding ascii
+          $readme = @'
+          SIGMA Studio Web AI MCP Demo / Beta インストーラー
+          ================================================
 
-      - name: Upload test app artifact
+          これは experiment/webai-mcp-bridge ブランチから作成する検証用ベータ版です。
+          安定版のリリースではありません。
+
+          インストール:
+          1. Sigma-Studio-Beta-*.exe を実行します。
+          2. Windows SmartScreen の警告が出る場合があります。未署名ビルドのためです。
+          3. インストール後、「Sigma Studio Beta」を起動してください。
+
+          データ分離:
+          - ベータ版のユーザーデータは「Sigma Studio Beta」用の場所に保存されます。
+          - ベータ版の共有 Workspace は %APPDATA%\Sigma Studio Beta\Workspace に保存されます。
+          - 通常版の共有 Workspace (%APPDATA%\Sigma Studio\Workspace) とは分離されます。
+          - アンインストール前に必要なベータ版データをバックアップしてください。アンインストール時のデータ保持は保証されません。
+
+          制限:
+          - ChatGPT Web とログイン済みセッションを使った手動コピー＆ペースト往復操作は、CI では検証できていません。
+          - MCP ツール実行は画面上の内容を確認し、ユーザーが明示的に実行してください。
+          - 重要なデータや本番データには使用しないでください。
+          - SHA256SUMS.txt にはインストーラーの SHA-256 ハッシュを記載しています。
+          '@
+          $readme | Set-Content -Path (Join-Path $handoff "README-ベータ版.txt") -Encoding utf8
+
+      - name: Upload beta installer artifact
         uses: actions/upload-artifact@v4
         with:
-          name: sigma-studio-webai-mcp-test-windows-${{ github.run_number }}
-          path: apps/desktop/release/sigma-studio-webai-test
+          name: sigma-studio-webai-mcp-installer-windows-${{ github.run_number }}
+          path: apps/desktop/release/sigma-studio-webai-mcp-installer
           if-no-files-found: error
           retention-days: 7
