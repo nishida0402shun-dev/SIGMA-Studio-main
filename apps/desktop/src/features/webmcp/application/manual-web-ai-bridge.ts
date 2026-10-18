@@ -104,6 +104,31 @@ export function filterManualWebAiBridgeTools(
     }));
 }
 
+const SUPPORTED_SCHEMA_KEYWORDS = new Set([
+  "$schema", "$id", "$comment", "title", "description", "default", "examples", "deprecated",
+  "readOnly", "writeOnly", "type", "properties", "required", "additionalProperties", "items",
+  "enum", "const", "minimum", "maximum", "exclusiveMinimum", "exclusiveMaximum",
+  "minLength", "maxLength", "minItems", "maxItems", "anyOf", "oneOf",
+]);
+
+/**
+ * This bridge intentionally implements only a documented subset of JSON Schema.
+ * Fail closed when a tool schema uses assertion keywords we do not enforce.
+ */
+function schemaUsesOnlySupportedKeywords(schema: unknown): schema is JsonSchema {
+  if (!isRecord(schema)) return false;
+  if (Object.keys(schema).some((key) => !SUPPORTED_SCHEMA_KEYWORDS.has(key))) return false;
+
+  const nestedSchemas: unknown[] = [];
+  if (isRecord(schema.properties)) nestedSchemas.push(...Object.values(schema.properties));
+  if (Array.isArray(schema.anyOf)) nestedSchemas.push(...schema.anyOf);
+  if (Array.isArray(schema.oneOf)) nestedSchemas.push(...schema.oneOf);
+  if (schema.items !== undefined) nestedSchemas.push(schema.items);
+  if (isRecord(schema.additionalProperties)) nestedSchemas.push(schema.additionalProperties);
+
+  return nestedSchemas.every(schemaUsesOnlySupportedKeywords);
+}
+
 function schemaMatches(value: unknown, schema: JsonSchema): boolean {
   if (schema.anyOf && !schema.anyOf.some((candidate) => schemaMatches(value, candidate))) return false;
   if (schema.oneOf && schema.oneOf.filter((candidate) => schemaMatches(value, candidate)).length !== 1) return false;
@@ -220,7 +245,10 @@ export async function executeManualWebAiBridgeRequest(
     return errorResult("TOOL_NOT_ALLOWED", "Tool is not registered as an allowlisted read-only tool.", parsed.tool);
   }
 
-  if (!schemaMatches(parsed.arguments, tool.inputSchema as JsonSchema)) {
+  if (!schemaUsesOnlySupportedKeywords(tool.inputSchema)) {
+    return errorResult("INVALID_ARGUMENTS", "Tool input schema contains validation keywords this bridge does not support.", parsed.tool);
+  }
+  if (!schemaMatches(parsed.arguments, tool.inputSchema)) {
     return errorResult("INVALID_ARGUMENTS", "arguments do not match the tool input schema.", parsed.tool);
   }
 
