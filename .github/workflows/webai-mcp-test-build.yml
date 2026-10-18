@@ -1,0 +1,119 @@
+name: Web AI MCP Test Build
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - experiment/webai-mcp-bridge
+
+permissions:
+  contents: read
+
+concurrency:
+  group: webai-mcp-test-build-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  windows-test-build:
+    name: Build isolated Windows test app
+    runs-on: windows-latest
+    timeout-minutes: 45
+    env:
+      NODE_OPTIONS: --max-old-space-size=4096
+    steps:
+      - name: Checkout selected experiment branch
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ github.ref }}
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: "24"
+          cache: npm
+
+      - name: Set up Python for bundled OCR runtime
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Check synchronized source versions
+        run: npm run version:check
+
+      - name: Build bundled Windows OCR runtime
+        working-directory: apps/desktop
+        run: npm run ocr:runtime:build
+        env:
+          SIGMA_OCR_PLATFORM: win
+          SIGMA_OCR_ARCH: x64
+
+      # Only the runner's working copy is changed. The commit, branch, lockfile,
+      # and published versions remain untouched. The beta suffix selects a
+      # separate appId/productName in electron-builder.config.cjs.
+      - name: Mark this runner build as beta
+        shell: pwsh
+        run: |
+          $path = "apps/desktop/package.json"
+          $pkg = Get-Content $path -Raw | ConvertFrom-Json
+          $baseVersion = [string]$pkg.version
+          if ($baseVersion -match "-beta\\.") {
+            $baseVersion = $baseVersion -replace "-beta\\..*$", ""
+          }
+          $pkg.version = "$baseVersion-beta.$env:GITHUB_RUN_NUMBER"
+          $pkg | ConvertTo-Json -Depth 100 | Set-Content -Path $path -Encoding utf8
+          Write-Host "Temporary test version: $($pkg.version)"
+
+      - name: Build renderer and Electron bundle
+        run: npm --workspace @sigma-studio/desktop run electron:prepare
+
+      - name: Package unpacked app without an installer or publishing
+        working-directory: apps/desktop
+        run: npx --no-install electron-builder --win --dir --publish never --config electron-builder.config.cjs
+
+      - name: Prepare isolated test folder and launcher
+        shell: pwsh
+        run: |
+          $release = "apps/desktop/release"
+          $app = Join-Path $release "sigma-studio-webai-test"
+          if (Test-Path $app) { Remove-Item -Recurse -Force $app }
+          New-Item -ItemType Directory -Force -Path (Join-Path $app "app") | Out-Null
+          Copy-Item -Path (Join-Path $release "win-unpacked\\*") -Destination (Join-Path $app "app") -Recurse -Force
+          @'
+          @echo off
+          setlocal
+          cd /d "%~dp0"
+          set "SIGMA_STUDIO_USER_DATA_DIR=%~dp0user-data"
+          if not exist "%SIGMA_STUDIO_USER_DATA_DIR%" mkdir "%SIGMA_STUDIO_USER_DATA_DIR%"
+          start "" "%~dp0app\\Sigma Studio Beta.exe"
+          '@ | Set-Content -Path (Join-Path $app "起動する.cmd") -Encoding ascii
+          @'
+          SIGMA Studio Web AI MCP テスト版
+          ================================
+
+          1. ZIP を任意のフォルダーへ展開してください。
+          2. 「起動する.cmd」を実行してください。
+          3. テスト用ユーザーデータは、このフォルダー内の user-data に保存されます。
+             通常版のユーザーデータフォルダーは使用しません。
+          4. テスト版は検証用です。重要なデータを入力しないでください。
+          5. Web AI / MCP の操作は、画面上で内容を確認し、明示的に実行してください。
+
+          注意:
+          - この配布物はインストーラーではなく、展開して起動するテスト用ビルドです。
+          - ChatGPT Web と SIGMA Studio の実際のログイン済みセッションを使った往復操作は、
+            CI では検証できません。起動後に手動で確認してください。
+          - テスト版のフォルダーを削除すると、そのフォルダー内の user-data も削除されます。
+          '@ | Set-Content -Path (Join-Path $app "README-テスト手順.txt") -Encoding utf8
+          if (-not (Test-Path (Join-Path $app "app\\Sigma Studio Beta.exe"))) {
+            throw "Expected beta executable was not packaged."
+          }
+
+      - name: Upload test app artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: sigma-studio-webai-mcp-test-windows-${{ github.run_number }}
+          path: apps/desktop/release/sigma-studio-webai-test
+          if-no-files-found: error
+          retention-days: 7
