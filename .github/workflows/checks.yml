@@ -32,6 +32,8 @@ jobs:
       - run: npm run test:scripts
       - run: npm exec --workspace @sigma-studio/desktop -- next typegen
       - run: npm run typecheck
+      # The new storage package has its own NodeNext config; verify it independently too.
+      - run: npm exec --workspace @sigma-studio/desktop -- tsc --project ../../packages/question-engine/tsconfig.json --noEmit
       - run: npm run lint
       # Source-graph scans and real filesystem tests exceed 5s on shared runners.
       - run: npm --workspace @sigma-studio/desktop run test -- --maxWorkers=2 --testTimeout=30000
