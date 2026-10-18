@@ -98,6 +98,17 @@ describe("SqliteQuestionRepository", () => {
     );
   });
 
+  it("rejects a current-version database missing a required FTS trigger", async () => {
+    await createRepository();
+    database!.raw.exec("DROP TRIGGER qe_knowledge_pages_fts_au");
+    database!.close();
+    database = undefined;
+
+    expect(() => openQuestionEngineDatabase({ dataDir: dir! })).toThrow(
+      "Question Engine DB schema version 5 is incomplete; missing required objects: trigger qe_knowledge_pages_fts_au",
+    );
+  });
+
   it("keeps knowledge-page and conversation FTS indexes in sync", async () => {
     await createRepository();
 
@@ -246,5 +257,9 @@ describe("SqliteQuestionRepository", () => {
     await repository.delete(created.id);
     expect(await repository.getById(created.id)).toBeNull();
     expect((await repository.search({ text: "確認問題" })).total).toBe(0);
+    for (const table of ["qe_question_tags", "qe_question_sources", "qe_question_versions", "qe_questions_fts"]) {
+      const row = database!.raw.prepare(`SELECT COUNT(*) AS count FROM ${table} WHERE question_id = ?`).get(created.id) as { count: number };
+      expect(row.count, `expected related rows in ${table} to be deleted`).toBe(0);
+    }
   });
 });
