@@ -43,6 +43,18 @@ describe("SqliteQuestionRepository", () => {
     expect(after.count).toBe(1);
   });
 
+  it("rejects existing Question Engine tables without a schema version", async () => {
+    await createRepository();
+    database!.raw.exec("DROP TABLE qe_schema_migrations");
+
+    database!.close();
+    database = undefined;
+
+    expect(() => openQuestionEngineDatabase({ dataDir: dir! })).toThrow(
+      "Question Engine DB contains existing tables without a schema version; automatic migration is unsafe and a verified migration path is not available",
+    );
+  });
+
   it("rejects an older schema when no verified migration path is available", async () => {
     await createRepository();
     const legacyVersion = QUESTION_ENGINE_SCHEMA_VERSION - 1;
