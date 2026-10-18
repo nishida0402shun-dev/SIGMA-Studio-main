@@ -43,6 +43,22 @@ describe("SqliteQuestionRepository", () => {
     expect(after.count).toBe(1);
   });
 
+  it("rejects an older schema when no verified migration path is available", async () => {
+    await createRepository();
+    const legacyVersion = QUESTION_ENGINE_SCHEMA_VERSION - 1;
+    database!.raw.prepare("DELETE FROM qe_schema_migrations").run();
+    database!.raw.prepare(
+      "INSERT INTO qe_schema_migrations(version, applied_at) VALUES (?, ?)",
+    ).run(legacyVersion, new Date().toISOString());
+
+    database!.close();
+    database = undefined;
+
+    expect(() => openQuestionEngineDatabase({ dataDir: dir! })).toThrow(
+      `Question Engine DB schema version ${legacyVersion} cannot be upgraded automatically; a verified migration path to version ${QUESTION_ENGINE_SCHEMA_VERSION} is not available`,
+    );
+  });
+
   it("rejects a database schema version newer than the application supports", async () => {
     await createRepository();
     const unsupportedVersion = QUESTION_ENGINE_SCHEMA_VERSION + 1;
