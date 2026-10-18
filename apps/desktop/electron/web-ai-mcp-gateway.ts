@@ -22,7 +22,7 @@ const READ_ONLY_TOOLS = new Set([
   "read_local_document","get_edit_context","get_document_outline","get_block","get_blocks","search_document","search_library",
   "validate_local_document","list_materials","get_material","render_block_context","render_page","get_selected_block",
   "get_insertion_candidates","get_neighbor_blocks","get_active_reference","get_attached_media","get_mentioned_sigma_docs",
-  "list_generated_images","get_image_reference","knowledge_db_list_sources","knowledge_db_search","knowledge_db_route_query","knowledge_db_rag_query","knowledge_db_get_context","knowledge_db_get_related_sources","knowledge_db_get_page","knowledge_db_get_region","knowledge_db_get_analysis_status","knowledge_db_get_classification_review_context","knowledge_db_list_classification_reviews","knowledge_db_pdf_import_staging_list","knowledge_db_pdf_import_staging_get",
+  "list_generated_images","get_image_reference","knowledge_db_list_sources","knowledge_db_search","knowledge_db_route_query","knowledge_db_rag_query","knowledge_db_get_context","knowledge_db_get_related_sources","knowledge_db_get_page","knowledge_db_get_region","knowledge_db_get_analysis_status","knowledge_db_get_classification_reviews","knowledge_db_pdf_import_staging_list","knowledge_db_pdf_import_staging_get",
   "conversation_memory_search","conversation_memory_recent",
 ]);
 
@@ -30,16 +30,31 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
-function hasExactWorkspaceFileId(result: unknown, fileId: string, workspaceId: string): boolean {
+/**
+ * MCP tool output may be wrapped in an execution envelope. Support both the
+ * direct overview shape and the current { data: { overview: { overview } } }
+ * shape returned by the desktop MCP tool runner.
+ */
+export function hasExactWorkspaceFileId(result: unknown, fileId: string, workspaceId: string): boolean {
   if (!isRecord(result) || !Array.isArray(result.content)) return false;
   for (const item of result.content) {
     if (!isRecord(item) || item.type !== "text" || typeof item.text !== "string") continue;
     try {
       const parsed: unknown = JSON.parse(item.text);
-      if (!isRecord(parsed) || !isRecord(parsed.overview) || !Array.isArray(parsed.overview.files)) continue;
-      return parsed.overview.files.some((file) =>
-        isRecord(file) && file.fileId === fileId && file.workspaceId === workspaceId,
-      );
+      if (!isRecord(parsed)) continue;
+      const roots = [
+        parsed,
+        ...(isRecord(parsed.data) ? [parsed.data] : []),
+        ...(isRecord(parsed.structuredContent) ? [parsed.structuredContent] : []),
+      ];
+      for (const root of roots) {
+        if (!isRecord(root.overview)) continue;
+        const overview = isRecord(root.overview.overview) ? root.overview.overview : root.overview;
+        if (!Array.isArray(overview.files)) continue;
+        if (overview.files.some((file) =>
+          isRecord(file) && file.fileId === fileId && file.workspaceId === workspaceId,
+        )) return true;
+      }
     } catch {
       continue;
     }
