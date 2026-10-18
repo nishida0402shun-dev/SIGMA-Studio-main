@@ -102,6 +102,20 @@ describe("manual web AI bridge execution", () => {
     expect(registeredTool.execute).not.toHaveBeenCalled();
   });
 
+  it("fails closed when a tool schema uses unsupported validation keywords", async () => {
+    const registeredTool = tool({
+      inputSchema: {
+        type: "object",
+        properties: { query: { type: "string", pattern: "^[a-z]+$" } },
+        required: ["query"],
+        additionalProperties: false,
+      },
+    });
+    const result = await executeManualWebAiBridgeRequest(request(), [registeredTool]);
+    expect(result).toMatchObject({ ok: false, error: { code: "INVALID_ARGUMENTS" } });
+    expect(registeredTool.execute).not.toHaveBeenCalled();
+  });
+
   it("requires a read-only annotation even for an allowlisted name", async () => {
     const registeredTool = tool({ annotations: { readOnlyHint: false, untrustedContentHint: true } });
     const result = await executeManualWebAiBridgeRequest(request(), [registeredTool]);
