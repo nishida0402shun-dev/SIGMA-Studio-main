@@ -1,6 +1,110 @@
+import { mkdirSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import type { DatabaseSync } from "node:sqlite";
+import { DatabaseSync } from "node:sqlite";
+
+const VECTOR_SCHEMA = `
+  CREATE TABLE IF NOT EXISTS qe_vector_records (
+    id TEXT PRIMARY KEY,
+    source_id TEXT NOT NULL,
+    page_number INTEGER NOT NULL CHECK (page_number > 0),
+    chunk_index INTEGER NOT NULL CHECK (chunk_index >= 0),
+    model TEXT NOT NULL,
+    dimensions INTEGER NOT NULL CHECK (dimensions > 0),
+    vector_json TEXT NOT NULL,
+    text_content TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    UNIQUE(source_id, page_number, chunk_index, model)
+  );
+  CREATE INDEX IF NOT EXISTS qe_vector_records_source_idx
+    ON qe_vector_records(source_id, page_number);
+  CREATE TABLE IF NOT EXISTS qe_vector_store_metadata (
+    key TEXT PRIMARY KEY,
+    value TEXT NOT NULL
+  );
+`;
+
+function initializeVectorSchema(database: DatabaseSync): void {
+  database.exec(VECTOR_SCHEMA);
+}
+
+/** Opens the vector index in a separate local SQLite file, independent of the relational DB. */
+export function openLocalVectorDatabase(directory: string, filename = "vector-index.sqlite"): DatabaseSync {
+  if (path.basename(filename) !== filename || filename === "." || filename === "..") {
+    throw new Error("Vector database filename must be a simple filename");
+  }
+  const dataDir = path.resolve(directory);
+  mkdirSync(dataDir, { recursive: true });
+  const database = new DatabaseSync(path.join(dataDir, filename));
+  try {
+    database.exec("PRAGMA journal_mode = WAL");
+    database.exec("PRAGMA busy_timeout = 5000");
+    initializeVectorSchema(database);
+    return database;
+  } catch (error) {
+    database.close();
+    throw error;
+  }
+}
+
+interface LegacyVectorRow {
+  id: string;
+  source_id: string;
+  page_number: number;
+  chunk_index: number;
+  model: string;
+  dimensions: number;
+  vector_json: string;
+  text_content: string;
+  updated_at: string;
+}
+
+/**
+ * Idempotently copies the old same-database vector rows to the new vector database.
+ * The migration marker is written only after the row copy commits successfully.
+ */
+export function migrateLegacyVectorRecords(source: DatabaseSync, target: DatabaseSync): number {
+  initializeVectorSchema(target);
+  const marker = target.prepare(
+    "SELECT value FROM qe_vector_store_metadata WHERE key = ?",
+  ).get("legacy-sqlite-vector-v1") as { value?: string } | undefined;
+  if (marker) return 0;
+
+  const rows = source.prepare(`
+    SELECT id, source_id, page_number, chunk_index, model, dimensions,
+           vector_json, text_content, updated_at
+    FROM qe_vector_records
+  `).all() as LegacyVectorRow[];
+  const insert = target.prepare(`
+    INSERT INTO qe_vector_records
+      (id, source_id, page_number, chunk_index, model, dimensions, vector_json, text_content, updated_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    ON CONFLICT(source_id, page_number, chunk_index, model) DO UPDATE SET
+      id = excluded.id,
+      dimensions = excluded.dimensions,
+      vector_json = excluded.vector_json,
+      text_content = excluded.text_content,
+      updated_at = excluded.updated_at
+  `);
+
+  target.exec("BEGIN IMMEDIATE");
+  try {
+    for (const row of rows) {
+      insert.run(
+        row.id, row.source_id, row.page_number, row.chunk_index, row.model,
+        row.dimensions, row.vector_json, row.text_content, row.updated_at,
+      );
+    }
+    target.prepare(
+      "INSERT INTO qe_vector_store_metadata(key, value) VALUES (?, ?)",
+    ).run("legacy-sqlite-vector-v1", new Date().toISOString());
+    target.exec("COMMIT");
+  } catch (error) {
+    target.exec("ROLLBACK");
+    throw error;
+  }
+  return rows.length;
+}
 
 export interface VectorRecord {
   id: string;
@@ -14,6 +118,16 @@ export interface VectorRecord {
 
 export interface VectorSearchResult extends Omit<VectorRecord, "vector"> {
   score: number;
+}
+
+/** Application-owned contract so a different embedded vector engine can replace SQLite without changing retrieval callers. */
+export interface VectorStore {
+  upsert(record: Omit<VectorRecord, "vector">): Promise<void>;
+  upsertMany(records: Array<Omit<VectorRecord, "vector">>): Promise<void>;
+  hasSource(sourceId: string): Promise<boolean>;
+  removeSource(sourceId: string): Promise<void>;
+  search(query: string, limit?: number): Promise<VectorSearchResult[]>;
+  hasRecords(): Promise<boolean>;
 }
 
 const DIMENSIONS = 256;
@@ -113,8 +227,10 @@ async function embedDocuments(texts: string[]): Promise<number[][]> {
   return vectors;
 }
 
-export class LocalVectorIndex {
-  constructor(private readonly db: DatabaseSync) {}
+export class LocalVectorIndex implements VectorStore {
+  constructor(private readonly db: DatabaseSync) {
+    initializeVectorSchema(db);
+  }
 
   async upsert(record: Omit<VectorRecord, "vector">): Promise<void> {
     await this.upsertMany([record]);
