@@ -54,6 +54,8 @@ jobs:
       - run: npm --workspace @sigma-studio/desktop run electron:prepare
       - name: Run Electron smoke test on the supported desktop OS
         run: npm --workspace @sigma-studio/desktop run test:e2e:electron -- tests/electron/open-document.spec.ts
+      - name: Verify SQLite capabilities in the shipped Electron runtime
+        run: npm exec --workspace @sigma-studio/desktop -- cross-env ELECTRON_RUN_AS_NODE=1 electron scripts/check-electron-sqlite.cjs
 
   public-packages:
     name: Public package build and contracts
