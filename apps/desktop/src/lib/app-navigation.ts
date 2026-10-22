@@ -1,8 +1,9 @@
-type AppRoute = "/" | "/workspace" | "/print";
+type AppRoute = "/" | "/workspace" | "/sources" | "/print";
 
 const STATIC_ROUTE_FILES: Record<AppRoute, string> = {
   "/": "index.html",
   "/workspace": "workspace.html",
+  "/sources": "sources.html",
   "/print": "print.html",
 };
 

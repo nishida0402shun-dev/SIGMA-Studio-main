@@ -100,6 +100,37 @@ describe("SourceMaterialService", () => {
     expect(bytes.name).toBe("japanese-two-pages.pdf");
   });
 
+  it("renders PDF page images in the main process for the viewer", async () => {
+    current().registerWorkspace("workspace-a", "A");
+    const imported = await current().importFile("workspace-a", PDF_FIXTURE);
+
+    const rendered = await current().getPageImage("workspace-a", imported.source.id, 1, 1);
+    expect(rendered.pageNumber).toBe(1);
+    expect(rendered.pageCount).toBe(2);
+    expect(rendered.width).toBeGreaterThan(100);
+    expect(rendered.height).toBeGreaterThan(100);
+    expect(Buffer.from(rendered.png).subarray(0, 8)).toEqual(
+      Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
+    );
+
+    const outOfRange = await captureError(() =>
+      current().getPageImage("workspace-a", imported.source.id, 3, 1),
+    );
+    expect(outOfRange.code).toBe("PAGE_NOT_FOUND");
+  });
+
+  it("rejects page images for text sources", async () => {
+    current().registerWorkspace("workspace-a", "A");
+    const imported = await current().importBytes("workspace-a", {
+      name: "notes.txt",
+      bytes: Buffer.from("本文", "utf8"),
+    });
+    const error = await captureError(() =>
+      current().getPageImage("workspace-a", imported.source.id, 1, 1),
+    );
+    expect(error.code).toBe("PAGE_IMAGE_UNAVAILABLE");
+  });
+
   it("deduplicates identical bytes only inside the same workspace", async () => {
     current().registerWorkspace("workspace-a", "A");
     current().registerWorkspace("workspace-b", "B");

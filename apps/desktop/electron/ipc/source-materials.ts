@@ -148,6 +148,22 @@ export function registerSourceMaterialIpc(deps: RegisterSourceMaterialIpcDeps): 
     ));
   });
 
+  ipcMain.handle("source-materials:get-page-image", (
+    event,
+    studioWorkspaceId: unknown,
+    sourceId: unknown,
+    pageNumber: unknown,
+    scale: unknown,
+  ) => {
+    assertTrustedSender(event, getMainWindow);
+    return run(() => getService().getPageImage(
+      requireString(studioWorkspaceId, te("electron.sourceMaterial.workspaceIdRequired")),
+      requireString(sourceId, te("electron.sourceMaterial.sourceIdRequired")),
+      requirePageNumber(pageNumber),
+      typeof scale === "number" && Number.isFinite(scale) ? scale : 1.5,
+    ));
+  });
+
   ipcMain.handle("source-materials:get-page-range", (
     event,
     studioWorkspaceId: unknown,

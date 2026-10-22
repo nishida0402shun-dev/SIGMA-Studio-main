@@ -4,6 +4,7 @@ import type {
   SourceMaterialExtractionInfo,
   SourceMaterialFileBytes,
   SourceMaterialImportResult,
+  SourceMaterialPageImage,
   SourceMaterialPageRangeResult,
   SourceMaterialPageResult,
   SourceMaterialResult,
@@ -435,6 +436,14 @@ const desktopAPI = {
       endPage: number,
     ): Promise<SourceMaterialResult<SourceMaterialPageRangeResult>> {
       return ipcRenderer.invoke("source-materials:get-page-range", studioWorkspaceId, sourceId, startPage, endPage);
+    },
+    getPageImage(
+      studioWorkspaceId: string,
+      sourceId: string,
+      pageNumber: number,
+      scale?: number,
+    ): Promise<SourceMaterialResult<SourceMaterialPageImage>> {
+      return ipcRenderer.invoke("source-materials:get-page-image", studioWorkspaceId, sourceId, pageNumber, scale);
     },
     getExtractionInfo(
       studioWorkspaceId: string,

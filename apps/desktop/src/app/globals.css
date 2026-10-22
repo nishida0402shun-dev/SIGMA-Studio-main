@@ -11,6 +11,7 @@
 @import "./styles/controls.css";
 @import "./styles/materials-and-dialogs.css";
 @import "./styles/workspace.css";
+@import "./styles/source-materials.css";
 @import "./styles/page-and-selection.css";
 @import "./styles/graph-and-text-editing.css";
 @import "./styles/ai-chat.css";

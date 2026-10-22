@@ -17,6 +17,7 @@ describe("app navigation", () => {
     });
 
     expect(getAppRouteHref("/", { fileId: "file_1" })).toBe("file:///Applications/Sigma%20Studio.app/Contents/Resources/app.asar/out/index.html?fileId=file_1");
+    expect(getAppRouteHref("/sources")).toBe("file:///Applications/Sigma%20Studio.app/Contents/Resources/app.asar/out/sources.html");
   });
 
   it("uses exported HTML files for production web navigation", () => {
@@ -29,6 +30,7 @@ describe("app navigation", () => {
     });
 
     expect(getAppRouteHref("/workspace")).toBe("https://sigma-studio.example/sigma/workspace");
+    expect(getAppRouteHref("/sources")).toBe("https://sigma-studio.example/sigma/sources");
     expect(getAppRouteHref("/print", { fileId: "file_1" })).toBe("https://sigma-studio.example/sigma/print?fileId=file_1");
     expect(getAppRouteHref("/", { fileId: "file_1" })).toBe("https://sigma-studio.example/sigma/?fileId=file_1");
   });
@@ -43,5 +45,6 @@ describe("app navigation", () => {
     });
 
     expect(getAppRouteHref("/workspace")).toBe("/workspace");
+    expect(getAppRouteHref("/sources")).toBe("/sources");
   });
 });

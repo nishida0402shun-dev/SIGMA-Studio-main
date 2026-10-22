@@ -250,6 +250,7 @@ function installDesktopRuntime() {
         importFiles: vi.fn(),
         getFileBytes: vi.fn(),
         getPage: vi.fn(),
+        getPageImage: vi.fn(),
         getPageRange: vi.fn(),
         getExtractionInfo: vi.fn(),
         search: vi.fn(),

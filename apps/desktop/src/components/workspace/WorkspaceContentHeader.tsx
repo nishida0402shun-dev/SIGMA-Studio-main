@@ -1,6 +1,6 @@
 "use client";
 
-import { ChevronRight, Pencil, Trash2 } from "lucide-react";
+import { BookOpen, ChevronRight, Pencil, Trash2 } from "lucide-react";
 import { Fragment } from "react";
 import type { DragEvent as ReactDragEvent } from "react";
 
@@ -27,6 +27,7 @@ interface WorkspaceContentHeaderProps {
   onNavigateFolder: (folderId: string) => void;
   viewMode: WorkspaceViewMode;
   onViewModeChange: (mode: WorkspaceViewMode) => void;
+  onOpenSources: () => void;
   onEditFolder: () => void;
   onDeleteFolder: () => void;
 }
@@ -42,6 +43,7 @@ export function WorkspaceContentHeader({
   onNavigateFolder,
   viewMode,
   onViewModeChange,
+  onOpenSources,
   onEditFolder,
   onDeleteFolder,
 }: WorkspaceContentHeaderProps) {
@@ -97,6 +99,14 @@ export function WorkspaceContentHeader({
         )}
       </nav>
       <div className="workspace-content-header-actions">
+        <button
+          type="button"
+          className="button secondary workspace-sources-button"
+          onClick={onOpenSources}
+        >
+          <BookOpen size={15} aria-hidden="true" />
+          {t("sources.title")}
+        </button>
         <WorkspaceViewToggle value={viewMode} onChange={onViewModeChange} />
         {showFolderActions && selectedFolder && (
           <>

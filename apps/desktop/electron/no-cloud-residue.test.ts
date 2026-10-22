@@ -1,5 +1,5 @@
 import { execFileSync } from "node:child_process";
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readFileSync, statSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -96,7 +96,8 @@ function repositoryTextFiles(): string[] {
     .filter((relativePath) => !BINARY_EXTENSIONS.has(path.extname(relativePath).toLowerCase()))
     .map((relativePath) => path.join(REPOSITORY_DIR, relativePath))
     // A tracked file intentionally deleted in the current worktree is already absent residue.
-    .filter((absolutePath) => existsSync(absolutePath));
+    // Submodule gitlinks also appear in `git ls-files`, but their worktree path is a directory.
+    .filter((absolutePath) => existsSync(absolutePath) && statSync(absolutePath).isFile());
 }
 
 describe("cloud removal boundary", () => {

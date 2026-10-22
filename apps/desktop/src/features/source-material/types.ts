@@ -66,6 +66,16 @@ export interface SourceMaterialPageRangeResult {
   pages: SourceMaterialPage[];
 }
 
+export interface SourceMaterialPageImage {
+  sourceId: string;
+  pageNumber: number;
+  pageCount: number;
+  width: number;
+  height: number;
+  scale: number;
+  png: Uint8Array;
+}
+
 export interface SourceMaterialExtractionInfo {
   extractorId: string;
   extractorVersion: string;

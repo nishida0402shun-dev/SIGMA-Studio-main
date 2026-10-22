@@ -1131,6 +1131,7 @@ export async function installDesktopRuntimeMock(
         importFiles: async () => ({ ok: false as const, error: { code: "NOT_AVAILABLE", message: "E2E mock" } }),
         getFileBytes: async () => ({ ok: false as const, error: { code: "NOT_AVAILABLE", message: "E2E mock" } }),
         getPage: async () => ({ ok: false as const, error: { code: "NOT_AVAILABLE", message: "E2E mock" } }),
+        getPageImage: async () => ({ ok: false as const, error: { code: "NOT_AVAILABLE", message: "E2E mock" } }),
         getPageRange: async () => ({ ok: false as const, error: { code: "NOT_AVAILABLE", message: "E2E mock" } }),
         getExtractionInfo: async () => ({ ok: false as const, error: { code: "NOT_AVAILABLE", message: "E2E mock" } }),
         search: async () => ({ ok: false as const, error: { code: "NOT_AVAILABLE", message: "E2E mock" } }),

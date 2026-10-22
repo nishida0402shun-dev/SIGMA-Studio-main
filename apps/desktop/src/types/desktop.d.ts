@@ -13,6 +13,7 @@ import type {
   SourceMaterialExtractionInfo,
   SourceMaterialFileBytes,
   SourceMaterialImportResult,
+  SourceMaterialPageImage,
   SourceMaterialPageRangeResult,
   SourceMaterialPageResult,
   SourceMaterialResult,
@@ -318,6 +319,12 @@ export interface DesktopSourceMaterialsAPI {
     startPage: number,
     endPage: number,
   ): Promise<SourceMaterialResult<SourceMaterialPageRangeResult>>;
+  getPageImage(
+    studioWorkspaceId: string,
+    sourceId: string,
+    pageNumber: number,
+    scale?: number,
+  ): Promise<SourceMaterialResult<SourceMaterialPageImage>>;
   getExtractionInfo(
     studioWorkspaceId: string,
     sourceId: string,

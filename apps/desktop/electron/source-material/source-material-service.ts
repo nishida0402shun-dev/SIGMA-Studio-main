@@ -12,6 +12,7 @@ import type {
   SourceMaterialFormat,
   SourceMaterialImportOutcome,
   SourceMaterialPage,
+  SourceMaterialPageImage,
   SourceMaterialPageRangeResult,
   SourceMaterialPageResult,
   SourceMaterialSearchHit,
@@ -32,6 +33,7 @@ import {
   type SourceLocation,
   type SourceObject,
 } from "./core-bridge";
+import { PdfRenderError, SourcePdfPageRenderer } from "./pdf-page-renderer";
 
 const te = createCurrentLocaleTranslator("error");
 
@@ -143,6 +145,7 @@ export class SourceMaterialService {
   readonly #coreService: CoreService;
   readonly #auth: AuthContext;
   readonly #maxBytes: number;
+  readonly #pdfRenderer = new SourcePdfPageRenderer();
   #closed = false;
 
   constructor(userDataPath: string, options: SourceMaterialServiceOptions = {}) {
@@ -393,6 +396,53 @@ export class SourceMaterialService {
     };
   }
 
+  async getPageImage(
+    studioWorkspaceId: string,
+    sourceId: string,
+    pageNumber: number,
+    scale: number,
+  ): Promise<SourceMaterialPageImage> {
+    const coreWorkspaceId = this.#registeredCoreWorkspaceId(studioWorkspaceId);
+    const object = this.#sourceInWorkspace(coreWorkspaceId, sourceId);
+    if (object.metadata.mimeType !== PDF_MIME_TYPE) {
+      throw new SourceMaterialError(
+        "PAGE_IMAGE_UNAVAILABLE",
+        te("electron.sourceMaterial.pageImageUnavailable"),
+      );
+    }
+    const bytes = await this.#coreService.getObjectBytes(this.#auth, sourceId);
+    if (!bytes) {
+      throw new SourceMaterialError(
+        "SOURCE_BYTES_UNAVAILABLE",
+        te("electron.sourceMaterial.bytesUnavailable"),
+      );
+    }
+    try {
+      const rendered = await this.#pdfRenderer.renderPage(sourceId, bytes, pageNumber, scale);
+      return {
+        sourceId,
+        pageNumber,
+        pageCount: rendered.pageCount,
+        width: rendered.width,
+        height: rendered.height,
+        scale: rendered.scale,
+        png: rendered.png,
+      };
+    } catch (error) {
+      if (error instanceof PdfRenderError) {
+        const message = error.code === "PDF_PASSWORD_REQUIRED"
+          ? te("electron.sourceMaterial.pdfPasswordRequired")
+          : error.code === "PDF_CORRUPT"
+            ? te("electron.sourceMaterial.pdfCorrupt")
+            : error.code === "PAGE_NOT_FOUND"
+              ? te("electron.sourceMaterial.pdfPageNotFound")
+              : te("electron.sourceMaterial.pdfRenderFailed");
+        throw new SourceMaterialError(error.code, message);
+      }
+      throw toSourceMaterialError(error);
+    }
+  }
+
   getPageRange(
     studioWorkspaceId: string,
     sourceId: string,
@@ -473,6 +523,7 @@ export class SourceMaterialService {
   close(): void {
     if (this.#closed) return;
     this.#closed = true;
+    this.#pdfRenderer.close();
     this.#repository.close();
   }
 }
