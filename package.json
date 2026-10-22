@@ -6,7 +6,8 @@
     "apps/desktop",
     "packages/viewer",
     "packages/editor",
-    "examples/editor-react18"
+    "examples/editor-react18",
+    "vendor/sigma-core"
   ],
   "scripts": {
     "dev": "npm --workspace @sigma-studio/desktop run dev",
@@ -23,6 +24,8 @@
     "viewer:test": "npm --workspace @sigma-studio/viewer run test",
     "viewer:typecheck": "npm --workspace @sigma-studio/viewer run typecheck",
     "viewer:pack": "npm pack --workspace @sigma-studio/viewer --dry-run",
+    "core:test": "npm --workspace @sigma-studio/core run test",
+    "core:typecheck": "npm --workspace @sigma-studio/core run typecheck",
     "viewer:example": "npm --workspace @sigma-studio/editor-react18-example run dev",
     "viewer:example:build": "npm --workspace @sigma-studio/editor-react18-example run build",
     "editor:build": "npm run viewer:build && npm --workspace @sigma-studio/editor run build",

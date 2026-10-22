@@ -1124,6 +1124,19 @@ export async function installDesktopRuntimeMock(
           return { ok: true };
         },
       },
+      sourceMaterials: {
+        getWorkspaceStatus: async () => ({ ok: false as const, error: { code: "NOT_AVAILABLE", message: "E2E mock" } }),
+        registerWorkspace: async () => ({ ok: false as const, error: { code: "NOT_AVAILABLE", message: "E2E mock" } }),
+        listSources: async () => ({ ok: false as const, error: { code: "NOT_AVAILABLE", message: "E2E mock" } }),
+        importFiles: async () => ({ ok: false as const, error: { code: "NOT_AVAILABLE", message: "E2E mock" } }),
+        getFileBytes: async () => ({ ok: false as const, error: { code: "NOT_AVAILABLE", message: "E2E mock" } }),
+        getPage: async () => ({ ok: false as const, error: { code: "NOT_AVAILABLE", message: "E2E mock" } }),
+        getPageRange: async () => ({ ok: false as const, error: { code: "NOT_AVAILABLE", message: "E2E mock" } }),
+        getExtractionInfo: async () => ({ ok: false as const, error: { code: "NOT_AVAILABLE", message: "E2E mock" } }),
+        search: async () => ({ ok: false as const, error: { code: "NOT_AVAILABLE", message: "E2E mock" } }),
+        deleteSource: async () => ({ ok: false as const, error: { code: "NOT_AVAILABLE", message: "E2E mock" } }),
+        restoreSource: async () => ({ ok: false as const, error: { code: "NOT_AVAILABLE", message: "E2E mock" } }),
+      },
       templates: {
         listTemplates: async (requestedWorkspaceId?: string | null) => {
           const nextTemplates = requestedWorkspaceId
