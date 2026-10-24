@@ -31,6 +31,7 @@ describe("error namespace resolution", () => {
           page: 3,
           targetId: "target",
           maxBytes: 1024,
+          megabytes: 50,
           startBlockId: "start",
           endBlockId: "end",
           ids: "id-1",

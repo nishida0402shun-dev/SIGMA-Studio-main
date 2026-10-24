@@ -1150,6 +1150,7 @@ export function WorkspaceManager() {
               }}
               viewMode={viewPreference.mode}
               onViewModeChange={(mode) => setViewPreference({ mode })}
+              onOpenSources={() => navigateToAppRoute("/sources")}
               onEditFolder={() => selectedFolder && startEditingFolder(selectedFolder)}
               onDeleteFolder={() => selectedFolder && void removeFolder(selectedFolder)}
             />

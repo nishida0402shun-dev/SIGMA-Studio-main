@@ -30,6 +30,7 @@ import { buildCodexAgentConfigToml, type CodexAgentConfigInput } from "./codex-m
 import { ClaudeStreamClient } from "./claude-stream-client";
 import { buildClaudeMcpConfig } from "./claude-mcp-config";
 import { GeminiHeadlessClient } from "./gemini-headless-client";
+import { siblingCoreMcpScriptPath } from "./sigma-studio-mcp-launch";
 import {
   buildGeminiWorkspaceSettings,
   cleanupStaleAgentWorkspaceGeminiAttachments,
@@ -46,6 +47,7 @@ import { AUTO_APPLY_DEFER_MS, shouldDeferAutoApply } from "./auto-apply-defer";
 import type { LocalStoreChangeEvent } from "./local-sigma-doc-store";
 import { SharedWorkspaceDocStore } from "./shared-workspace-doc-store";
 import { LocalMaterialStore } from "./local-material-store";
+import { SourceMaterialService } from "./source-material/source-material-service";
 import { LocalTemplateStore } from "./local-template-store";
 import {
   LocalMcpEditProposalStore,
@@ -66,6 +68,7 @@ import { ResearchSessionStore } from "./research-session-store";
 import { registerResearchSessionIpc } from "./ipc/research-session";
 import { documentPathsFromArgv, ExternalDocumentOpenQueue } from "./external-document-open";
 import { registerMaterialsIpc } from "./ipc/materials";
+import { registerSourceMaterialIpc } from "./ipc/source-materials";
 import { registerStorageIpc } from "./ipc/storage";
 import { createProposalApprovalCoordinator } from "./proposal-approval";
 import { registerWorkspacePreviewIpc } from "./ipc/workspace-preview";
@@ -313,6 +316,14 @@ const SIGMA_STUDIO_DATA_PATH = path.join(USER_DATA_PATH, "data");
 const conversationMemoryStore = new ConversationMemoryStore(SIGMA_STUDIO_DATA_PATH);
 const longTermMemoryStore = new LongTermMemoryStore(SIGMA_STUDIO_DATA_PATH);
 const researchSessionStore = new ResearchSessionStore(SIGMA_STUDIO_DATA_PATH);
+let sourceMaterialService: SourceMaterialService | null = null;
+
+function getSourceMaterialService(): SourceMaterialService {
+  // Open Core lazily so a Core/SQLite failure cannot prevent the existing
+  // editor, save, AI, and PDF features from starting.
+  sourceMaterialService ??= new SourceMaterialService(USER_DATA_PATH);
+  return sourceMaterialService;
+}
 const appUpdateController = new AppUpdateController({ releaseUrl: RELEASE_PAGE_URL });
 const desktopSettings = readDesktopSettingsSync(SIGMA_STUDIO_DATA_PATH);
 /**
@@ -341,6 +352,7 @@ setAppLocale(startupPromptLocale);
 const codexAgentConfigBase: Omit<CodexAgentConfigInput, "webSearchEnabled" | "uiLocale"> = {
   execPath: process.execPath,
   scriptPath: resolveMcpServerScriptPath(),
+  coreScriptPath: siblingCoreMcpScriptPath(resolveMcpServerScriptPath()),
   userDataDir: USER_DATA_PATH,
   runContextFile: localChatgptRunContextStore.getRunContextFilePath(),
   renderBridgeFile: localAiRenderBridgeStore.getBridgeFilePath(),
@@ -360,6 +372,7 @@ const claudeStreamClient = new ClaudeStreamClient({
   mcpConfig: buildClaudeMcpConfig({
     execPath: process.execPath,
     scriptPath: resolveMcpServerScriptPath(),
+    coreScriptPath: siblingCoreMcpScriptPath(resolveMcpServerScriptPath()),
     userDataDir: USER_DATA_PATH,
     runContextFile: localAiEditRunContextStore.getRunContextFilePath(),
     renderBridgeFile: localAiRenderBridgeStore.getBridgeFilePath(),
@@ -390,6 +403,7 @@ void writeGeminiWorkspaceSettings(
   buildGeminiWorkspaceSettings({
     execPath: process.execPath,
     scriptPath: resolveMcpServerScriptPath(),
+    coreScriptPath: siblingCoreMcpScriptPath(resolveMcpServerScriptPath()),
     userDataDir: USER_DATA_PATH,
     runContextFile: localGeminiRunContextStore.getRunContextFilePath(),
     renderBridgeFile: localAiRenderBridgeStore.getBridgeFilePath(),
@@ -1749,6 +1763,11 @@ function registerIpc() {
     localTemplateStore,
   });
 
+  registerSourceMaterialIpc({
+    getMainWindow: () => mainWindow,
+    getService: getSourceMaterialService,
+  });
+
   registerStorageIpc({
     localSigmaDocStore,
     localMcpProposalStore,
@@ -1840,6 +1859,8 @@ app.on("before-quit", (event) => {
   void sweepOrphanPerRunContextFiles(USER_DATA_PATH, "antigravity");
   stopAiRenderBridgeServer();
   stopWebAiBridgeServer();
+  sourceMaterialService?.close();
+  sourceMaterialService = null;
 });
 
 async function startAiRenderBridgeServer(): Promise<void> {

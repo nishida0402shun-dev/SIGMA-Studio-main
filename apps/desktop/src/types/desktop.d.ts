@@ -9,6 +9,18 @@ import type { SigmaDocumentRecoveryIssue, SigmaDocumentSchemaFailure } from "@/l
 import type { MaterialContent, MaterialItem } from "@/types/material";
 import type { TemplateItem } from "@/types/template";
 import type { DocumentVersion, DocumentVersionMetadata, DocumentVersionOrigin } from "@/lib/document-version-history";
+import type {
+  SourceMaterialExtractionInfo,
+  SourceMaterialFileBytes,
+  SourceMaterialImportResult,
+  SourceMaterialPageImage,
+  SourceMaterialPageRangeResult,
+  SourceMaterialPageResult,
+  SourceMaterialResult,
+  SourceMaterialSearchHit,
+  SourceMaterialSummary,
+  SourceMaterialWorkspaceStatus,
+} from "@/features/source-material/types";
 
 export interface DesktopAiEditChatAttachmentSummary {
   id: string;
@@ -285,6 +297,51 @@ export interface DesktopMaterialsAPI {
   renameMaterial(id: string, name: string): Promise<MaterialItem>;
   updateMaterialMetadata(id: string, input: Partial<Pick<MaterialItem, "name" | "description" | "tags" | "usage" | "visualConcepts" | "transformPolicy" | "ports" | "content">>): Promise<MaterialItem>;
   deleteMaterial(id: string): Promise<DesktopStorageResult>;
+}
+
+export interface DesktopSourceMaterialsAPI {
+  getWorkspaceStatus(studioWorkspaceId: string): Promise<SourceMaterialResult<SourceMaterialWorkspaceStatus>>;
+  registerWorkspace(
+    studioWorkspaceId: string,
+    displayName: string,
+  ): Promise<SourceMaterialResult<SourceMaterialWorkspaceStatus>>;
+  listSources(studioWorkspaceId: string): Promise<SourceMaterialResult<SourceMaterialSummary[]>>;
+  importFiles(studioWorkspaceId: string): Promise<SourceMaterialResult<SourceMaterialImportResult>>;
+  getFileBytes(studioWorkspaceId: string, sourceId: string): Promise<SourceMaterialResult<SourceMaterialFileBytes>>;
+  getPage(
+    studioWorkspaceId: string,
+    sourceId: string,
+    pageNumber: number,
+  ): Promise<SourceMaterialResult<SourceMaterialPageResult>>;
+  getPageRange(
+    studioWorkspaceId: string,
+    sourceId: string,
+    startPage: number,
+    endPage: number,
+  ): Promise<SourceMaterialResult<SourceMaterialPageRangeResult>>;
+  getPageImage(
+    studioWorkspaceId: string,
+    sourceId: string,
+    pageNumber: number,
+    scale?: number,
+  ): Promise<SourceMaterialResult<SourceMaterialPageImage>>;
+  getExtractionInfo(
+    studioWorkspaceId: string,
+    sourceId: string,
+  ): Promise<SourceMaterialResult<SourceMaterialExtractionInfo[]>>;
+  search(
+    studioWorkspaceId: string,
+    query: string,
+    limit?: number,
+  ): Promise<SourceMaterialResult<SourceMaterialSearchHit[]>>;
+  deleteSource(
+    studioWorkspaceId: string,
+    sourceId: string,
+  ): Promise<SourceMaterialResult<{ deleted: boolean }>>;
+  restoreSource(
+    studioWorkspaceId: string,
+    sourceId: string,
+  ): Promise<SourceMaterialResult<{ restored: boolean }>>;
 }
 
 export interface DesktopTemplatesAPI {
@@ -908,6 +965,7 @@ export interface DesktopAPI {
   inputSource?: DesktopInputSourceAPI;
   materials: DesktopMaterialsAPI;
   templates: DesktopTemplatesAPI;
+  sourceMaterials: DesktopSourceMaterialsAPI;
   storage: DesktopStorageAPI;
   researchSessions?: DesktopResearchSessionsAPI;
   workspacePreview?: DesktopWorkspacePreviewAPI;

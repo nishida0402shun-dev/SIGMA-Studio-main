@@ -1,5 +1,18 @@
 import { contextBridge, ipcRenderer } from "electron";
 
+import type {
+  SourceMaterialExtractionInfo,
+  SourceMaterialFileBytes,
+  SourceMaterialImportResult,
+  SourceMaterialPageImage,
+  SourceMaterialPageRangeResult,
+  SourceMaterialPageResult,
+  SourceMaterialResult,
+  SourceMaterialSearchHit,
+  SourceMaterialSummary,
+  SourceMaterialWorkspaceStatus,
+} from "../src/features/source-material/types";
+
 type AiEditEvent = unknown;
 
 let runCounter = 0;
@@ -387,6 +400,75 @@ const desktopAPI = {
     },
     deleteMaterial(id: string): Promise<unknown> {
       return ipcRenderer.invoke("materials:delete", id);
+    },
+  },
+
+  sourceMaterials: {
+    getWorkspaceStatus(studioWorkspaceId: string): Promise<SourceMaterialResult<SourceMaterialWorkspaceStatus>> {
+      return ipcRenderer.invoke("source-materials:workspace-status", studioWorkspaceId);
+    },
+    registerWorkspace(
+      studioWorkspaceId: string,
+      displayName: string,
+    ): Promise<SourceMaterialResult<SourceMaterialWorkspaceStatus>> {
+      return ipcRenderer.invoke("source-materials:register-workspace", studioWorkspaceId, displayName);
+    },
+    listSources(studioWorkspaceId: string): Promise<SourceMaterialResult<SourceMaterialSummary[]>> {
+      return ipcRenderer.invoke("source-materials:list", studioWorkspaceId);
+    },
+    importFiles(studioWorkspaceId: string): Promise<SourceMaterialResult<SourceMaterialImportResult>> {
+      return ipcRenderer.invoke("source-materials:import", studioWorkspaceId);
+    },
+    getFileBytes(studioWorkspaceId: string, sourceId: string): Promise<SourceMaterialResult<SourceMaterialFileBytes>> {
+      return ipcRenderer.invoke("source-materials:get-bytes", studioWorkspaceId, sourceId);
+    },
+    getPage(
+      studioWorkspaceId: string,
+      sourceId: string,
+      pageNumber: number,
+    ): Promise<SourceMaterialResult<SourceMaterialPageResult>> {
+      return ipcRenderer.invoke("source-materials:get-page", studioWorkspaceId, sourceId, pageNumber);
+    },
+    getPageRange(
+      studioWorkspaceId: string,
+      sourceId: string,
+      startPage: number,
+      endPage: number,
+    ): Promise<SourceMaterialResult<SourceMaterialPageRangeResult>> {
+      return ipcRenderer.invoke("source-materials:get-page-range", studioWorkspaceId, sourceId, startPage, endPage);
+    },
+    getPageImage(
+      studioWorkspaceId: string,
+      sourceId: string,
+      pageNumber: number,
+      scale?: number,
+    ): Promise<SourceMaterialResult<SourceMaterialPageImage>> {
+      return ipcRenderer.invoke("source-materials:get-page-image", studioWorkspaceId, sourceId, pageNumber, scale);
+    },
+    getExtractionInfo(
+      studioWorkspaceId: string,
+      sourceId: string,
+    ): Promise<SourceMaterialResult<SourceMaterialExtractionInfo[]>> {
+      return ipcRenderer.invoke("source-materials:get-extraction-info", studioWorkspaceId, sourceId);
+    },
+    search(
+      studioWorkspaceId: string,
+      query: string,
+      limit?: number,
+    ): Promise<SourceMaterialResult<SourceMaterialSearchHit[]>> {
+      return ipcRenderer.invoke("source-materials:search", studioWorkspaceId, query, limit);
+    },
+    deleteSource(
+      studioWorkspaceId: string,
+      sourceId: string,
+    ): Promise<SourceMaterialResult<{ deleted: boolean }>> {
+      return ipcRenderer.invoke("source-materials:delete", studioWorkspaceId, sourceId);
+    },
+    restoreSource(
+      studioWorkspaceId: string,
+      sourceId: string,
+    ): Promise<SourceMaterialResult<{ restored: boolean }>> {
+      return ipcRenderer.invoke("source-materials:restore", studioWorkspaceId, sourceId);
     },
   },
 

@@ -3,6 +3,41 @@ import { describe, expect, it } from "vitest";
 import { buildClaudeMcpConfig } from "./claude-mcp-config";
 
 describe("buildClaudeMcpConfig", () => {
+  it("adds the read-only sigma-core-local server only when a Core script is supplied", () => {
+    const withoutCore = buildClaudeMcpConfig({
+      execPath: "/electron",
+      scriptPath: "/app/sigma-doc-mcp-server.cjs",
+      userDataDir: "/data",
+      runContextFile: "/data/run-context.json",
+      renderBridgeFile: "/data/render-bridge.json",
+      provider: "claude",
+      uiLocale: "ja" as const,
+    });
+    expect(withoutCore.mcpServers["sigma-core-local"]).toBeUndefined();
+
+    const withCore = buildClaudeMcpConfig({
+      execPath: "/electron",
+      scriptPath: "/app/sigma-doc-mcp-server.cjs",
+      coreScriptPath: "/app/sigma-core-mcp-server.cjs",
+      userDataDir: "/data",
+      runContextFile: "/data/run-context.json",
+      renderBridgeFile: "/data/render-bridge.json",
+      provider: "claude",
+      uiLocale: "ja" as const,
+    });
+    expect(withCore.mcpServers["sigma-core-local"]).toEqual({
+      type: "stdio",
+      command: "/electron",
+      args: ["/app/sigma-core-mcp-server.cjs"],
+      env: {
+        ELECTRON_RUN_AS_NODE: "1",
+        SIGMA_CORE_DB_PATH: "/data/data/sigma-core/core.sqlite",
+        SIGMA_CORE_BLOB_DIR: "/data/data/sigma-core/blobs",
+        SIGMA_CORE_SUBJECT_ID: "studio-ai",
+      },
+    });
+  });
+
   it("points the sigma-studio-local server at the bundled script via the Electron node runtime", () => {
     const config = buildClaudeMcpConfig({
       execPath: "/Applications/Sigma Studio.app/Contents/MacOS/Sigma Studio",

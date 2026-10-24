@@ -16,6 +16,7 @@ import { buildGeminiWorkspaceSettings, writeGeminiWorkspaceSettings } from "./ge
 import { LocalSigmaDocStore } from "./local-sigma-doc-store";
 import { LocalAiRenderBridgeStore } from "./ai-render-bridge";
 import { ClaudeStreamClient } from "./claude-stream-client";
+import { siblingCoreMcpScriptPath } from "./sigma-studio-mcp-launch";
 
 export interface WebAiAgentRunInput {
   runId: string;
@@ -126,6 +127,7 @@ export function createWebAiAgentRuntime(deps: WebAiAgentRuntimeDeps) {
             uiLocale: locale,
             execPath: process.execPath,
             scriptPath: deps.resolveMcpServerScriptPath(),
+            coreScriptPath: siblingCoreMcpScriptPath(deps.resolveMcpServerScriptPath()),
             userDataDir: deps.userDataPath,
             runContextFile,
             renderBridgeFile: deps.aiRenderBridgeStore.getBridgeFilePath(),
@@ -140,6 +142,7 @@ export function createWebAiAgentRuntime(deps: WebAiAgentRuntimeDeps) {
           buildGeminiWorkspaceSettings({
             execPath: process.execPath,
             scriptPath: deps.resolveMcpServerScriptPath(),
+            coreScriptPath: siblingCoreMcpScriptPath(deps.resolveMcpServerScriptPath()),
             userDataDir: deps.userDataPath,
             runContextFile: deps.geminiRunContextStore.getRunContextFilePath(),
             renderBridgeFile: deps.aiRenderBridgeStore.getBridgeFilePath(),

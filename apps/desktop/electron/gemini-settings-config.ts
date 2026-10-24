@@ -2,7 +2,9 @@ import fs from "node:fs/promises";
 import path from "node:path";
 
 import {
+  buildSigmaCoreMcpStdioServer,
   buildSigmaStudioMcpEnv,
+  SIGMA_CORE_MCP_SERVER_NAME,
   SIGMA_DOC_MCP_SERVER_NAME,
   type SigmaStudioMcpLaunchSpec,
 } from "./sigma-studio-mcp-launch";
@@ -21,12 +23,14 @@ export interface GeminiMcpStdioServer {
 export interface GeminiWorkspaceSettings {
   mcpServers: {
     "sigma-studio-local": GeminiMcpStdioServer;
+    "sigma-core-local"?: GeminiMcpStdioServer;
   };
 }
 
-export { SIGMA_DOC_MCP_SERVER_NAME };
+export { SIGMA_CORE_MCP_SERVER_NAME, SIGMA_DOC_MCP_SERVER_NAME };
 
 export function buildGeminiWorkspaceSettings(input: GeminiSettingsConfigInput): GeminiWorkspaceSettings {
+  const core = buildSigmaCoreMcpStdioServer(input);
   return {
     mcpServers: {
       [SIGMA_DOC_MCP_SERVER_NAME]: {
@@ -34,6 +38,15 @@ export function buildGeminiWorkspaceSettings(input: GeminiSettingsConfigInput): 
         args: [input.scriptPath],
         env: buildSigmaStudioMcpEnv(input),
       },
+      ...(core
+        ? {
+            [SIGMA_CORE_MCP_SERVER_NAME]: {
+              command: core.command,
+              args: core.args,
+              env: core.env,
+            },
+          }
+        : {}),
     },
   };
 }
@@ -44,6 +57,7 @@ export interface WriteGeminiWorkspaceSettingsOptions {
 }
 
 export const SIGMA_STUDIO_ANTIGRAVITY_MCP_PERMISSION = `mcp(${SIGMA_DOC_MCP_SERVER_NAME}/*)`;
+export const SIGMA_CORE_ANTIGRAVITY_MCP_PERMISSION = `mcp(${SIGMA_CORE_MCP_SERVER_NAME}/*)`;
 
 export async function writeGeminiWorkspaceSettings(
   workspaceDir: string,
@@ -153,6 +167,9 @@ async function writeAntigravityCliPermissionSettings(
 function buildSigmaStudioAntigravityPermissionRules(settings: GeminiWorkspaceSettings): string[] {
   const userDataDir = settings.mcpServers[SIGMA_DOC_MCP_SERVER_NAME].env.SIGMA_STUDIO_USER_DATA_DIR?.trim();
   const rules = [SIGMA_STUDIO_ANTIGRAVITY_MCP_PERMISSION];
+  if (settings.mcpServers[SIGMA_CORE_MCP_SERVER_NAME]) {
+    rules.push(SIGMA_CORE_ANTIGRAVITY_MCP_PERMISSION);
+  }
   if (userDataDir) {
     const runContextDir = path.join(userDataDir, "data", "ai-run-context").replaceAll("\\", "/");
     rules.push(`read_file(${runContextDir})`);
@@ -161,12 +178,17 @@ function buildSigmaStudioAntigravityPermissionRules(settings: GeminiWorkspaceSet
 }
 
 function buildObsoleteSigmaStudioAntigravityPermissionRules(settings: GeminiWorkspaceSettings): string[] {
+  const obsolete: string[] = [];
+  if (!settings.mcpServers[SIGMA_CORE_MCP_SERVER_NAME]) {
+    obsolete.push(SIGMA_CORE_ANTIGRAVITY_MCP_PERMISSION);
+  }
   const userDataDir = settings.mcpServers[SIGMA_DOC_MCP_SERVER_NAME].env.SIGMA_STUDIO_USER_DATA_DIR?.trim();
   if (!userDataDir) {
-    return [];
+    return obsolete;
   }
   const previewDir = path.join(userDataDir, "data", "ai-run-context", "previews").replaceAll("\\", "/");
-  return [`read_file(${previewDir})`];
+  obsolete.push(`read_file(${previewDir})`);
+  return obsolete;
 }
 
 function mergeMcpSettings(current: Record<string, unknown>, settings: GeminiWorkspaceSettings): GeminiWorkspaceSettings & Record<string, unknown> {

@@ -11,6 +11,10 @@ const pkg = JSON.parse(readFileSync(path.join(root, "package.json"), "utf8"));
 
 const external = [
   "electron",
+  // Core falls back to better-sqlite3 only when node:sqlite is unavailable.
+  // Keep the native optional dependency out of the bundle; Electron 44 ships
+  // Node 24 and uses node:sqlite.
+  "better-sqlite3",
   // mathlive / i18next は main.cjs へ束ねる。external のままだと実行時に node_modules を
   // 要求し、electron-builder の `files` に載っていないパッケージング事故になる。
   ...Object.keys(pkg.dependencies ?? {}).filter((name) => name !== "mathlive" && name !== "i18next"),
@@ -26,6 +30,15 @@ const common = {
   sourcemap: emitSourceMaps,
   external,
   logLevel: "info",
+  // SIGMA Core is authored as ESM and uses import.meta.url for createRequire.
+  // main.cjs/preload.cjs are CJS, so provide a real file URL instead of the
+  // empty import.meta object esbuild would otherwise emit.
+  define: {
+    "import.meta.url": "__sigmaImportMetaUrl",
+  },
+  banner: {
+    js: 'const __sigmaImportMetaUrl = require("node:url").pathToFileURL(__filename).href;',
+  },
   alias: {
     "@": path.join(root, "src"),
     "mathlive/ssr": path.join(root, "electron/mathlive-main-stub.ts"),
@@ -40,6 +53,7 @@ export async function buildElectron({ watch = false, onBuilt } = {}) {
       main: path.join(root, "electron/main.ts"),
       preload: path.join(root, "electron/preload.ts"),
       "sigma-doc-mcp-server": path.join(root, "mcp/sigma-doc-mcp-server.ts"),
+      "sigma-core-mcp-server": path.join(root, "mcp/source-material-mcp-server.ts"),
     },
     outdir: path.join(root, "dist-electron"),
     outExtension: { ".js": ".cjs" },
