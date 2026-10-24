@@ -173,7 +173,11 @@ jobs:
             if [[ "${{ steps.channel.outputs.channel }}" == "beta" ]]; then
               args+=(--prerelease)
             fi
-            gh release create "${tag}" "${args[@]}" --target "${{ needs.prepare.outputs.ref }}"
+            # The tag already exists for push/tag-triggered releases. Only manual branch dispatch needs an explicit commit target.
+            if [[ "${GITHUB_EVENT_NAME}" == "workflow_dispatch" && "${GITHUB_REF_TYPE}" != "tag" ]]; then
+              args+=(--target "${{ needs.prepare.outputs.ref }}")
+            fi
+            gh release create "${tag}" "${args[@]}"
           fi
 
       - name: Build and publish Windows installer
