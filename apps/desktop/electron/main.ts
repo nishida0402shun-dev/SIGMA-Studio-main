@@ -30,6 +30,7 @@ import { buildCodexAgentConfigToml, type CodexAgentConfigInput } from "./codex-m
 import { ClaudeStreamClient } from "./claude-stream-client";
 import { buildClaudeMcpConfig } from "./claude-mcp-config";
 import { GeminiHeadlessClient } from "./gemini-headless-client";
+import { siblingCoreMcpScriptPath } from "./sigma-studio-mcp-launch";
 import {
   buildGeminiWorkspaceSettings,
   cleanupStaleAgentWorkspaceGeminiAttachments,
@@ -351,6 +352,7 @@ setAppLocale(startupPromptLocale);
 const codexAgentConfigBase: Omit<CodexAgentConfigInput, "webSearchEnabled" | "uiLocale"> = {
   execPath: process.execPath,
   scriptPath: resolveMcpServerScriptPath(),
+  coreScriptPath: siblingCoreMcpScriptPath(resolveMcpServerScriptPath()),
   userDataDir: USER_DATA_PATH,
   runContextFile: localChatgptRunContextStore.getRunContextFilePath(),
   renderBridgeFile: localAiRenderBridgeStore.getBridgeFilePath(),
@@ -370,6 +372,7 @@ const claudeStreamClient = new ClaudeStreamClient({
   mcpConfig: buildClaudeMcpConfig({
     execPath: process.execPath,
     scriptPath: resolveMcpServerScriptPath(),
+    coreScriptPath: siblingCoreMcpScriptPath(resolveMcpServerScriptPath()),
     userDataDir: USER_DATA_PATH,
     runContextFile: localAiEditRunContextStore.getRunContextFilePath(),
     renderBridgeFile: localAiRenderBridgeStore.getBridgeFilePath(),
@@ -400,6 +403,7 @@ void writeGeminiWorkspaceSettings(
   buildGeminiWorkspaceSettings({
     execPath: process.execPath,
     scriptPath: resolveMcpServerScriptPath(),
+    coreScriptPath: siblingCoreMcpScriptPath(resolveMcpServerScriptPath()),
     userDataDir: USER_DATA_PATH,
     runContextFile: localGeminiRunContextStore.getRunContextFilePath(),
     renderBridgeFile: localAiRenderBridgeStore.getBridgeFilePath(),

@@ -7,6 +7,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   buildGeminiWorkspaceSettings,
   cleanupStaleGeminiAttachments,
+  SIGMA_CORE_ANTIGRAVITY_MCP_PERMISSION,
   SIGMA_STUDIO_ANTIGRAVITY_MCP_PERMISSION,
   writeGeminiWorkspaceSettings,
 } from "./gemini-settings-config";
@@ -28,6 +29,23 @@ const OBSOLETE_PREVIEW_READ_PERMISSION =
   "read_file(/Users/teacher/Library/Application Support/Sigma Studio/data/ai-run-context/previews)";
 
 describe("buildGeminiWorkspaceSettings", () => {
+  it("registers the read-only sigma-core-local server when configured", () => {
+    const settings = buildGeminiWorkspaceSettings({
+      ...BASE_INPUT,
+      coreScriptPath: "/app/dist-electron/sigma-core-mcp-server.cjs",
+    });
+    expect(settings.mcpServers["sigma-core-local"]).toEqual({
+      command: BASE_INPUT.execPath,
+      args: ["/app/dist-electron/sigma-core-mcp-server.cjs"],
+      env: {
+        ELECTRON_RUN_AS_NODE: "1",
+        SIGMA_CORE_DB_PATH: `${BASE_INPUT.userDataDir}/data/sigma-core/core.sqlite`,
+        SIGMA_CORE_BLOB_DIR: `${BASE_INPUT.userDataDir}/data/sigma-core/blobs`,
+        SIGMA_CORE_SUBJECT_ID: "studio-ai",
+      },
+    });
+  });
+
   it("registers the sigma-studio-local MCP server with command/args", () => {
     const settings = buildGeminiWorkspaceSettings(BASE_INPUT);
 
@@ -147,6 +165,21 @@ describe("writeGeminiWorkspaceSettings", () => {
       deny: ["mcp(other/*)"],
       ask: ["read_url(*)"],
     });
+  });
+
+  it("adds the read-only Core MCP permission only while the Core server is configured", async () => {
+    const withCore = buildGeminiWorkspaceSettings({
+      ...BASE_INPUT,
+      coreScriptPath: "/app/dist-electron/sigma-core-mcp-server.cjs",
+    });
+    await writeGeminiWorkspaceSettings(workspaceDir, withCore, { sharedConfigDir: null, cliSettingsPath });
+    let parsed = JSON.parse(await fs.readFile(cliSettingsPath, "utf8"));
+    expect(parsed.permissions.allow).toContain(SIGMA_CORE_ANTIGRAVITY_MCP_PERMISSION);
+
+    const withoutCore = buildGeminiWorkspaceSettings(BASE_INPUT);
+    await writeGeminiWorkspaceSettings(workspaceDir, withoutCore, { sharedConfigDir: null, cliSettingsPath });
+    parsed = JSON.parse(await fs.readFile(cliSettingsPath, "utf8"));
+    expect(parsed.permissions.allow).not.toContain(SIGMA_CORE_ANTIGRAVITY_MCP_PERMISSION);
   });
 
   it("does not duplicate the Sigma Studio MCP permission on repeated writes", async () => {

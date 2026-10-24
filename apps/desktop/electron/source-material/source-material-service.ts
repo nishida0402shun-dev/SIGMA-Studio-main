@@ -1,4 +1,4 @@
-import { createHash } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { mkdirSync } from "node:fs";
 import { readFile, stat } from "node:fs/promises";
 import path from "node:path";
@@ -39,6 +39,8 @@ const te = createCurrentLocaleTranslator("error");
 
 export const SOURCE_MATERIAL_MAX_BYTES = 50 * 1024 * 1024;
 export const SOURCE_MATERIAL_STUDIO_SUBJECT = "studio-local";
+/** Read-only CLI AI subject. Never used for writes by Studio or its MCP server. */
+export const SOURCE_MATERIAL_AI_SUBJECT = "studio-ai";
 
 const CORE_WORKSPACE_PREFIX = "studio:";
 const TEXT_EXTENSIONS = new Set(["txt", "md", "markdown", "csv"]);
@@ -82,6 +84,31 @@ export function coreWorkspaceIdForStudio(studioWorkspaceId: string): string {
 
 function extensionOf(fileName: string): string {
   return fileName.toLowerCase().split(".").pop() ?? "";
+}
+
+/**
+ * Studio accepts the two encodings Japanese teachers commonly use. Core's
+ * built-in extractor is deliberately UTF-8-only, so normalize Shift_JIS text
+ * before it becomes a source object. The stored canonical bytes are therefore
+ * UTF-8; extraction, offsets, and hashes all describe the same bytes.
+ */
+export function normalizeImportedTextBytes(name: string, bytes: Uint8Array): Uint8Array {
+  if (!TEXT_EXTENSIONS.has(extensionOf(name))) return bytes;
+  try {
+    new TextDecoder("utf-8", { fatal: true }).decode(bytes);
+    return bytes;
+  } catch {
+    // Try Shift_JIS below. A byte sequence can be invalid in both encodings.
+  }
+  try {
+    const decoded = new TextDecoder("shift_jis", { fatal: true }).decode(bytes);
+    return new TextEncoder().encode(decoded);
+  } catch {
+    throw new SourceMaterialError(
+      "TEXT_DECODE_FAILED",
+      te("electron.sourceMaterial.textDecodeFailed"),
+    );
+  }
 }
 
 function mimeTypeForFileName(fileName: string, isPdf: boolean): string {
@@ -188,6 +215,23 @@ export class SourceMaterialService {
     return coreWorkspaceId;
   }
 
+  /**
+   * CLI AI is a separate Core subject with read access only. Repair the grant
+   * when an existing workspace predates this policy, or when a previous grant
+   * expired. This never creates a workspace.
+   */
+  #ensureAiReadGrant(coreWorkspaceId: string): void {
+    const now = new Date().toISOString();
+    if (this.#repository.hasPermission(SOURCE_MATERIAL_AI_SUBJECT, coreWorkspaceId, "read", now)) return;
+    this.#repository.grantPolicy({
+      grantId: `grant_${randomUUID()}`,
+      subjectId: SOURCE_MATERIAL_AI_SUBJECT,
+      scopeId: coreWorkspaceId,
+      permission: "read",
+      validFrom: now,
+    });
+  }
+
   #sourceInWorkspace(coreWorkspaceId: string, sourceId: string): SourceObject {
     const object = this.#coreService.getObject(this.#auth, sourceId);
     if (!object || object.scopeId !== coreWorkspaceId) {
@@ -238,6 +282,7 @@ export class SourceMaterialService {
         sourceCount: 0,
       };
     }
+    this.#ensureAiReadGrant(coreWorkspaceId);
     return {
       studioWorkspaceId,
       coreWorkspaceId,
@@ -261,6 +306,9 @@ export class SourceMaterialService {
     if (!this.#repository.getWorkspace(coreWorkspaceId)) {
       this.#coreService.createWorkspace(this.#auth, coreWorkspaceId, trimmedName);
     }
+    // CLI AI is a separate Core subject. Grant it read access only when the
+    // user explicitly registers a Workspace; Studio keeps write/admin access.
+    this.#ensureAiReadGrant(coreWorkspaceId);
     return this.getWorkspaceStatus(studioWorkspaceId);
   }
 
@@ -319,7 +367,8 @@ export class SourceMaterialService {
       );
     }
 
-    const detection = detectFormat(input.bytes, name);
+    const bytes = normalizeImportedTextBytes(name, input.bytes);
+    const detection = detectFormat(bytes, name);
     if (detection.format !== "pdf" && detection.format !== "plain-text") {
       throw new SourceMaterialError(
         "UNSUPPORTED_FORMAT",
@@ -339,7 +388,7 @@ export class SourceMaterialService {
       );
     }
 
-    const contentHash = createHash("sha256").update(input.bytes).digest("hex");
+    const contentHash = createHash("sha256").update(bytes).digest("hex");
     const existing = this.#repository.findSourceByContentHash(contentHash);
     if (existing?.scopeId === coreWorkspaceId && existing.status === "Active") {
       return { source: this.#summary(existing), duplicate: true };
@@ -350,7 +399,7 @@ export class SourceMaterialService {
       registered = await this.#coreService.registerObject(this.#auth, {
         workspaceId: coreWorkspaceId,
         name,
-        bytes: input.bytes,
+        bytes,
         mimeType: mimeTypeForFileName(name, detection.format === "pdf"),
         ...(input.originalPath === undefined ? {} : { originalPath: input.originalPath }),
       });

@@ -53,6 +53,7 @@ export async function buildElectron({ watch = false, onBuilt } = {}) {
       main: path.join(root, "electron/main.ts"),
       preload: path.join(root, "electron/preload.ts"),
       "sigma-doc-mcp-server": path.join(root, "mcp/sigma-doc-mcp-server.ts"),
+      "sigma-core-mcp-server": path.join(root, "mcp/source-material-mcp-server.ts"),
     },
     outdir: path.join(root, "dist-electron"),
     outExtension: { ".js": ".cjs" },

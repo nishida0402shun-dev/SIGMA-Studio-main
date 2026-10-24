@@ -25,6 +25,7 @@ import type { GeminiHeadlessClient } from "../gemini-headless-client";
 import { buildGeminiWorkspaceSettings, writeGeminiWorkspaceSettings } from "../gemini-settings-config";
 import type { LocalMcpEditProposalStore } from "../local-sigma-doc-proposal-store";
 import { LocalSigmaDocStore } from "../local-sigma-doc-store";
+import { siblingCoreMcpScriptPath } from "../sigma-studio-mcp-launch";
 
 // Cancellation registry for in-flight ai-edit:run calls, keyed by the same
 // runId used for that run's run-context files (see runEditWithRunContext
@@ -256,6 +257,7 @@ export function registerAiEditIpc(deps: RegisterAiEditIpcDeps): void {
                   uiLocale: locale,
                   execPath: process.execPath,
                   scriptPath: resolveMcpServerScriptPath(),
+                  coreScriptPath: siblingCoreMcpScriptPath(resolveMcpServerScriptPath()),
                   userDataDir: userDataPath,
                   runContextFile: claudeRunContextStore.getRunContextFilePath(),
                   renderBridgeFile: localAiRenderBridgeStore.getBridgeFilePath(),
@@ -276,6 +278,7 @@ export function registerAiEditIpc(deps: RegisterAiEditIpcDeps): void {
               buildGeminiWorkspaceSettings({
                 execPath: process.execPath,
                 scriptPath: resolveMcpServerScriptPath(),
+                coreScriptPath: siblingCoreMcpScriptPath(resolveMcpServerScriptPath()),
                 userDataDir: userDataPath,
                 runContextFile: localGeminiRunContextStore.getRunContextFilePath(),
                 renderBridgeFile: localAiRenderBridgeStore.getBridgeFilePath(),

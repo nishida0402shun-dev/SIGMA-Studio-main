@@ -14,6 +14,27 @@ const BASE_INPUT = {
 };
 
 describe("buildCodexAgentConfigToml", () => {
+  it("registers the read-only sigma-core-local server when configured", () => {
+    const toml = buildCodexAgentConfigToml({
+      ...BASE_INPUT,
+      coreScriptPath: "/app/dist-electron/sigma-core-mcp-server.cjs",
+    });
+
+    expect(toml).toContain("[mcp_servers.sigma-core-local]");
+    expect(toml).toContain(
+      `args = [${JSON.stringify("/app/dist-electron/sigma-core-mcp-server.cjs")}]`,
+    );
+    expect(toml).toContain(
+      `SIGMA_CORE_DB_PATH = ${JSON.stringify(`${BASE_INPUT.userDataDir}/data/sigma-core/core.sqlite`)}`,
+    );
+    expect(toml).toContain('SIGMA_CORE_SUBJECT_ID = "studio-ai"');
+  });
+
+  it("leaves the Core server out when no script is supplied", () => {
+    const toml = buildCodexAgentConfigToml(BASE_INPUT);
+    expect(toml).not.toContain("sigma-core-local");
+  });
+
   it("includes the base agent flags", () => {
     const toml = buildCodexAgentConfigToml(BASE_INPUT);
 

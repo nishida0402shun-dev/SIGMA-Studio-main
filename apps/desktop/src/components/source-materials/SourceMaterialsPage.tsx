@@ -6,17 +6,31 @@ import {
   BookOpen,
   ChevronLeft,
   ChevronRight,
+  Crop,
   FileText,
   Loader2,
   Maximize2,
   Minus,
   Plus,
+  ScanLine,
+  Trash2,
+  Undo2,
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type { ReactNode } from "react";
+import type { PointerEvent as ReactPointerEvent, ReactNode } from "react";
 
 import { Button, IconButton } from "@/components/ui/Button";
 import { Select } from "@/components/ui/Select";
+import { SourceCapturePreviewDialog } from "./SourceCapturePreviewDialog";
+import { SourceDeleteDialog } from "./SourceDeleteDialog";
+import {
+  createPageCapture,
+  createRegionCapture,
+  createTextCapture,
+  type SourceCapture,
+  type SourceCaptureBoundingBox,
+} from "@/features/source-material/capture";
+import { isCsvSource, parseCsv } from "@/features/source-material/csv";
 import type {
   SourceMaterialImportItem,
   SourceMaterialPage,
@@ -63,6 +77,30 @@ function clampScale(value: number): number {
 
 function toMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
+}
+
+function imageRegionToDataUrl(
+  image: HTMLImageElement,
+  box: SourceCaptureBoundingBox,
+): string | null {
+  const sourceWidth = image.naturalWidth || image.width;
+  const sourceHeight = image.naturalHeight || image.height;
+  if (sourceWidth <= 0 || sourceHeight <= 0) return null;
+  const sx = Math.max(0, Math.round(box.x * sourceWidth));
+  const sy = Math.max(0, Math.round(box.y * sourceHeight));
+  const sw = Math.max(1, Math.round(box.width * sourceWidth));
+  const sh = Math.max(1, Math.round(box.height * sourceHeight));
+  const canvas = document.createElement("canvas");
+  canvas.width = sw;
+  canvas.height = sh;
+  const context = canvas.getContext("2d");
+  if (!context) return null;
+  context.drawImage(image, sx, sy, sw, sh, 0, 0, sw, sh);
+  return canvas.toDataURL("image/png");
+}
+
+function imageToDataUrl(image: HTMLImageElement): string | null {
+  return imageRegionToDataUrl(image, { x: 0, y: 0, width: 1, height: 1 });
 }
 
 function EmptyPanel({
@@ -127,7 +165,22 @@ export function SourceMaterialsPage() {
   const [pageText, setPageText] = useState<SourceMaterialPage | null>(null);
   const [textLoading, setTextLoading] = useState(false);
   const [textError, setTextError] = useState<string | null>(null);
+  const [textSelection, setTextSelection] = useState<{
+    text: string;
+    startOffset: number;
+    endOffset: number;
+  } | null>(null);
+  const [capture, setCapture] = useState<SourceCapture | null>(null);
+  const [regionMode, setRegionMode] = useState(false);
+  const [regionBox, setRegionBox] = useState<SourceCaptureBoundingBox | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<SourceMaterialSummary | null>(null);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+  const [deleting, setDeleting] = useState(false);
+  const [undoDelete, setUndoDelete] = useState<{ sourceId: string; name: string } | null>(null);
   const viewerRef = useRef<HTMLDivElement | null>(null);
+  const pageImageRef = useRef<HTMLImageElement | null>(null);
+  const textRef = useRef<HTMLPreElement | null>(null);
+  const regionDragRef = useRef<SourceCaptureBoundingBox | null>(null);
 
   const selectedWorkspace = useMemo(
     () => workspaces.find((workspace) => workspace.id === selectedWorkspaceId) ?? null,
@@ -145,6 +198,11 @@ export function SourceMaterialsPage() {
     : 0;
   const warnings = selectedSource?.extraction.warnings ?? [];
   const ocrRequired = warnings.some((warning) => warning.includes("OCR_REQUIRED"));
+  const isCsv = selectedSource ? isCsvSource(selectedSource) : false;
+  const csvTable = useMemo(
+    () => (isCsv && pageText ? parseCsv(pageText.text) : null),
+    [isCsv, pageText],
+  );
 
   useEffect(() => {
     // Bridge detection reads `window`, which is unavailable during static
@@ -334,6 +392,14 @@ export function SourceMaterialsPage() {
     };
   }, [api, pageNumber, selectedSource, selectedWorkspaceId]);
 
+  const clearCaptureInteraction = () => {
+    setTextSelection(null);
+    setCapture(null);
+    setRegionMode(false);
+    setRegionBox(null);
+    regionDragRef.current = null;
+  };
+
   const handleWorkspaceChange = (value: string) => {
     const nextWorkspaceId = value || null;
     setSelectedWorkspaceId(nextWorkspaceId);
@@ -353,6 +419,10 @@ export function SourceMaterialsPage() {
     setPageText(null);
     setTextError(null);
     setTextLoading(false);
+    clearCaptureInteraction();
+    setDeleteTarget(null);
+    setDeleteError(null);
+    setUndoDelete(null);
   };
 
   const handleSelectSource = (source: SourceMaterialSummary) => {
@@ -365,10 +435,12 @@ export function SourceMaterialsPage() {
     setPageText(null);
     setTextError(null);
     setTextLoading(false);
+    clearCaptureInteraction();
   };
 
   const handleViewerModeChange = (mode: ViewerMode) => {
     setViewerMode(mode);
+    clearCaptureInteraction();
     if (mode === "text") {
       setPageImage(null);
       setPageImageError(null);
@@ -437,6 +509,7 @@ export function SourceMaterialsPage() {
     setPageImageError(null);
     setPageText(null);
     setTextError(null);
+    clearCaptureInteraction();
   };
 
   const handleNextPage = () => {
@@ -445,13 +518,18 @@ export function SourceMaterialsPage() {
     setPageImageError(null);
     setPageText(null);
     setTextError(null);
+    clearCaptureInteraction();
   };
 
   const handleZoomOut = () => {
+    setRegionMode(false);
+    setRegionBox(null);
     setScale((current) => clampScale(current - ZOOM_STEP));
   };
 
   const handleZoomIn = () => {
+    setRegionMode(false);
+    setRegionBox(null);
     setScale((current) => clampScale(current + ZOOM_STEP));
   };
 
@@ -460,6 +538,173 @@ export function SourceMaterialsPage() {
     const availableWidth = viewerRef.current?.clientWidth;
     if (!availableWidth) return;
     setScale((current) => clampScale(current * ((availableWidth - 64) / pageImage.width)));
+  };
+
+  const handleTextSelection = () => {
+    const container = textRef.current;
+    const selection = window.getSelection();
+    if (!container || !selection || selection.rangeCount === 0 || selection.isCollapsed) {
+      setTextSelection(null);
+      return;
+    }
+    const range = selection.getRangeAt(0);
+    if (!container.contains(range.commonAncestorContainer)) {
+      setTextSelection(null);
+      return;
+    }
+    const selectedText = range.toString();
+    if (selectedText.trim().length === 0) {
+      setTextSelection(null);
+      return;
+    }
+    const prefix = document.createRange();
+    prefix.selectNodeContents(container);
+    prefix.setEnd(range.startContainer, range.startOffset);
+    const startOffset = prefix.toString().length;
+    setTextSelection({
+      text: selectedText,
+      startOffset,
+      endOffset: startOffset + selectedText.length,
+    });
+  };
+
+  const handleCapturePage = (source: SourceMaterialSummary) => {
+    const text = pageText?.text ?? "";
+    const base = createPageCapture({
+      source,
+      pageNumber: selectedSource?.format === "text" ? 1 : pageNumber,
+      text,
+    });
+    const image = pageImageRef.current;
+    const imageDataUrl = image ? imageToDataUrl(image) : null;
+    if (text.trim().length === 0 && !imageDataUrl) {
+      setSourcesError(t("sources.captureUnavailable"));
+      return;
+    }
+    setSourcesError(null);
+    setCapture(imageDataUrl ? { ...base, imageDataUrl } : base);
+  };
+
+  const handleCaptureSelection = (source: SourceMaterialSummary) => {
+    if (!textSelection) return;
+    setCapture(
+      createTextCapture({
+        source,
+        pageNumber: selectedSource?.format === "text" ? 1 : pageNumber,
+        text: textSelection.text,
+        startOffset: textSelection.startOffset,
+        endOffset: textSelection.endOffset,
+      }),
+    );
+  };
+
+  const normalizedPointer = (
+    event: ReactPointerEvent<HTMLDivElement>,
+  ): { x: number; y: number } => {
+    const rect = event.currentTarget.getBoundingClientRect();
+    return {
+      x: Math.min(1, Math.max(0, (event.clientX - rect.left) / Math.max(1, rect.width))),
+      y: Math.min(1, Math.max(0, (event.clientY - rect.top) / Math.max(1, rect.height))),
+    };
+  };
+
+  const boxFromPoints = (
+    start: { x: number; y: number },
+    end: { x: number; y: number },
+  ): SourceCaptureBoundingBox => ({
+    x: Math.min(start.x, end.x),
+    y: Math.min(start.y, end.y),
+    width: Math.abs(end.x - start.x),
+    height: Math.abs(end.y - start.y),
+  });
+
+  const handleRegionPointerDown = (event: ReactPointerEvent<HTMLDivElement>) => {
+    if (!regionMode || !selectedSource || !pageImage) return;
+    event.preventDefault();
+    event.currentTarget.setPointerCapture(event.pointerId);
+    const point = normalizedPointer(event);
+    regionDragRef.current = { x: point.x, y: point.y, width: 0, height: 0 };
+    setRegionBox({ x: point.x, y: point.y, width: 0, height: 0 });
+  };
+
+  const handleRegionPointerMove = (event: ReactPointerEvent<HTMLDivElement>) => {
+    const start = regionDragRef.current;
+    if (!start || !regionMode) return;
+    setRegionBox(boxFromPoints(start, normalizedPointer(event)));
+  };
+
+  const handleRegionPointerUp = (event: ReactPointerEvent<HTMLDivElement>) => {
+    const start = regionDragRef.current;
+    if (!start || !selectedSource) return;
+    regionDragRef.current = null;
+    const box = boxFromPoints(start, normalizedPointer(event));
+    setRegionBox(box);
+    if (box.width < 0.01 || box.height < 0.01) return;
+
+    const image = pageImageRef.current;
+    const imageDataUrl = image ? imageRegionToDataUrl(image, box) : null;
+    if (!imageDataUrl) {
+      setSourcesError(t("sources.pageImageFailed"));
+      return;
+    }
+    setRegionMode(false);
+    setSourcesError(null);
+    setCapture(
+      createRegionCapture({
+        source: selectedSource,
+        pageNumber,
+        // A region is image-only: extracted text belongs to the whole page, so
+        // attaching it here would misrepresent the selected area.
+        text: "",
+        boundingBox: box,
+        imageDataUrl,
+      }),
+    );
+  };
+
+  const handleDeleteConfirm = async () => {
+    if (!api || !selectedWorkspaceId || !deleteTarget || deleting) return;
+    setDeleting(true);
+    setDeleteError(null);
+    try {
+      const result = await api.deleteSource(selectedWorkspaceId, deleteTarget.id);
+      if (!result.ok || !result.value.deleted) {
+        setDeleteError(result.ok ? t("sources.deleteFailed") : result.error.message);
+        return;
+      }
+      setSources((current) => current.filter((source) => source.id !== deleteTarget.id));
+      if (selectedSourceId === deleteTarget.id) {
+        setSelectedSourceId(null);
+        setPageImage(null);
+        setPageText(null);
+        setTextError(null);
+      }
+      clearCaptureInteraction();
+      setUndoDelete({ sourceId: deleteTarget.id, name: deleteTarget.name });
+      setActionMessage(t("sources.deletedMessage", { name: deleteTarget.name }));
+      setDeleteTarget(null);
+    } catch (error) {
+      setDeleteError(toMessage(error));
+    } finally {
+      setDeleting(false);
+    }
+  };
+
+  const handleUndoDelete = async () => {
+    if (!api || !selectedWorkspaceId || !undoDelete) return;
+    const target = undoDelete;
+    const result = await api.restoreSource(selectedWorkspaceId, target.sourceId);
+    if (!result.ok || !result.value.restored) {
+      setSourcesError(
+        result.ok
+          ? t("sources.restoreFailed")
+          : `${t("sources.restoreFailed")}: ${result.error.message}`,
+      );
+      return;
+    }
+    setUndoDelete(null);
+    setActionMessage(null);
+    await refreshSources(selectedWorkspaceId);
   };
 
   return (
@@ -558,9 +803,15 @@ export function SourceMaterialsPage() {
               </div>
 
               {actionMessage ? (
-                <p className="sources-message" role="status">
-                  {actionMessage}
-                </p>
+                <div className="sources-message" role="status">
+                  <span>{actionMessage}</span>
+                  {undoDelete ? (
+                    <Button tone="ghost" size="sm" onClick={() => void handleUndoDelete()}>
+                      <Undo2 size={15} aria-hidden="true" />
+                      {t("sources.undoDelete")}
+                    </Button>
+                  ) : null}
+                </div>
               ) : null}
               {importNotices.length > 0 ? (
                 <ul className="sources-notices" aria-live="polite">
@@ -592,7 +843,7 @@ export function SourceMaterialsPage() {
               ) : (
                 <ul className="sources-list">
                   {sources.map((source) => (
-                    <li key={source.id}>
+                    <li key={source.id} className="sources-list-row">
                       <button
                         type="button"
                         className="sources-list-item"
@@ -615,6 +866,18 @@ export function SourceMaterialsPage() {
                           <AlertTriangle className="sources-list-warning" size={16} aria-hidden="true" />
                         ) : null}
                       </button>
+                      <IconButton
+                        className="sources-list-delete"
+                        label={t("sources.deleteSource")}
+                        size="sm"
+                        tone="ghost"
+                        onClick={() => {
+                          setDeleteError(null);
+                          setDeleteTarget(source);
+                        }}
+                      >
+                        <Trash2 size={15} aria-hidden="true" />
+                      </IconButton>
                     </li>
                   ))}
                 </ul>
@@ -688,6 +951,15 @@ export function SourceMaterialsPage() {
                           </IconButton>
                         </div>
                       ) : null}
+                      <Button
+                        tone="ghost"
+                        size="sm"
+                        onClick={() => handleCapturePage(selectedSource)}
+                        disabled={textLoading || pageImageLoading}
+                      >
+                        <ScanLine size={16} aria-hidden="true" />
+                        {t("sources.capturePage")}
+                      </Button>
                       {isPdf && viewerMode === "document" ? (
                         <div className="sources-zoom-controls">
                           <IconButton
@@ -712,6 +984,18 @@ export function SourceMaterialsPage() {
                           <Button tone="ghost" size="sm" onClick={handleFitWidth} disabled={!pageImage}>
                             <Maximize2 size={16} aria-hidden="true" />
                             {t("sources.fitWidth")}
+                          </Button>
+                          <Button
+                            tone={regionMode ? "primary" : "ghost"}
+                            size="sm"
+                            onClick={() => {
+                              setRegionBox(null);
+                              setRegionMode((current) => !current);
+                            }}
+                            disabled={!pageImage}
+                          >
+                            <Crop size={16} aria-hidden="true" />
+                            {regionMode ? t("sources.cancelRegion") : t("sources.selectRegion")}
                           </Button>
                         </div>
                       ) : null}
@@ -753,20 +1037,44 @@ export function SourceMaterialsPage() {
                         </div>
                       ) : null}
                       {pageImage ? (
-                        // The renderer receives PNG bytes from the main process,
-                        // so this is a Blob URL rather than an optimizable asset.
-                        // eslint-disable-next-line @next/next/no-img-element
-                        <img
-                          className="sources-page-image"
-                          src={pageImage.url}
-                          width={pageImage.width}
-                          height={pageImage.height}
-                          alt={t("sources.pdfPageAlt", {
-                            name: selectedSource.name,
-                            page: pageNumber,
-                          })}
-                          draggable={false}
-                        />
+                        <div
+                          className="sources-page-image-shell"
+                          data-region-mode={regionMode}
+                          onPointerDown={handleRegionPointerDown}
+                          onPointerMove={handleRegionPointerMove}
+                          onPointerUp={handleRegionPointerUp}
+                        >
+                          {/* The renderer receives PNG bytes from the main process,
+                              so this is a Blob URL rather than an optimizable asset. */}
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img
+                            ref={pageImageRef}
+                            className="sources-page-image"
+                            src={pageImage.url}
+                            width={pageImage.width}
+                            height={pageImage.height}
+                            alt={t("sources.pdfPageAlt", {
+                              name: selectedSource.name,
+                              page: pageNumber,
+                            })}
+                            draggable={false}
+                          />
+                          {regionBox ? (
+                            <span
+                              className="sources-region-box"
+                              aria-hidden="true"
+                              style={{
+                                left: `${regionBox.x * 100}%`,
+                                top: `${regionBox.y * 100}%`,
+                                width: `${regionBox.width * 100}%`,
+                                height: `${regionBox.height * 100}%`,
+                              }}
+                            />
+                          ) : null}
+                          {regionMode ? (
+                            <span className="sources-region-hint">{t("sources.regionHint")}</span>
+                          ) : null}
+                        </div>
                       ) : null}
                     </div>
                   ) : (
@@ -785,7 +1093,67 @@ export function SourceMaterialsPage() {
                           </div>
                         </div>
                       ) : pageText && pageText.text.trim().length > 0 ? (
-                        <pre className="sources-text">{pageText.text}</pre>
+                        <>
+                          {!isCsv ? (
+                            <div className="sources-text-toolbar">
+                              {textSelection ? (
+                                <>
+                                  <span>
+                                    {t("sources.selectionReady", {
+                                      count: textSelection.text.length,
+                                    })}
+                                  </span>
+                                  <Button
+                                    tone="primary"
+                                    size="sm"
+                                    onClick={() => handleCaptureSelection(selectedSource)}
+                                  >
+                                    <ScanLine size={15} aria-hidden="true" />
+                                    {t("sources.captureSelection")}
+                                  </Button>
+                                </>
+                              ) : (
+                                <span className="sources-select-hint">
+                                  {t("sources.selectWordHint")}
+                                </span>
+                              )}
+                            </div>
+                          ) : null}
+                          {isCsv && csvTable && csvTable.rows.length > 0 ? (
+                            <>
+                              <div className="sources-csv-scroll">
+                                <table
+                                  className="sources-csv-table"
+                                  aria-label={t("sources.csvTableLabel")}
+                                >
+                                  <tbody>
+                                    {csvTable.rows.map((row, rowIndex) => (
+                                      <tr key={rowIndex}>
+                                        {row.map((cell, columnIndex) => (
+                                          <td key={columnIndex}>{cell}</td>
+                                        ))}
+                                      </tr>
+                                    ))}
+                                  </tbody>
+                                </table>
+                              </div>
+                              {csvTable.truncated ? (
+                                <p className="sources-csv-note" role="status">
+                                  {t("sources.csvTruncated")}
+                                </p>
+                              ) : null}
+                            </>
+                          ) : (
+                            <pre
+                              ref={textRef}
+                              className="sources-text"
+                              onMouseUp={handleTextSelection}
+                              onKeyUp={handleTextSelection}
+                            >
+                              {pageText.text}
+                            </pre>
+                          )}
+                        </>
                       ) : (
                         <div className="sources-text-empty">
                           <FileText size={24} aria-hidden="true" />
@@ -800,6 +1168,30 @@ export function SourceMaterialsPage() {
           </div>
         ) : null}
       </main>
+
+      {capture && selectedWorkspaceId ? (
+        <SourceCapturePreviewDialog
+          key={capture.id}
+          capture={capture}
+          source={selectedSource}
+          workspaceId={selectedWorkspaceId}
+          onClose={() => setCapture(null)}
+        />
+      ) : null}
+
+      {deleteTarget ? (
+        <SourceDeleteDialog
+          sourceName={deleteTarget.name}
+          deleting={deleting}
+          error={deleteError}
+          onCancel={() => {
+            if (deleting) return;
+            setDeleteTarget(null);
+            setDeleteError(null);
+          }}
+          onConfirm={() => void handleDeleteConfirm()}
+        />
+      ) : null}
     </div>
   );
 }

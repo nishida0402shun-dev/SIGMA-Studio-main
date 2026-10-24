@@ -1,5 +1,7 @@
 import {
+  buildSigmaCoreMcpStdioServer,
   buildSigmaStudioMcpEnv,
+  SIGMA_CORE_MCP_SERVER_NAME,
   SIGMA_DOC_MCP_SERVER_NAME,
   type SigmaStudioMcpLaunchSpec,
 } from "./sigma-studio-mcp-launch";
@@ -16,12 +18,14 @@ export interface ClaudeMcpStdioServer {
 export interface ClaudeMcpConfig {
   mcpServers: {
     "sigma-studio-local": ClaudeMcpStdioServer;
+    "sigma-core-local"?: ClaudeMcpStdioServer;
   };
 }
 
-export { SIGMA_DOC_MCP_SERVER_NAME };
+export { SIGMA_CORE_MCP_SERVER_NAME, SIGMA_DOC_MCP_SERVER_NAME };
 
 export function buildClaudeMcpConfig(input: ClaudeMcpConfigInput): ClaudeMcpConfig {
+  const core = buildSigmaCoreMcpStdioServer(input);
   return {
     mcpServers: {
       [SIGMA_DOC_MCP_SERVER_NAME]: {
@@ -30,6 +34,7 @@ export function buildClaudeMcpConfig(input: ClaudeMcpConfigInput): ClaudeMcpConf
         args: [input.scriptPath],
         env: buildSigmaStudioMcpEnv(input),
       },
+      ...(core ? { [SIGMA_CORE_MCP_SERVER_NAME]: core } : {}),
     },
   };
 }

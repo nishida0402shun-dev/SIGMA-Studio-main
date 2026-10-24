@@ -417,6 +417,7 @@ export const error = {
       unsupportedFormat: "この形式の資料はまだ表示できません（PDF / TXT / Markdown / CSVに対応）",
       pdfContentMismatch: "PDFの内容を確認できませんでした。ファイルが破損していないか確認してください",
       unsupportedTextFormat: "テキスト資料はTXT / Markdown / CSVとして登録してください",
+      textDecodeFailed: "テキストの文字コードを判別できません。UTF-8またはShift_JISで保存してください",
       bytesUnavailable: "資料の原本を読み出せません",
       pageNotFound: "このページのテキストは抽出されていません。ページ画像を表示するかOCRを実行してください",
       pageImageUnavailable: "この資料はページ画像を表示できません",

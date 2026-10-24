@@ -4,7 +4,9 @@ import path from "node:path";
 
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
+import { CoreRepository } from "./core-bridge";
 import {
+  SOURCE_MATERIAL_AI_SUBJECT,
   SourceMaterialError,
   SourceMaterialService,
   toSourceMaterialError,
@@ -100,6 +102,33 @@ describe("SourceMaterialService", () => {
     expect(bytes.name).toBe("japanese-two-pages.pdf");
   });
 
+  it("grants CLI AI read-only access when a workspace is registered", async () => {
+    current().registerWorkspace("workspace-a", "A");
+    current().close();
+    service = null;
+
+    const repository = new CoreRepository(
+      path.join(userDataDir, "data", "sigma-core", "core.sqlite"),
+    );
+    expect(
+      repository.hasPermission(
+        SOURCE_MATERIAL_AI_SUBJECT,
+        "studio:workspace-a",
+        "read",
+        new Date().toISOString(),
+      ),
+    ).toBe(true);
+    expect(
+      repository.hasPermission(
+        SOURCE_MATERIAL_AI_SUBJECT,
+        "studio:workspace-a",
+        "write",
+        new Date().toISOString(),
+      ),
+    ).toBe(false);
+    repository.close();
+  });
+
   it("renders PDF page images in the main process for the viewer", async () => {
     current().registerWorkspace("workspace-a", "A");
     const imported = await current().importFile("workspace-a", PDF_FIXTURE);
@@ -172,6 +201,30 @@ describe("SourceMaterialService", () => {
     });
     const page = current().getPage("workspace-a", outcome.source.id, 1);
     expect(page.page.text).toBe("# 見出し\n本文です。");
+  });
+
+  it("normalizes Shift_JIS text to UTF-8 before registration", async () => {
+    current().registerWorkspace("workspace-a", "A");
+    const outcome = await current().importBytes("workspace-a", {
+      name: "shift-jis.txt",
+      // 「こんにちは」 in Shift_JIS.
+      bytes: Buffer.from("82b182f182c982bf82cd", "hex"),
+    });
+
+    const page = current().getPage("workspace-a", outcome.source.id, 1);
+    expect(page.page.text).toBe("こんにちは");
+    const bytes = await current().getFileBytes("workspace-a", outcome.source.id);
+    expect(Buffer.from(bytes.bytes).toString("utf8")).toBe("こんにちは");
+  });
+
+  it("rejects text that is neither UTF-8 nor Shift_JIS", async () => {
+    current().registerWorkspace("workspace-a", "A");
+    const error = await captureError(() => current().importBytes("workspace-a", {
+      name: "broken.txt",
+      bytes: Buffer.from([0x81, 0x20, 0xff]),
+    }));
+    expect(error.code).toBe("TEXT_DECODE_FAILED");
+    expect(current().listSources("workspace-a")).toEqual([]);
   });
 
   it("rejects unsupported and mismatched files without registering them", async () => {

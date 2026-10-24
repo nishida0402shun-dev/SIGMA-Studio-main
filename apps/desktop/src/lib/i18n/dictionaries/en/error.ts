@@ -128,6 +128,7 @@ export const error = {
       unsupportedFormat: "This format cannot be displayed yet. PDF, TXT, Markdown, and CSV are supported.",
       pdfContentMismatch: "The PDF content could not be verified. Check that the file is not corrupted.",
       unsupportedTextFormat: "Register text materials as TXT, Markdown, or CSV.",
+      textDecodeFailed: "The text encoding could not be detected. Save the file as UTF-8 or Shift_JIS.",
       bytesUnavailable: "The original source material could not be read.",
       pageNotFound: "Text has not been extracted for this page. Show the page image or run OCR.",
       pageImageUnavailable: "Page images are unavailable for this source material.",

@@ -53,8 +53,13 @@ function workspaceStatus(registered: boolean): SourceMaterialWorkspaceStatus {
   };
 }
 
-function createApi(options: { registered?: boolean; sources?: SourceMaterialSummary[] } = {}) {
+function createApi(options: {
+  registered?: boolean;
+  sources?: SourceMaterialSummary[];
+  pageText?: string;
+} = {}) {
   let registered = options.registered ?? false;
+  const pageSource = options.sources?.[0] ?? PDF_SOURCE;
   const api: DesktopSourceMaterialsAPI = {
     getWorkspaceStatus: vi.fn(async () => ok(workspaceStatus(registered))),
     registerWorkspace: vi.fn(async () => {
@@ -70,11 +75,11 @@ function createApi(options: { registered?: boolean; sources?: SourceMaterialSumm
       bytes: new Uint8Array(),
     })),
     getPage: vi.fn(async (_workspaceId: string, _sourceId: string, pageNumber: number) => ok({
-      source: PDF_SOURCE,
+      source: pageSource,
       page: {
-        sourceId: PDF_SOURCE.id,
+        sourceId: pageSource.id,
         pageNumber,
-        text: `${pageNumber}ページ目の本文`,
+        text: options.pageText ?? `${pageNumber}ページ目の本文`,
         semanticType: "page",
       },
     } satisfies SourceMaterialPageResult)),
@@ -217,6 +222,93 @@ describe("SourceMaterialsPage", () => {
     await waitFor(() => container.textContent?.includes("資料がありません") ?? false, "empty list");
     expect(api.listSources).toHaveBeenCalledWith("ws-1");
     expect(container.textContent).toContain("このWorkspaceで資料を有効にしました");
+  });
+
+  it("renders CSV extraction as a safe table", async () => {
+    const csvSource: SourceMaterialSummary = {
+      ...PDF_SOURCE,
+      id: "source-csv",
+      name: "scores.csv",
+      mimeType: "text/csv",
+      format: "text",
+      pageCount: 1,
+      contentHash: "hash-csv",
+    };
+    await mount(createApi({
+      registered: true,
+      sources: [csvSource],
+      pageText: '名前,点数\n"山田, 太郎",90\n',
+    }));
+    await selectWorkspace();
+    await waitFor(
+      () => container.textContent?.includes(csvSource.name) ?? false,
+      "CSV source",
+    );
+    await click(buttonWithText(container, csvSource.name));
+
+    await waitFor(() => container.querySelector("table.sources-csv-table") !== null, "CSV table");
+    const cells = Array.from(container.querySelectorAll("table.sources-csv-table td"))
+      .map((cell) => cell.textContent);
+    expect(cells).toEqual(["名前", "点数", "山田, 太郎", "90"]);
+    expect(container.querySelector("pre.sources-text")).toBeNull();
+  });
+
+  it("opens a capture preview containing only the displayed page text", async () => {
+    await mount(createApi({ registered: true, sources: [PDF_SOURCE] }));
+    await selectWorkspace();
+    await waitFor(
+      () => container.textContent?.includes(PDF_SOURCE.name) ?? false,
+      "source list",
+    );
+    await click(buttonWithText(container, PDF_SOURCE.name));
+    await waitFor(
+      () => (api.getPage as ReturnType<typeof vi.fn>).mock.calls.length > 0,
+      "page text",
+    );
+    await flush();
+
+    await click(buttonWithText(container, "このページをAIへ"));
+    await waitFor(() => document.querySelector("#sources-capture-text") !== null, "capture preview");
+    expect(document.body.textContent).toContain("AIへ渡す内容を確認");
+    expect(
+      document.querySelector<HTMLTextAreaElement>("#sources-capture-text")?.value,
+    ).toBe("1ページ目の本文");
+    expect(document.body.textContent).toContain("CLI AI（MCP）");
+    expect(document.body.textContent).toContain("Web AI");
+    expect(buttonWithText(document, "Markdownをコピー")).toBeTruthy();
+  });
+
+  it("deletes a source with in-app confirmation and restores it from undo", async () => {
+    await mount(createApi({ registered: true, sources: [PDF_SOURCE] }));
+    await selectWorkspace();
+    await waitFor(
+      () => container.textContent?.includes(PDF_SOURCE.name) ?? false,
+      "source list",
+    );
+
+    const deleteButton = container.querySelector<HTMLButtonElement>('[aria-label="資料を削除"]');
+    if (!deleteButton) throw new Error("delete button not found");
+    await click(deleteButton);
+    await waitFor(() => document.body.textContent?.includes("資料を削除しますか？") ?? false, "delete dialog");
+    await click(buttonWithText(document, "削除する"));
+
+    await waitFor(
+      () => (api.deleteSource as ReturnType<typeof vi.fn>).mock.calls.length === 1,
+      "delete request",
+    );
+    expect(api.deleteSource).toHaveBeenCalledWith("ws-1", PDF_SOURCE.id);
+    await waitFor(() => container.textContent?.includes("資料がありません") ?? false, "empty list");
+    await click(buttonWithText(container, "元に戻す"));
+
+    await waitFor(
+      () => (api.restoreSource as ReturnType<typeof vi.fn>).mock.calls.length === 1,
+      "restore request",
+    );
+    expect(api.restoreSource).toHaveBeenCalledWith("ws-1", PDF_SOURCE.id);
+    await waitFor(
+      () => container.textContent?.includes(PDF_SOURCE.name) ?? false,
+      "restored source",
+    );
   });
 
   it("shows a PDF page image, navigates pages, and exposes extracted text", async () => {

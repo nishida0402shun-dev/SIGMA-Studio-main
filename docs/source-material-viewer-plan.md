@@ -4,7 +4,7 @@
 - 対象：SIGMA Studio デスクトップ版
 - 連携先：`nishida0402shun-dev/SIGMA-Core`
 - 元計画：`docs/sigma-studio-implementation-plan.md`
-- 状態：実装開始時点の計画。各項目は実装・テスト・CI・Electron確認が終わるまで完了扱いにしない。
+- 状態：M0〜M2 を実装済み。M3（Office / HTML）と M4（OCR）は未実装。各項目は実装・テスト・CI・Electron確認が終わるまで完了扱いにしない。
 
 ## 1. 目的
 
@@ -14,13 +14,15 @@
 
 ### Studio
 
-- `main` / `origin/main`：`5e86d78`
-- 外部資料の一覧・ビューアーは未実装。
+- 基準コミット：`5e86d78`。実装ブランチ：`feat/source-material-viewer`。
+- `/sources` に資料一覧・Workspace 明示選択・PDF / テキストビューアーを実装。
+- PDF ページ画像は Electron main の pdf.js + `@napi-rs/canvas` で PNG 化し、レンダラは Blob URL で表示する。
+- 選択テキスト・ページ・範囲のキャプチャー、確認ダイアログ、テキスト / Markdown / PNG のコピー・保存を実装。
+- CLI AI 向け `sigma-core-local` MCP（読み取り専用）を実装。Web AI は MCP を前提にせず、プレビューから手動で渡す。
 - 既存の「素材」は SigmaDoc 断片の再利用ライブラリであり、新しい「資料」とは別物。
-- PDF は SigmaDoc の出力と、AI 添付時の main プロセス一時描画のみ。
 - 旧 KnowledgeDB / SIGMA Core は main から削除済み（`ef4f559`、`10b3a9e`）。
-- PPTX 取り込み、PaddleOCR ランタイムのビルドスクリプトは既存資産として存在。
-- 未コミット変更：`apps/desktop/next-env.d.ts`、`package-lock.json`（実装中も保持）。
+- PPTX 取り込み、PaddleOCR ランタイムのビルドスクリプトは既存資産として存在するが、資料ビューアーには未統合。
+- 未コミット変更：`apps/desktop/next-env.d.ts`（ユーザー所有。コミット対象外）。
 
 ### SIGMA Core
 
@@ -33,12 +35,17 @@
   - テキスト / PDF 抽出、1始まりページ番号、出典 bbox、警告
   - FTS5 検索、ページ範囲取得、MCP アダプタ
   - `SigmaStudioAdapter`
-- 未実装：
-  - Office / OCR 抽出
+- Studio 側で実装済み：
+  - Studio Workspace との対応付け（`studio:<Studio workspace id>`）
+  - 読み取り専用 MCP プロファイル（`sigma-core-local`、subject `studio-ai`）
+  - Studio main プロセスへの CJS 同梱
+- Core 側で未実装：
+  - Office / HTML / 画像の抽出
+  - OCR 抽出結果の保存・差し替え API
   - ページ内テキスト項目単位の範囲取得
-  - PDF ページ画像レンダリング
-  - Studio への接続、配布用パッケージ、読み取り専用 MCP プロファイル
-  - Studio Workspace との対応付け
+- Studio / CLI AI の互換性：
+  - Core の MCP アダプタは変更せず、Studio が読み取り専用ツールだけを公開するラッパーを同梱する。
+  - PDF ページ画像は Core ではなく Electron main が生成する。
 
 ### 技術検証済み
 
@@ -85,7 +92,7 @@
             ├─ SigmaStudioAdapter / CoreService
             │    ├─ SQLite: userData/data/sigma-core/core.sqlite
             │    └─ blob:   userData/data/sigma-core/blobs
-            └─ PDF bytes → renderer の pdf.js でページ描画
+            └─ PDF bytes → main の pdf.js + @napi-rs/canvas → PNG → renderer
 
 CLI AI
   ├─ sigma-studio-local MCP（既存）
@@ -106,15 +113,15 @@ Web AI
 
 ### PDF 表示
 
-- Core から原本 bytes を取得し、レンダラの `pdfjs-dist` でページ描画する。
-- pdf.js の worker は使わず、CSP `worker-src 'none'` のまま fake worker で動かす。旧 KnowledgeDB の実装で前例がある。
+- Core から原本 bytes を取得し、Electron main の `SourcePdfPageRenderer` が `pdfjs-dist` + `@napi-rs/canvas` でページを PNG に描画する。
+- レンダラは PNG bytes を Blob URL にして表示する。CSP の `worker-src 'none'` を変更せず、pdf.js の worker をレンダラへ持ち込まない。
 - ページ番号は原本の1始まり。Core の抽出ページ番号と直接対応させる。
-- 描画失敗とテキスト抽出失敗は別状態とする。
-- fake worker が現在の pdfjs-dist / CSP で動かない場合は、main プロセスの `pdfjs-dist` + `@napi-rs/canvas` にフォールバックする。この場合も SigmaDoc のページネーションは使わない。
+- 描画失敗とテキスト抽出失敗は別状態とする。パスワード保護・破損・ページ範囲外は別コードで返す。
+- SigmaDoc の `PageCanvas` / `OutputSession` は教材 PDF 用の唯一のページネーションエンジンとして維持し、外部資料 PDF には使わない。
 
 ## 5. マイルストーン
 
-### M0 基盤
+### M0 基盤（実装・単体テスト済み）
 
 - ベースライン取得：`next typegen`、typecheck、lint、テスト、build、Electron 起動。
 - アーキテクチャ文書、形式対応表、Core ギャップ一覧。
@@ -124,7 +131,7 @@ Web AI
 - テスト：DB open、Workspace 明示登録、PDF 登録、一覧、ページ取得、bytes 取得、重複、権限、DB 異常。
 - 受け入れ：既存アプリ無影響。Electron main で Core DB を開ける。
 
-### M1 最初の縦切り
+### M1 最初の縦切り（実装・単体テスト済み）
 
 - `/sources` ルート、`app-navigation.ts`、静的ルート。
 - Workspace 明示選択。未選択時の空状態。既定 Workspace を暗黙に使わない。
@@ -134,7 +141,7 @@ Web AI
 - 状態：loading / ready / unsupported / password-required / corrupt / ocr-required / empty / text-extraction-failed。
 - テスト：ページ番号、抽出と描画の失敗分離、エンコーディング、UI状態、e2e。
 
-### M2 選択・キャプチャー・AI引き渡し・Workspace
+### M2 選択・キャプチャー・AI引き渡し・Workspace（実装・単体テスト済み）
 
 - 選択モデル：ページ、テキスト範囲、領域。
 - 出典：sourceId、contentHash、page、offsets、bbox。
@@ -146,7 +153,7 @@ Web AI
 - 古い contentHash / 削除済み source の参照を拒否。
 - テスト：出典パッケージ、サイズ上限、Workspace 切替、MCP スキーマ、e2e。
 
-### M3 形式拡張
+### M3 形式拡張（未実装）
 
 - HTML：サニタイズ表示、Core テキスト抽出。
 - DOCX：HTML / テキスト抽出、サニタイズ表示。
@@ -156,7 +163,7 @@ Web AI
 - 新規依存はライセンス、保守状況、サイズ、Electron 互換性を確認。
 - 代表サンプルと破損・大容量・パスワード等の異常系テスト。
 
-### M4 OCR・性能
+### M4 OCR・性能（未実装）
 
 - 既存 PaddleOCR ランタイムをサイドカーとして統合。
 - PDF / 画像の OCR を非同期ジョブにし、進捗・キャンセル・失敗を表示。
@@ -165,7 +172,7 @@ Web AI
 - 大容量 PDF のメモリ・描画時間を測定。
 - 必要なら Core にページ内テキスト項目と範囲取得 API を追加。
 
-### M5 品質・リリース
+### M5 品質・リリース（進行中）
 
 - 単体 / 統合 / e2e / 回帰テスト。
 - typecheck、lint、build、Electron / Windows スモーク。
@@ -174,18 +181,72 @@ Web AI
 - 未確認事項を区別した作業報告。
 - feature branch を push し、PR を作成。
 
+## 5.1 実装結果（2026-10-22）
+
+### 実装済み
+
+- Core 同梱、DB / blob の分離、`SourceMaterialService`、IPC / preload、明示的な Workspace 登録。
+- `/sources` の一覧、Workspace 選択、PDF ページ画像、ページ移動、ズーム、フィット幅、抽出テキスト。
+- TXT / Markdown / CSV の表示。UTF-8 / Shift_JIS を UTF-8 に正規化してから Core へ登録。
+- CSV は自前の防御的パーサーで表表示し、セル内容を HTML として解釈しない。
+- テキスト選択・ページ・範囲のキャプチャー。出典に sourceId / contentHash / page / offsets / bbox を保持。
+- キャプチャーの確認ダイアログ、本文編集、テキスト / Markdown コピー、範囲 PNG の保存、サイズ警告。
+- キャプチャーはビューアーの表示画像 / 選択テキストから生成し、`desktopCapturer` や外部アプリの画面を使わない。
+- Workspace 切替・資料切替・ページ移動時に選択とプレビューを破棄。更新済み contentHash / 削除済み source はコピー操作を拒否。
+- 資料の削除（アプリ内確認）と undo（Core の PendingDeletion からの復元）。
+- CLI AI の `sigma-core-local`（読み取り専用、subject `studio-ai`）。Claude / Codex / Antigravity の設定へ追加。
+- Web AI は MCP を前提にせず、プレビューからコピー / 画像保存で渡す。
+
+### 形式サポート状況
+
+| 形式 | 表示 | Core 抽出 | 状態 |
+|---|---|---|---|
+| PDF | あり（main で PNG 化） | あり | 実装・単体テスト済み |
+| TXT / MD | あり | あり | 実装・単体テスト済み |
+| CSV | 表表示 | あり（プレーンテキスト） | 実装・単体テスト済み |
+| HTML | なし | なし | 未実装。サニタイズ方針と Core 抽出が必要 |
+| DOCX | なし | なし | 未実装。抽出・表示の依存とライセンス評価が必要 |
+| XLSX | なし | なし | 未実装。シート / セル出典の設計が必要 |
+| PPTX | なし | なし | 未実装。既存 PPTX 取り込み資産を資料ビューアー向けに再利用する設計が必要 |
+| 画像 / OCR | なし | なし | 未実装。PaddleOCR ランタイムが未同梱 |
+
+未対応形式は取り込み時に `UNSUPPORTED_FORMAT` と日本語の案内を返し、壊れた表示や空の成功にしない。
+
+### OCR の未確認事項
+
+- `apps/desktop/ocr-runtime/windows|mac` は `.gitkeep` のみで、PaddleOCR の実行バイナリはリポジトリに含まれていない。
+- `npm run ocr:runtime:build` は PaddlePaddle / PaddleOCR / PyInstaller を必要とし、この Linux 環境では実行していない。
+- OCR 結果を Core の抽出成果物として差し替える API は Core 側に未実装。
+- そのため、画像ベース PDF は `OCR_REQUIRED` の警告とテキスト抽出不可を表示する。OCR 実行・進捗・キャンセルは未実装。
+
+### 実行済みの検証
+
+- 資料サービス、PDF ページ描画、キャプチャー、CSV、UI、MCP、CLI 設定の focused tests（71 tests）。
+- TypeScript typecheck。
+- ESLint（`@sigma-studio/desktop`、`--max-warnings=0`）。
+- Electron ビルド（main / preload / 2 MCP サーバー）。
+- 静的エクスポート（`NEXT_PUBLIC_TARGET=desktop`）。`out/sources.html` を確認。
+
+### 未確認事項
+
+- Electron GUI はこの Linux コンテナの共有ライブラリ不足（`libatk-1.0.so.0` など）で起動できないため、実ウィンドウでの PDF 表示・範囲ドラッグ・コピー・OS ファイルダイアログは未確認。
+- PaddleOCR の実バイナリでの OCR 精度・速度・配布サイズは未確認。
+- Windows / macOS 実機でのパッケージ済み MCP 起動は未確認。
+
 ## 6. 形式対応表
 
 | 形式 | 表示 | 抽出 | 選択・出典 | 備考 |
 |---|---|---|---|---|
-| PDF | pdf.js canvas + テキストレイヤー | Core | ページ / テキスト / 範囲 | パスワード・破損・OCR必要を区別 |
+| PDF | main の pdf.js で PNG 化 | Core | ページ / テキスト / 範囲 | パスワード・破損・OCR必要を区別 |
 | TXT / MD | テキスト | Core | テキスト範囲 | UTF-8 / Shift_JIS |
 | CSV | 表 | Core | 行 / セル | 引用符・改行対応 |
 | HTML | サニタイズ表示 | Core | テキスト / ブロック | スクリプト・外部読込なし |
 | DOCX | サニタイズHTML | Core | 段落 / テキスト | 画像・容量制限 |
 | XLSX | グリッド | Core | シート / セル範囲 | 数式・結合セルの制約 |
 | PPTX | スライド | Core / Studio | スライド / 図形 | 既存 pptx 資産を評価 |
-| 画像 / OCR | 画像 | PaddleOCR | 範囲 | 既存 OCR ランタイム |
+| 画像 / OCR | 画像 | PaddleOCR | 範囲 | 既存 OCR ランタイム（未統合） |
+
+上表は目標とする形式対応。現時点の実装状況は「5.1 実装結果」を正とする。
 
 ## 7. テスト方針
 

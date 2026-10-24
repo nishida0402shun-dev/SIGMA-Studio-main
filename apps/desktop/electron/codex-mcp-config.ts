@@ -9,7 +9,13 @@
 //   抑止しない)。有効値は auto / prompt / approve のみ。MCPサーバーは各ツールの
 //   safety annotationsを宣言するが、最終的な承認判断はCodex側のポリシーが持つ。
 
-import { buildSigmaStudioMcpEnv, SIGMA_DOC_MCP_SERVER_NAME, type SigmaStudioMcpLaunchSpec } from "./sigma-studio-mcp-launch";
+import {
+  buildSigmaCoreMcpEnv,
+  buildSigmaStudioMcpEnv,
+  SIGMA_CORE_MCP_SERVER_NAME,
+  SIGMA_DOC_MCP_SERVER_NAME,
+  type SigmaStudioMcpLaunchSpec,
+} from "./sigma-studio-mcp-launch";
 
 export type CodexAgentConfigInput = SigmaStudioMcpLaunchSpec & { webSearchEnabled: boolean };
 
@@ -28,6 +34,26 @@ function tomlKey(key: string): string {
 export function buildCodexAgentConfigToml(input: CodexAgentConfigInput): string {
   const env = buildSigmaStudioMcpEnv(input);
   const envLines = Object.entries(env).map(([key, value]) => `${tomlKey(key)} = ${tomlString(value)}`);
+  const coreEnv = buildSigmaCoreMcpEnv(input);
+  const coreEnvLines = coreEnv
+    ? Object.entries(coreEnv).map(([key, value]) => `${tomlKey(key)} = ${tomlString(value)}`)
+    : [];
+  const coreLines = coreEnv && input.coreScriptPath
+    ? [
+        "",
+        `[mcp_servers.${SIGMA_CORE_MCP_SERVER_NAME}]`,
+        `command = ${tomlString(input.execPath)}`,
+        `args = [${tomlString(input.coreScriptPath)}]`,
+        `startup_timeout_sec = ${MCP_STARTUP_TIMEOUT_SEC}`,
+        `tool_timeout_sec = ${MCP_TOOL_TIMEOUT_SEC}`,
+        // This server exposes retrieval tools only, so automatic approval here
+        // cannot authorize a mutation.
+        'default_tools_approval_mode = "approve"',
+        "",
+        `[mcp_servers.${SIGMA_CORE_MCP_SERVER_NAME}.env]`,
+        ...coreEnvLines,
+      ]
+    : [];
 
   return [
     'approval_policy = "never"',
@@ -56,6 +82,7 @@ export function buildCodexAgentConfigToml(input: CodexAgentConfigInput): string 
     "",
     `[mcp_servers.${SIGMA_DOC_MCP_SERVER_NAME}.env]`,
     ...envLines,
+    ...coreLines,
     "",
   ].join("\n");
 }
