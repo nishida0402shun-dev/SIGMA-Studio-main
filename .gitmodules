@@ -1,3 +1,4 @@
 [submodule "vendor/sigma-core"]
 	path = vendor/sigma-core
 	url = https://github.com/nishida0402shun-dev/SIGMA-Core.git
+	branch = main

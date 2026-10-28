@@ -7,6 +7,20 @@ npm ci
 npm run dev
 ```
 
+SIGMA Core は `vendor/sigma-core` のgit submoduleで、依存先のコミットを固定しています。
+クローン直後やsubmodule更新後は、ルートで次を実行してから作業します。
+
+```sh
+git submodule update --init --recursive
+npm run core:test
+npm run core:typecheck
+```
+
+Core の `main` 更新は1日1回確認され、Studio 側のロックファイルを含む更新PRが作成されます。
+Coreのテスト・型検査・ライセンス検査・production依存監査が先に実行され、
+更新PRでは通常のStudio Checksも明示的に実行します。自動マージは行いません。
+手動で確認するときは GitHub Actions の `Update SIGMA Core` を実行してください。
+
 ## デスクトップ版をホットリロードで開発する
 
 ```sh
@@ -51,6 +65,9 @@ npm --workspace @sigma-studio/desktop run test -- src/features/drawing/graph3d-v
 npm exec --workspace @sigma-studio/desktop -- next typegen
 npm run typecheck
 npm run lint
+npm run core:test
+npm run core:typecheck
+npm --workspace @sigma-studio/core run licenses:check
 npm run test
 npm run test:scripts
 npm run version:check
@@ -101,8 +118,8 @@ CSS・フォント・画像の扱いも本番設定を通します。`dist` は�
 ホストによる保存、再読込を確認します。外部サービスや公開サイトには書き込みません。
 `test:scripts` は実際のversion CLIを一時ディレクトリで実行し、manifest同期とcheckの読取専用性を検査します。
 
-Pull Requestとmainへのpushでは [Checks](.github/workflows/checks.yml) が基本チェックと公開パッケージの
-ビルド・契約テストを実行します。保存ロックはmacOS・Windows・Linuxの別jobで実プロセスの競合・終了を検査し、
+Pull Requestとmainへのpushでは [Checks](.github/workflows/checks.yml) が基本チェック、SIGMA Coreの
+テスト・型検査、公開パッケージのビルド・契約テストを実行します。保存ロックはmacOS・Windows・Linuxの別jobで実プロセスの競合・終了を検査し、
 配布に使うElectronでもネイティブ依存を読み込みます。手元では
 `npm --workspace @sigma-studio/desktop run test -- file-lock`で対象テストを実行できます。
 ブラウザの確認範囲と結果はPRに記載してください。

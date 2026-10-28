@@ -162,6 +162,16 @@ clockと状態書込先を受け取るprocess共通のinstanceを使い、tool h
 状態ファイルの保存は`mcp/visual-session-status-file.ts`、Electron側と共有する形式は
 `electron/visual-session-status.ts`に置きます。終了状態の保存完了後にlive sessionを削除する順序を維持します。
 
+資料ビューアー（`/sources`）のElectron main境界は`electron/source-material/`が所有します。
+`core-bridge.ts`だけが`vendor/sigma-core`（MITのgit submodule）の内部pathをimportし、
+esbuildがmain / preload / MCPのCJS bundleへ同梱します。レンダラはpreloadのIPC型だけを使い、
+CoreのSQLite・blob・repositoryへ直接依存しません。
+CoreのDBとblobは`userData/data/sigma-core/`に置き、SigmaDocの保存先
+（`library.json`、`documents/*.sigmadoc.json`）とは共有しません。
+外部PDFのページ画像はmainのpdf.jsと`@napi-rs/canvas`で生成し、
+SigmaDoc用の`PageCanvas` / `OutputSession`を外部資料へ再利用しません。
+CLI AI向けMCPは`studio-ai` subjectの読み取り専用ツールだけを公開します。
+
 この依存規則は `src/features/headless-boundaries.test.ts`、`src/features/document/architecture.test.ts`、`src/features/drawing/architecture.test.ts`、`src/features/rendering/architecture.test.ts`、`src/features/text-editing/architecture.test.ts`、`src/features/ai-edit/editor-boundary.test.ts`、`src/components/editor/text-flow/architecture.test.ts`、`src/components/tiptap/text-format-controller-architecture.test.ts`、`src/components/editor/page-canvas/architecture.test.ts`、`src/components/editor/overlay-canvas/shape-renderer-architecture.test.ts` で検査します。互換性を型検査するtestと出力adapterは境界を跨ぐこと自体が役割なので、純粋coreと同じ禁止規則は適用しません。
 
 ### Future OSS Surface

@@ -37,6 +37,9 @@ jobs:
       - run: npm exec --workspace @sigma-studio/desktop -- next typegen
       - run: npm run typecheck
       - run: npm run lint
+      - run: npm run core:test
+      - run: npm run core:typecheck
+      - run: npm --workspace @sigma-studio/core run licenses:check
       - run: npm --workspace @sigma-studio/desktop run electron:prepare
       - run: npm --workspace @sigma-studio/desktop run test -- --maxWorkers=2 --testTimeout=30000
 

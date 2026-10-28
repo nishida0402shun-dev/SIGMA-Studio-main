@@ -1,0 +1,158 @@
+name: Update SIGMA Core
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "23 2 * * *"
+
+permissions:
+  contents: read
+  pull-requests: read
+
+concurrency:
+  group: update-sigma-core
+  cancel-in-progress: false
+
+jobs:
+  validate-core:
+    name: Validate latest SIGMA Core
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    outputs:
+      changed: ${{ steps.candidate.outputs.changed }}
+      core-sha: ${{ steps.candidate.outputs.core-sha }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          submodules: recursive
+      - uses: actions/setup-node@v6
+        with:
+          node-version: "24"
+          cache: npm
+      - name: Check for an unreviewed update
+        id: candidate
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          git -C vendor/sigma-core fetch --no-tags origin main
+          core_sha="$(git -C vendor/sigma-core rev-parse FETCH_HEAD)"
+          pinned_sha="$(git rev-parse HEAD:vendor/sigma-core)"
+          short_sha="$(git -C vendor/sigma-core rev-parse --short=12 "$core_sha")"
+          title="chore(deps): update SIGMA Core to $short_sha"
+          existing_pr="$(gh pr list --state open --base main --json title,number | jq -r --arg title "$title" '.[] | select(.title == $title) | .number' | head -n 1)"
+
+          echo "core-sha=$core_sha" >> "$GITHUB_OUTPUT"
+          if [ "$core_sha" = "$pinned_sha" ]; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::SIGMA Core is already pinned to $short_sha."
+          elif [ -n "$existing_pr" ]; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::Update PR #$existing_pr is still open; no duplicate PR will be created."
+          else
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          fi
+      - name: Check out candidate Core commit
+        if: steps.candidate.outputs.changed == 'true'
+        env:
+          CORE_SHA: ${{ steps.candidate.outputs.core-sha }}
+        run: git -C vendor/sigma-core checkout --detach "$CORE_SHA"
+      - name: Refresh workspace lockfile
+        if: steps.candidate.outputs.changed == 'true'
+        run: npm install --package-lock-only --ignore-scripts --workspace @sigma-studio/core
+      - name: Install locked dependencies
+        if: steps.candidate.outputs.changed == 'true'
+        run: npm ci
+      - name: Check production dependency audit
+        if: steps.candidate.outputs.changed == 'true'
+        run: npm run audit:production
+      - name: Check Core license inventory
+        if: steps.candidate.outputs.changed == 'true'
+        run: npm --workspace @sigma-studio/core run licenses:check
+      - name: Run Core tests
+        if: steps.candidate.outputs.changed == 'true'
+        run: npm run core:test
+      - name: Type-check Core
+        if: steps.candidate.outputs.changed == 'true'
+        run: npm run core:typecheck
+
+  create-update-pr:
+    name: Open validated Core update PR
+    needs: validate-core
+    if: needs.validate-core.outputs.changed == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    permissions:
+      actions: write
+      contents: write
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          submodules: recursive
+      - uses: actions/setup-node@v6
+        with:
+          node-version: "24"
+          cache: npm
+      - name: Prepare the pinned Core update
+        id: update
+        env:
+          CORE_SHA: ${{ needs.validate-core.outputs.core-sha }}
+        run: |
+          git -C vendor/sigma-core fetch --no-tags origin "$CORE_SHA"
+          git -C vendor/sigma-core checkout --detach "$CORE_SHA"
+          npm install --package-lock-only --ignore-scripts --workspace @sigma-studio/core
+
+          short_sha="$(git -C vendor/sigma-core rev-parse --short=12 "$CORE_SHA")"
+          branch="automation/update-sigma-core-$short_sha-$GITHUB_RUN_ID"
+          title="chore(deps): update SIGMA Core to $short_sha"
+          git switch --create "$branch"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add vendor/sigma-core package-lock.json
+          git commit -m "$title"
+          git push --set-upstream origin "$branch"
+          echo "branch=$branch" >> "$GITHUB_OUTPUT"
+          echo "title=$title" >> "$GITHUB_OUTPUT"
+      - name: Create update pull request
+        id: pull-request
+        env:
+          GH_TOKEN: ${{ github.token }}
+          BRANCH: ${{ steps.update.outputs.branch }}
+          TITLE: ${{ steps.update.outputs.title }}
+          CORE_SHA: ${{ needs.validate-core.outputs.core-sha }}
+        run: |
+          body="$(cat <<EOF
+          ## Summary
+          - Pin SIGMA Core to \`$CORE_SHA\`.
+          - Refresh the root npm lockfile for the updated workspace.
+          - Core tests, type-check, production audit, and license inventory passed in the preceding validation job.
+
+          The full Studio Checks workflow is dispatched against this branch below. This PR is not merged automatically.
+
+          Validation run: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID
+          EOF
+          )"
+          gh pr create --base main --head "$BRANCH" --title "$TITLE" --body "$body"
+          echo "branch=$BRANCH" >> "$GITHUB_OUTPUT"
+      - name: Run full Studio checks on the update branch
+        env:
+          GH_TOKEN: ${{ github.token }}
+          BRANCH: ${{ steps.pull-request.outputs.branch }}
+        run: |
+          gh workflow run checks.yml --ref "$BRANCH"
+
+          run_id=""
+          for attempt in $(seq 1 60); do
+            run_id="$(gh run list --workflow checks.yml --branch "$BRANCH" --event workflow_dispatch --limit 1 --json databaseId --jq '.[0].databaseId // empty')"
+            if [ -n "$run_id" ]; then
+              break
+            fi
+            sleep 5
+          done
+
+          if [ -z "$run_id" ]; then
+            echo "::error::Timed out waiting for the Studio Checks workflow to start."
+            exit 1
+          fi
+
+          gh run watch "$run_id" --exit-status --interval 20
