@@ -19,7 +19,7 @@ function launchSpec(overrides: Partial<SigmaStudioMcpLaunchSpec> = {}): SigmaStu
     userDataDir,
     runContextFile: path.join(userDataDir, "run-context.json"),
     renderBridgeFile: path.join(userDataDir, "render-bridge.json"),
-    provider: "codex",
+    provider: "claude",
     ...overrides,
   };
 }
