@@ -82,13 +82,13 @@ describe("bundled SIGMA Core MCP stdio integration", () => {
       SIGMA_CORE_SUBJECT_ID: "studio-ai",
     });
 
-    const transport = new StdioClientTransport({
+    const createTransport = () => new StdioClientTransport({
       command: serverExecutable,
       args: [serverPath],
       env,
     });
     client = new Client({ name: "sigma-studio-windows-integration", version: "1.0.0" });
-    await client.connect(transport);
+    await client.connect(createTransport());
 
     const { tools } = await client.listTools();
     const names = tools.map((tool) => tool.name).sort();
@@ -160,5 +160,16 @@ describe("bundled SIGMA Core MCP stdio integration", () => {
     // Re-check that MCP used the same on-disk DB and blob directory seeded above.
     expect((await fs.stat(databasePath)).isFile()).toBe(true);
     expect(await fs.readdir(blobDirectory)).not.toHaveLength(0);
+
+    await client.close();
+    client = undefined;
+    client = new Client({ name: "sigma-studio-core-restart-smoke", version: "1.0.0" });
+    await client.connect(createTransport());
+    const restoredResult = await client.callTool({
+      name: "list_sources",
+      arguments: { workspaceId: "studio:stdio-fixture" },
+    });
+    expect(restoredResult.isError).not.toBe(true);
+    expect(JSON.stringify(restoredResult.content)).toContain(imported.source.id);
   }, 30_000);
 });
