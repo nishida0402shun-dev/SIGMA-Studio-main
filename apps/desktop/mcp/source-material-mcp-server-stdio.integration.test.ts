@@ -5,12 +5,13 @@ import { fileURLToPath } from "node:url";
 
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
-import electronPath from "electron";
+import { createRequire } from "node:module";
 import { afterEach, describe, expect, it } from "vitest";
 
 import { SourceMaterialService } from "../electron/source-material/source-material-service";
 
 const runWindowsOnly = process.platform === "win32" ? describe : describe.skip;
+const electronPath = createRequire(import.meta.url)("electron") as string;
 const serverPath = fileURLToPath(new URL("../dist-electron/sigma-core-mcp-server.cjs", import.meta.url));
 
 runWindowsOnly("packaged SIGMA Core MCP stdio integration", () => {
