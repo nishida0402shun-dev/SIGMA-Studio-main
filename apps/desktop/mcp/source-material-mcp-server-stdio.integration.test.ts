@@ -36,10 +36,13 @@ runWindowsOnly("packaged SIGMA Core MCP stdio integration", () => {
     // Seed the exact DB/blob directory contract used by SourceMaterialService.
     const sourceService = new SourceMaterialService(userDataDir);
     sourceService.registerWorkspace("stdio-fixture", "stdio integration fixture");
+    const fixtureBytes = Buffer.from("SIGMA Core MCP stdio round-trip fixture.", "utf8");
     const imported = await sourceService.importBytes("stdio-fixture", {
       name: "fixture.txt",
-      bytes: Buffer.from("SIGMA Core MCP stdio round-trip fixture.", "utf8"),
+      bytes: fixtureBytes,
     });
+    const original = await sourceService.getFileBytes("stdio-fixture", imported.source.id);
+    expect(Buffer.from(original.bytes)).toEqual(fixtureBytes);
     sourceService.close();
 
     expect(await fs.stat(databasePath)).toBeDefined();
