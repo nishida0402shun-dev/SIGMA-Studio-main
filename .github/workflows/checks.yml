@@ -65,6 +65,40 @@ jobs:
         run: npm --workspace @sigma-studio/desktop run test -- mcp/source-material-mcp-server-stdio.integration.test.ts
         env:
           SIGMA_CORE_MCP_PACKAGED: "true"
+      - name: Build Windows NSIS installer without publishing
+        run: npm exec --workspace @sigma-studio/desktop -- electron-builder --config electron-builder.config.cjs --win nsis --publish never
+      - name: Install NSIS build and verify installed Electron runtime
+        shell: pwsh
+        run: |
+          $installer = Get-ChildItem -Path apps/desktop/release -Filter "Sigma-Studio-*.exe" | Select-Object -First 1
+          if (-not $installer) {
+            throw "NSIS installer was not generated."
+          }
+
+          $installDir = Join-Path $env:RUNNER_TEMP "sigma-studio-nsis-install"
+          $install = Start-Process -FilePath $installer.FullName -ArgumentList @("/S", "/D=$installDir") -Wait -PassThru
+          if ($install.ExitCode -ne 0) {
+            throw "NSIS installer exited with code $($install.ExitCode)."
+          }
+
+          $app = Join-Path $installDir "Sigma Studio.exe"
+          $asar = Join-Path $installDir "resources/app.asar"
+          if (-not (Test-Path -LiteralPath $app -PathType Leaf)) {
+            throw "Installed Sigma Studio executable was not found."
+          }
+          if (-not (Test-Path -LiteralPath $asar -PathType Leaf)) {
+            throw "Installed app.asar was not found."
+          }
+
+          $versionOutput = & $app --version
+          if ($LASTEXITCODE -ne 0 -or -not $versionOutput) {
+            throw "Installed Electron executable did not report its version."
+          }
+          "SIGMA_CORE_MCP_PACKAGED_APP_DIR=$installDir" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+      - name: Verify Core MCP from the installed NSIS app
+        run: npm --workspace @sigma-studio/desktop run test -- mcp/source-material-mcp-server-stdio.integration.test.ts
+        env:
+          SIGMA_CORE_MCP_PACKAGED: "true"
       - name: Run Electron smoke test on the supported desktop OS
         run: npm --workspace @sigma-studio/desktop run test:e2e:electron -- tests/electron/open-document.spec.ts tests/electron/sigma-core-mcp.spec.ts
 

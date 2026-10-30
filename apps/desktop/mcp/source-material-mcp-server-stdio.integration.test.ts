@@ -1,3 +1,4 @@
+import { spawn } from "node:child_process";
 import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
@@ -16,12 +17,14 @@ const packaged = process.env.SIGMA_CORE_MCP_PACKAGED === "true";
 const productName = /-beta\./.test((createRequire(import.meta.url)("../package.json") as { version: string }).version)
   ? "Sigma Studio Beta"
   : "Sigma Studio";
-const packagedResources = path.join(desktopRoot, "release", "win-unpacked", "resources");
+const packagedAppDir = process.env.SIGMA_CORE_MCP_PACKAGED_APP_DIR
+  || path.join(desktopRoot, "release", "win-unpacked");
+const packagedResources = path.join(packagedAppDir, "resources");
 const serverPath = packaged
   ? path.join(packagedResources, "app.asar", "dist-electron", "sigma-core-mcp-server.cjs")
   : fileURLToPath(new URL("../dist-electron/sigma-core-mcp-server.cjs", import.meta.url));
 const serverExecutable = packaged
-  ? path.join(desktopRoot, "release", "win-unpacked", `${productName}.exe`)
+  ? path.join(packagedAppDir, `${productName}.exe`)
   : process.platform === "win32"
     ? electronPath
     : process.execPath;
@@ -41,6 +44,40 @@ describe("bundled SIGMA Core MCP stdio integration", () => {
       }
     }
   });
+
+  it("fails visibly on stderr when a required Core data path is missing", async () => {
+    const env = Object.fromEntries(
+      Object.entries(process.env).filter((entry): entry is [string, string] => entry[1] !== undefined),
+    );
+    env.ELECTRON_RUN_AS_NODE = "1";
+    delete env.SIGMA_CORE_DB_PATH;
+    delete env.SIGMA_CORE_BLOB_DIR;
+    delete env.SIGMA_CORE_SUBJECT_ID;
+
+    const child = spawn(serverExecutable, [serverPath], {
+      cwd: desktopRoot,
+      env,
+      stdio: ["ignore", "pipe", "pipe"],
+    });
+    let stdout = "";
+    let stderr = "";
+    child.stdout.on("data", (chunk: Buffer) => {
+      stdout += chunk.toString();
+    });
+    child.stderr.on("data", (chunk: Buffer) => {
+      stderr += chunk.toString();
+    });
+    const exit = await new Promise<{ code: number | null; signal: NodeJS.Signals | null }>(
+      (resolve, reject) => {
+        child.once("error", reject);
+        child.once("close", (code, signal) => resolve({ code, signal }));
+      },
+    );
+
+    expect(exit.code).not.toBe(0);
+    expect(stdout).toBe("");
+    expect(stderr).toContain("Missing required environment variable: SIGMA_CORE_DB_PATH");
+  }, 15_000);
 
   it("launches the bundled Electron Node entrypoint and completes a read-only round-trip", async () => {
     if (packaged) {
