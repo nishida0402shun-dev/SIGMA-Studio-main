@@ -87,12 +87,13 @@ are automatically created or verified.
 
 ## Verified and outstanding checks
 
-The Windows CI gate is configured to build `win-unpacked`, verify the Core MCP
-round-trip, build the NSIS installer with publishing disabled, install it in
-the runner, and run the same MCP round-trip using the installed executable and
-`app.asar`. The installer portion is not considered verified until this
-change's GitHub Actions run succeeds. The CI job does not publish installer or
-release assets.
+The Windows CI gate builds `win-unpacked`, verifies the Core MCP round-trip,
+builds the NSIS installer with publishing disabled, installs it in the runner,
+and runs the same MCP round-trip using the installed executable and `app.asar`.
+Studio PR #41 Checks run
+[41048216578](https://github.com/nishida0402shun-dev/SIGMA-Studio-main/actions/runs/41048216578)
+passed all four jobs, including the NSIS install and installed-app MCP test.
+The CI job does not publish installer or release assets.
 
 Still requiring a target-user environment are a manual signed/unsigned
 installation check, SmartScreen behavior, confirmation of the actual

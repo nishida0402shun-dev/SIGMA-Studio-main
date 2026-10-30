@@ -2,7 +2,7 @@
 
 - 文書種別: 実装計画書
 - 作成日: 2026-10-28
-- ステータス: Core を SHA 固定する方針を選定。Windows unpacked app の MCP CI は成功。NSIS installer CI は追加済み・実行待ち。対象ユーザー環境の確認と必須チェックの branch protection は未完了
+- ステータス: Core を SHA 固定する方針を選定。Windows unpacked／NSIS installed app の MCP CI は成功。対象ユーザー環境の確認と必須チェックの branch protection は未完了
 - 主目的: SIGMA Core の更新を安全に SIGMA Studio へ反映できる開発・配布フローを構築する
 - 対象リポジトリ:
   - SIGMA Studio: https://github.com/nishida0402shun-dev/SIGMA-Studio-main
@@ -431,7 +431,7 @@ Studio は承認済み Core SHA を Electron main と読み取り専用 MCP entr
 - [x] Core 更新検知・PR 自動作成 workflow（日次／手動、auto-mergeなし）
 - [x] Studio 統合テスト・回帰テスト（Linux/Windows CI）
 - [x] Windows unpacked app の接続テスト
-- [ ] Windows NSIS installer のインストール済み接続テスト（CIを追加。PR Checksの成功待ち）
+- [x] Windows NSIS installer のインストール済み接続テスト（Studio PR #41 Checks run `41048216578` で成功。publishなし）
 - [x] ロールバック・データ復旧手順の文書化（実機restore drillは未実施）
 - [ ] branch protectionによる必須チェック強制（repo-wide設定のため変更前に承認が必要）
 - [ ] 対象ユーザーPCでのSmartScreen・既存データ保持・backup/restore drill
@@ -490,7 +490,7 @@ Phase 0 の調査を完了した。以下はこの Studio checkout と、その 
 | Phase 1 — Core の識別と互換性 | 実装方針・契約文書化済み | Core 公開releaseではなく固定SHAを互換性identityとして採用。Core/StudioのCIと契約文書をゲートにし、breaking changeはレビューPRで扱う。 |
 | Phase 2 — Studio の依存固定と手動統合 | 実装・CI検証済み | submodule pin、資料サービス、読み取り専用 stdio MCP、Electron bundle。Windows runnerからunpacked `app.asar` 内のMCPを起動し、read-only往復と再起動後データ保持を確認。 |
 | Phase 3 — 更新検知と PR 自動化 | 実装・CI検証済み | schedule/manual起点でCore `main` SHAを検証、Core CI相当のchecksを行い、submodule/lockfile更新PRを作成し、Studio Checksをdispatch。auto-mergeなし。正式release/tag起点ではないことは選定方式による意図的な差分。 |
-| Phase 4 — Windows 配布と品質ゲート | unpacked完了、installer検証中 | run `41038044873` でWindows `win-unpacked` 内MCP起動・読み取り・再起動後保持を確認。NSIS build/install/installed executable testをChecksへ追加し、PR CI待ち。ユーザー環境でのSmartScreen、既存データ保持、restore drillは手動未確認。 |
+| Phase 4 — Windows 配布と品質ゲート | CI検証完了、対象ユーザー環境は未確認 | run `41038044873` でWindows `win-unpacked` 内MCP起動・読み取り・再起動後保持を確認。Studio PR #41 run `41048216578` でNSIS build/install後、installed executableと`app.asar`からのround-tripも成功。ユーザー環境でのSmartScreen、実データ保持、restore drillは手動未確認。 |
 | Phase 5 — 運用・拡張 | 未着手 | 初期接続・配布検証後の候補として保留する。 |
 
 ### 16.3 追加した最小ゲートと未確認事項
@@ -499,9 +499,9 @@ Phase 0 の調査を完了した。以下はこの Studio checkout と、その 
 
 さらに既存PR #40 で、`apps/desktop/mcp/source-material-mcp-server-stdio.integration.test.ts` をLinux／Windowsで実行可能にし、Windows CIではelectron-builderの `--win --dir --publish never` で生成した `release/win-unpacked` の Electron executable から `resources/app.asar` 内のCore MCP entrypointを起動するよう拡張した。`check-native-lock-package.cjs` は従来のnative lock検査に加えて、asar内の `dist-electron/sigma-core-mcp-server.cjs` の存在も検査する。Windows runnerはCore更新workflowやリリースworkflowとは独立して、パッケージをpublishせず smoke を実行する。PRのCIで追加テストに起因する `content` の `unknown` 型エラーが見つかったため、MCP結果のcontent/textを実行時検証してからJSON parseする修正を追加した。
 
-Linux上ではbundled MCPのinitialize、read-only tool list、登録資料のlist/search/page/range、mutation拒否、プロセス再起動後のデータ保持、隔離DB/blob cleanupを確認した。Studio main `ff31fe5` のChecks run [41038044873](https://github.com/nishida0402shun-dev/SIGMA-Studio-main/actions/runs/41038044873) は4/4 jobs成功し、Windows unpacked app内でCore MCP往復と再起動後のデータ保持を確認した。NSIS installed-app testはこの変更後のChecksで実行する。`v0.469.171` tagとversion bumpはmerge後の既存Release workflowによって生成されたが、workflowはユーザー判断で公開前にcancelされ、GitHub Release assetは作成されていない。今後も明示的な許可なしにreleaseを再実行しない。
+Linux上ではbundled MCPのinitialize、read-only tool list、登録資料のlist/search/page/range、mutation拒否、プロセス再起動後のデータ保持、隔離DB/blob cleanupを確認した。Studio main `ff31fe5` のChecks run [41038044873](https://github.com/nishida0402shun-dev/SIGMA-Studio-main/actions/runs/41038044873) は4/4 jobs成功し、Windows unpacked app内でCore MCP往復と再起動後のデータ保持を確認した。さらにStudio PR #41 のChecks run [41048216578](https://github.com/nishida0402shun-dev/SIGMA-Studio-main/actions/runs/41048216578) も4/4 jobs成功。Windows runnerでNSISをpublishなしでbuild/installし、installed executableと`app.asar`からMCP read-only round-tripに成功した。`v0.469.171` tagとversion bumpは既存Release workflowによって生成されたが、workflowはユーザー判断で公開前にcancelされ、GitHub Release assetは作成されていない。今後も明示的な許可なしにreleaseを再実行しない。
 
-今回追加するNSIS testはCI結果が出るまで未確認とする。Windows GitHub runnerでの成功は、対象ユーザー環境のSmartScreen、既存データ保持、手動backup/restore drillを代替しない。branch protection は現状無効であり、PR Checks の存在だけでは merge 制約にならない。repository-wide設定はユーザー承認前に変更しない。
+Windows runnerでのNSIS CI成功は、対象ユーザー環境のSmartScreen、既存データ保持、手動backup/restore drillを代替しない。branch protection は現状無効であり、PR Checks の存在だけでは merge 制約にならない。repository-wide設定はユーザー承認前に変更しない。Studio PR #41 はCI成功後もDraftのままレビュー待ちとし、mainへのmergeやRelease workflowの実行は行っていない。
 
 今回の検証結果:
 
@@ -525,5 +525,5 @@ Linux上ではbundled MCPのinitialize、read-only tool list、登録資料のli
 | `git diff --check` | 成功 |
 | branch protection の required checks | 未設定（repository-wide変更は承認待ち） |
 | Studio main Checks run `41038044873`（PR #40 merge後） | 成功（4/4 jobs。Windows unpacked Core MCP round-trip） |
-| NSIS installer build/install + installed MCP round-trip | 未実行（本PRのChecksで実行） |
+| Studio PR #41 Checks run `41048216578` | 成功（4/4 jobs。NSIS build/installとinstalled executable/app.asar経由のMCP round-tripを確認。publishなし） |
 | 対象ユーザーPCでのSmartScreen・既存データ・backup/restore確認 | 未実施（実機作業） |
