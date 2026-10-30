@@ -1,0 +1,124 @@
+import fs from "node:fs/promises";
+import os from "node:os";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+
+import { Client } from "@modelcontextprotocol/sdk/client/index.js";
+import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
+import electronPath from "electron";
+import { afterEach, describe, expect, it } from "vitest";
+
+import { SourceMaterialService } from "../electron/source-material/source-material-service";
+
+const runWindowsOnly = process.platform === "win32" ? describe : describe.skip;
+const serverPath = fileURLToPath(new URL("../dist-electron/sigma-core-mcp-server.cjs", import.meta.url));
+
+runWindowsOnly("packaged SIGMA Core MCP stdio integration", () => {
+  let userDataDir: string | undefined;
+  let client: Client | undefined;
+
+  afterEach(async () => {
+    await client?.close().catch(() => undefined);
+    client = undefined;
+    if (userDataDir) {
+      await fs.rm(userDataDir, { recursive: true, force: true });
+      userDataDir = undefined;
+    }
+  });
+
+  it("launches the bundled Electron Node entrypoint and completes a read-only round-trip", async () => {
+    userDataDir = await fs.mkdtemp(path.join(os.tmpdir(), "sigma-core-stdio-"));
+    const dataDir = path.join(userDataDir, "data", "sigma-core");
+    const databasePath = path.join(dataDir, "core.sqlite");
+    const blobDirectory = path.join(dataDir, "blobs");
+
+    // Seed the exact DB/blob directory contract used by SourceMaterialService.
+    const sourceService = new SourceMaterialService(userDataDir);
+    sourceService.registerWorkspace("stdio-fixture", "stdio integration fixture");
+    const imported = await sourceService.importBytes("stdio-fixture", {
+      name: "fixture.txt",
+      bytes: Buffer.from("SIGMA Core MCP stdio round-trip fixture.", "utf8"),
+    });
+    sourceService.close();
+
+    expect(await fs.stat(databasePath)).toBeDefined();
+    expect(await fs.readdir(blobDirectory)).not.toHaveLength(0);
+
+    const env = Object.fromEntries(
+      Object.entries(process.env).filter((entry): entry is [string, string] => entry[1] !== undefined),
+    );
+    Object.assign(env, {
+      ELECTRON_RUN_AS_NODE: "1",
+      SIGMA_CORE_DB_PATH: databasePath,
+      SIGMA_CORE_BLOB_DIR: blobDirectory,
+      SIGMA_CORE_SUBJECT_ID: "studio-ai",
+    });
+
+    const transport = new StdioClientTransport({
+      command: electronPath,
+      args: [serverPath],
+      env,
+    });
+    client = new Client({ name: "sigma-studio-windows-integration", version: "1.0.0" });
+    await client.connect(transport);
+
+    const { tools } = await client.listTools();
+    const names = tools.map((tool) => tool.name).sort();
+    expect(names).toEqual([
+      "get_source",
+      "get_source_page",
+      "get_source_page_range",
+      "list_source_workspaces",
+      "list_sources",
+      "search_sources",
+    ]);
+    expect(tools.every((tool) => tool.annotations?.readOnlyHint === true)).toBe(true);
+
+    const workspaceResult = await client.callTool({
+      name: "list_source_workspaces",
+      arguments: {},
+    });
+    expect(workspaceResult.isError).not.toBe(true);
+    expect(JSON.stringify(workspaceResult.content)).toContain("studio:stdio-fixture");
+
+    const listResult = await client.callTool({
+      name: "list_sources",
+      arguments: { workspaceId: "studio:stdio-fixture" },
+    });
+    expect(listResult.isError).not.toBe(true);
+    const listPayload = JSON.parse(String((listResult.content[0] as { text: string }).text)) as {
+      sources: Array<{ sourceId: string; name: string }>;
+    };
+    const source = listPayload.sources.find((item) => item.sourceId === imported.source.id);
+    expect(source?.name).toBe("fixture.txt");
+
+    const rangeResult = await client.callTool({
+      name: "get_source_page_range",
+      arguments: {
+        workspaceId: "studio:stdio-fixture",
+        sourceId: imported.source.id,
+        startPage: 1,
+        endPage: 1,
+      },
+    });
+    expect(rangeResult.isError).not.toBe(true);
+    expect(JSON.stringify(rangeResult.content)).toContain("SIGMA Core MCP stdio round-trip fixture.");
+
+    const searchResult = await client.callTool({
+      name: "search_sources",
+      arguments: { workspaceId: "studio:stdio-fixture", query: "round-trip" },
+    });
+    expect(searchResult.isError).not.toBe(true);
+    expect(JSON.stringify(searchResult.content)).toContain(imported.source.id);
+
+    // There is intentionally no mutation tool in the exposed MCP surface.
+    await expect(client.callTool({
+      name: "delete_source",
+      arguments: { workspaceId: "studio:stdio-fixture", sourceId: imported.source.id },
+    })).rejects.toThrow();
+
+    // Re-check that MCP used the same on-disk DB and blob directory seeded above.
+    expect((await fs.stat(databasePath)).isFile()).toBe(true);
+    expect(await fs.readdir(blobDirectory)).not.toHaveLength(0);
+  }, 30_000);
+});
