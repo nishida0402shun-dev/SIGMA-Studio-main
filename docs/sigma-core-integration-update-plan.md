@@ -2,7 +2,7 @@
 
 - 文書種別: 実装計画書
 - 作成日: 2026-10-28
-- ステータス: Phase 0 調査済み。Windows unpacked app での Core MCP 統合検証は CI 成功。NSIS installer など未確認事項を §16 に記録
+- ステータス: Core を SHA 固定する方針を選定。Windows unpacked／NSIS installed app の MCP CI は成功。対象ユーザー環境の確認と必須チェックの branch protection は未完了
 - 主目的: SIGMA Core の更新を安全に SIGMA Studio へ反映できる開発・配布フローを構築する
 - 対象リポジトリ:
   - SIGMA Studio: https://github.com/nishida0402shun-dev/SIGMA-Studio-main
@@ -17,23 +17,23 @@ SIGMA Studio と SIGMA Core は別々の GitHub リポジトリとして維持�
 目標とするフローは次のとおり。
 
 1. SIGMA Core を独立して開発・テストする。
-2. Core の変更をバージョン付きの成果物または固定コミットとして識別できるようにする。
-3. Core のリリース／更新を契機に、Studio 側の依存更新を自動検知する。
+2. Core の変更を Studio の gitlink に記録する固定コミット SHA として識別する。
+3. 固定 SHA と異なる Core の更新候補を検知し、Studio 側で検証する。
 4. Studio の更新ブランチ／Pull Request（PR）を作成する。
 5. Core 単体テスト、Studio のテスト、MCP 統合テスト、パッケージング検証を実行する。
 6. 成功した更新をレビュー・承認後にマージする。
-7. 承認済みの Core バージョンを含む Studio をビルド・配布する。
+7. 別の公開承認を得た後に、承認済み Core SHA を含む Studio をビルド・配布する。
 
 **重要:** 自動化するのは更新の検知・PR 作成・テストまでを基本とし、初期段階では本番ブランチへの自動マージや、配布版への未検証更新の自動反映は行わない。
 
 ## 2. 設計原則
 
 1. **リポジトリを分離する。** Studio と Core は別々の履歴・Issue・PR・リリースを持つ。
-2. **Core のバージョンを固定する。** Studio の再現可能なビルドのため、依存する Core の版を lockfile 等で固定する。
+2. **Core の commit SHA を固定する。** Studio の再現可能なビルドのため、submodule gitlink と workspace lockfile に依存先を記録する。
 3. **更新は段階的に反映する。** Core の更新を即座に本番採用せず、Studio 側の検証を通す。
 4. **契約を明示する。** MCP のツール名・入力スキーマ・戻り値・エラー形式・互換性方針を管理する。
 5. **非破壊を優先する。** 既存 Studio 文書ストア、既存 MCP、Skills、AI 設定を、移行検証前に削除・置換しない。
-6. **ローカル MCP を初期接続方式とする。** Studio が Core MCP プロセスを起動し、stdio で通信する。初期実装では外部ポートを公開しない。
+6. **ローカル MCP を初期接続方式とする。** AI client は Studio が提供する read-only MCP entrypoint を Electron Node mode で起動し、stdio で通信する。初期実装では外部ポートを公開しない。
 7. **証拠に基づいて完了判定する。** CI 設定の存在だけでなく、最新コミットの実行結果、配布版の動作、テストログを確認する。
 8. **大きな設計変更は事前レビューする。** データ形式変更、破壊的 API 変更、書き込み系ツール追加は別途レビューする。
 9. **秘密情報を保護する。** CI トークンは最小権限にし、不要な PAT を作成・保存しない。
@@ -45,9 +45,9 @@ SIGMA Studio と SIGMA Core は別々の GitHub リポジトリとして維持�
 ┌────────────────────────────┐
 │ SIGMA Core Repository      │
 │ Source / Tests / CI        │
-│ Versioned release          │
+│ Commit-pinned source       │
 └──────────────┬─────────────┘
-               │ release / version update event
+               │ scheduled/manual SHA check
                ▼
 ┌────────────────────────────┐
 │ Update automation          │
@@ -66,18 +66,18 @@ SIGMA Studio と SIGMA Core は別々の GitHub リポジトリとして維持�
                ▼
 ┌────────────────────────────┐
 │ SIGMA Studio Desktop App   │
-│ Electron UI / Local MCP    │
+│ Electron UI / MCP adapter  │
 └──────────────┬─────────────┘
                │ stdio
                ▼
 ┌────────────────────────────┐
-│ SIGMA Core MCP Server      │
-│ Core Services / SQLite     │
-│ BlobStore / Search / OCR   │
+│ SIGMA Core Services        │
+│ SQLite / BlobStore /       │
+│ Search / OCR               │
 └────────────────────────────┘
 ```
 
-この図は目標構成であり、現時点で全経路が実装済みであることを示すものではない。
+この図は採用した source-pinned 構成を示す。Core の公開 package/release artifact は使わない。
 
 ## 4. Core の配布方式を選ぶ
 
@@ -132,11 +132,11 @@ Phase 0 で実装・依存・パッケージ構成を調査してから選ぶ。
 
 ### 5.1 バージョン管理
 
-- Core は明示的なバージョンを持つ。
-- 公開 API／MCP 契約の後方互換性を SemVer 等の規則で管理する。
-- Studio は利用する Core バージョンを package manifest、lockfile、またはリリース設定に固定する。
+- Studio が使用する Core は Git submodule の固定 SHA で識別する。Core の private package version は Studio の実行時依存バージョンとして扱わない。
+- 公開 API／MCP 契約の後方互換性は明文化した契約と両リポジトリのテストで管理する。Core の正式 release/tag 運用は source-pinned 統合の必須条件としない。
+- Studio は利用する Core SHA を Git tree の gitlink と npm workspace lockfile に固定する。
 - Core の開発ブランチの先端を Studio の通常ビルドが暗黙に参照しない。
-- リリースノートに変更点、破壊的変更、移行要件、既知の問題を記載する。
+- 更新 PR に Core SHA、変更点、破壊的変更、移行要件、既知の問題を記録する。
 
 ### 5.2 MCP 契約
 
@@ -156,30 +156,29 @@ Phase 0 で実装・依存・パッケージ構成を調査してから選ぶ。
 
 ### 5.3 互換性ルール
 
-- パッチ更新：原則として後方互換性を維持する。
-- マイナー更新：既存契約を維持しながら機能を追加する。
-- メジャー更新：破壊的変更、移行手順、Studio 側修正を明示する。
-- 互換性が判定できない更新は、自動採用せず PR をブロックする。
-- 実際のプロジェクトが別のバージョン規則を採用している場合は、既存ルールを調査してから統一する。
+- Studio が採用する Core の版は submodule に記録する commit SHA で識別し、package `0.1.0` の値から互換性を推定しない。
+- MCP schema、authorization、DB schema の互換性に影響する変更は、影響範囲、移行・rollback手順、Studio側テストを更新PRで明示する。
+- 互換性が判定できない SHA は自動採用せず、Studio Checks と人手レビューが完了するまで保留する。
+- 将来 Core が正式なSemVer/release運用を採用する場合は、source-pinned方式との役割を別途決定する。
 
 ## 6. 自動更新フロー
 
 ### 6.1 通常フロー
 
 1. Core の PR で型チェック・単体テスト・ライセンス検査などを実行する。
-2. Core のリリース候補または正式リリースを作成する。
-3. Core リリースをトリガーとして Studio 側の更新検知を開始する。
-4. Studio 側で依存バージョン／固定コミットを更新するブランチを作成する。
-5. Studio の型チェック、単体テスト、MCP 統合テスト、ビルド、パッケージ内容検査を実行する。
-6. 結果、変更点、Core バージョン、テストログを記載した PR を作成する。
-7. 必須チェックが成功した後、担当者が差分をレビューする。
-8. 承認後にマージする。
-9. Studio のリリース工程で承認済み Core を含む成果物を作成する。
+2. Core の変更を main に統合し、Core CI を成功させる。
+3. Studio の日次／手動 workflow が Core main の新 SHA を検知する。
+4. Studio 側で submodule の固定 SHA と workspace lockfile を更新するブランチを作成する。
+5. Core checks と Studio の型チェック、単体テスト、MCP 統合テスト、ビルド、パッケージ検証を実行する。
+6. 結果、変更点、Core SHA、テスト結果を記録した PR を作成する。
+7. checks の成功後、担当者が差分をレビューする。
+8. 承認後にマージする。現在、branch protection による必須チェック強制は未設定。
+9. Studio のリリース工程は別の承認点とし、明示的な公開判断なしに実行しない。
 
 ### 6.2 自動化してよい作業
 
-- Core リリース／タグの検知
-- Studio 側依存バージョンの更新ブランチ作成
+- Core main の新しいコミット SHA の検知
+- Studio の submodule SHA と workspace lockfile の更新ブランチ作成
 - 更新 PR 作成
 - テスト・型チェック・ビルド・パッケージ検査
 - PR へのテスト結果・更新内容の要約追加
@@ -203,7 +202,6 @@ Phase 0 で実装・依存・パッケージ構成を調査してから選ぶ。
 トリガー:
 - Pull Request
 - Core のメインブランチ更新
-- リリース作成前
 
 チェック候補:
 - 型チェック
@@ -216,7 +214,9 @@ Phase 0 で実装・依存・パッケージ構成を調査してから選ぶ。
 
 ### 7.2 Core Release
 
-トリガー:
+選定した source-pinned 方式では、Core の公開 package/release artifact を Studio が消費しないため、この workflow は現時点で作成しない。Core の private package version は Studio の互換性 identity ではない。
+
+将来 package/artifact 配布へ切り替える場合の参考案:
 - 承認されたタグまたは GitHub Release
 
 処理:
@@ -229,12 +229,11 @@ Phase 0 で実装・依存・パッケージ構成を調査してから選ぶ。
 ### 7.3 Studio Update Check
 
 トリガー:
-- Core の正式リリース
+- Core main の新 SHA（日次 schedule）
 - 手動実行（workflow_dispatch）
-- 定期確認を導入する場合は、過剰な更新 PR を避ける頻度に制限
 
 処理:
-- 最新の許可された Core バージョンを確認する。
+- 現在の gitlink と Core main SHA を比較する。
 - Studio の依存参照だけを更新する。
 - lockfile を更新する。
 - 更新ブランチ／PR を作成する。
@@ -244,7 +243,7 @@ Phase 0 で実装・依存・パッケージ構成を調査してから選ぶ。
 
 チェック候補:
 - Studio の型チェック・単体テスト
-- Core MCP の起動・初期化・ツール一覧取得
+- Studio-owned Core MCP adapter の起動・初期化・ツール一覧取得
 - 読み取り専用ツール呼び出し
 - Workspace 認可と不正入力テスト
 - 既存 MCP／Skills／文書ストアの回帰テスト
@@ -266,15 +265,15 @@ CI 成功は、その CI 環境における成功を示す。Windows 実機・�
 
 ## 8. ローカル MCP 接続の要件
 
-Studio のアプリ実行時には、承認済みの Core バージョンをローカルプロセスとして起動する。
+Studio は承認済み Core SHA を Electron main と読み取り専用 MCP entrypoint にバンドルする。CLI AI client は Studio が提供する MCP 設定を通じて Electron executable を Node mode で起動する。Core のフル MCP entrypoint をそのまま公開する設計ではない。
 
 ### 8.1 起動・通信
 
-- Studio が Core MCP サーバーを子プロセスとして起動する。
-- stdio を使って MCP メッセージを交換する。
+- MCP client が Studio の bundled entrypoint を子プロセスとして起動し、stdio で MCP メッセージを交換する。
+- Studio UI の資料操作は Electron main の `SourceMaterialService` を通し、renderer から Core DB に直接アクセスしない。
 - stdout は MCP 通信専用、ログは stderr またはアプリ側ロガーに送る。
 - 起動タイムアウト、接続切断、異常終了を処理する。
-- Studio 終了時に子プロセスをクリーンアップする。
+- MCP client が stdio を閉じたときに server process が終了し、orphan process を残さない。
 - 初期構成では HTTP ポートを公開しない。
 
 ### 8.2 データ・Workspace
@@ -295,7 +294,7 @@ Studio のアプリ実行時には、承認済みの Core バージョンをロ�
 
 ## 9. Windows 配布と実機検証
 
-- Core MCP 成果物と必要な依存関係が配布パッケージに含まれる。
+- Core bridge と Studio-owned MCP entrypoint が Electron bundle／配布パッケージに含まれる。
 - 実行時にソースコードや開発用 Node.js の手動配置を要求しない。
 - Electron／Node の起動方式が対象バージョンで動作する。
 - パスに空白や日本語が含まれても起動できる。
@@ -309,11 +308,11 @@ Studio のアプリ実行時には、承認済みの Core バージョンをロ�
 | ID | テスト内容 | 合格条件 |
 |---|---|---|
 | AUTO-001 | Core CI | 必須の型チェック・単体テストが成功 |
-| AUTO-002 | Core リリース識別 | バージョンとコミット SHA が追跡できる |
+| AUTO-002 | Core commit identity | Studio gitlink の Core SHA を追跡できる |
 | AUTO-003 | Studio 依存固定 | Studio の依存参照と lockfile が更新される |
 | AUTO-004 | 更新 PR 自動作成 | Core 更新時に Studio の PR が作成される |
-| AUTO-005 | PR 必須チェック | 必須チェックが成功するまでマージできない |
-| MCP-001 | stdio 起動 | Core プロセスが正常に起動する |
+| AUTO-005 | PR 必須チェック | branch protection で必須チェックが成功するまで merge を禁止する |
+| MCP-001 | stdio 起動 | bundled Studio MCP process が正常に起動する |
 | MCP-002 | MCP 初期化 | クライアントとの初期化が成功する |
 | MCP-003 | ツール一覧 | 定義済みツールを取得できる |
 | MCP-004 | 読み取りツール | 実際のデータに対する応答が返る |
@@ -321,7 +320,7 @@ Studio のアプリ実行時には、承認済みの Core バージョンをロ�
 | MCP-006 | Workspace 未選択 | 自動選択せず拒否する |
 | MCP-007 | 権限外アクセス | Core 側で拒否される |
 | MCP-008 | 不正・過大入力 | 安全に拒否される |
-| MCP-009 | Core 異常終了 | Studio がエラーを処理し、回復可能な状態を保つ |
+| MCP-009 | 起動設定異常 | 必須設定が欠けた場合、プロトコルstdoutを汚さずエラーをstderrへ出して非0終了する |
 | MCP-010 | 既存機能回帰 | 既存 MCP／Skills／文書ストアが維持される |
 | PKG-001 | packaged app 同梱 | 必要な Core 成果物がパッケージ内に存在する |
 | PKG-002 | Windows 起動 | クリーン環境で Core が起動する |
@@ -349,50 +348,50 @@ Studio のアプリ実行時には、承認済みの Core バージョンをロ�
 - 配布方式とバージョン規則の案を確定する。
 - 破壊的変更を伴わず次フェーズに進めることを確認する。
 
-### Phase 1 — Core のリリース単位を確立
+### Phase 1 — Core の識別と互換性契約
 
 作業:
-- バージョン番号、タグ、リリースノートの規則を整える。
-- Core のビルド成果物を確定する。
+- Studio の submodule gitlink に記録する Core commit SHA を互換性 identity とする。
 - MCP 契約と互換性ルールを文書化する。
-- Core CI とパッケージ内容検査を整える。
+- Core CI と Studio 統合チェックを更新候補のゲートとする。
 
 完了条件:
-- 特定の Core バージョン／コミットから再現可能な成果物を生成できる。
-- Core 単体テストと契約テストが実行できる。
-- リリース成果物の内容と必要な依存関係が明確である。
+- 特定の Core SHA から再現可能な Studio build を生成できる。
+- Core 単体テストと Studio の統合契約テストが実行できる。
+- Core の公開 package/release artifact を更新経路に使用しないことが明記されている。
 
 ### Phase 2 — Studio の依存固定と手動統合
 
 作業:
-- Studio が特定 Core バージョンを参照するようにする。
-- Studio から Core MCP を起動する。
+- Studio が特定 Core commit SHA を参照するようにする。
+- Studio-owned MCP entrypoint を Electron Node mode で起動する。
 - initialize／tool list／読み取りツール呼び出しを統合する。
 - 検索・ページ取得を接続する。
 
 完了条件:
-- Studio が固定された Core バージョンを利用する。
+- Studio が固定された Core commit SHA を利用する。
 - 開発環境で MCP 接続と読み取り操作が成功する。
 - 既存機能の回帰テストが成功する。
 
 ### Phase 3 — 更新検知と PR 自動化
 
 作業:
-- Core の正式リリースを検知する workflow を用意する。
-- Studio の依存参照と lockfile を更新する PR を自動作成する。
-- PR で Studio/Core の統合テストを実行する。
+- Core main の新しい SHA を検知する workflow を用意する。
+- Studio の submodule gitlink と workspace lockfile を更新する PR を自動作成する。
+- 候補 Core SHA の検査と Studio Checks を実行する。
 - 失敗時は自動的にチェックを失敗させ、更新を保留する。
 
 完了条件:
-- Core の新しいリリースから Studio の更新 PR まで自動化されている。
-- PR に Core バージョン、変更概要、テスト結果が記録される。
-- 必須チェック成功とレビューを経ない自動マージが行われない。
+- Core main の新しい SHA から Studio の更新 PR まで自動化されている。
+- PR に Core SHA、変更概要、テスト結果が記録される。
+- 自動マージは行わない。branch protection による必須チェック強制は別途有効化が必要。
 
 ### Phase 4 — Windows 配布と品質ゲート
 
 作業:
-- Core 成果物の配布版同梱を実装する。
-- Windows CI／実機で起動・接続・検索・ページ取得を検証する。
+- Core bridge と Studio-owned MCP entrypoint の配布版同梱を検証する。
+- Windows CI で unpacked app と NSIS installed app の起動・接続・検索・ページ取得を検証する。
+- 対象ユーザー環境でインストール、既存データ保持、SmartScreen、復旧を確認する。
 - 異常系・権限・データ保存先を検証する。
 - 更新後のデータ保持と復旧手順を確認する。
 
@@ -413,8 +412,8 @@ Studio のアプリ実行時には、承認済みの Core バージョンをロ�
 
 ## 12. ロールバックと障害対応
 
-- 更新 PR のテストが失敗した場合はマージせず、直前の安定バージョンを維持する。
-- リリース後に重大な問題が判明した場合、Studio が参照する Core バージョンを直前の安定版へ戻せるようにする。
+- 更新 PR のテストが失敗した場合はマージせず、直前の安定した Core SHA を維持する。
+- リリース後に重大な問題が判明した場合、Studio が参照する Core SHA を直前の安定コミットへ戻せるようにする。
 - データベース形式を変更する Core 更新では、バックアップ、移行前チェック、移行後検証、失敗時の復旧手順を別途定義する。
 - DB の自動ダウングレードは安全性が確認できない限り行わない。
 - Core の起動失敗時に Studio 全体が起動不能にならないよう、障害を局所化する。
@@ -422,18 +421,21 @@ Studio のアプリ実行時には、承認済みの Core バージョンをロ�
 
 ## 13. 成果物チェックリスト
 
-- [ ] Studio/Core の現状調査レポート
-- [ ] Core 配布方式の決定記録
-- [ ] Core バージョン・リリース運用ルール
-- [ ] MCP 契約・互換性文書
-- [ ] Core CI／リリース workflow
-- [ ] Studio の固定 Core 依存
-- [ ] Studio の MCP プロセス管理と統合
-- [ ] Core 更新検知・PR 自動作成 workflow
-- [ ] Studio 統合テスト・回帰テスト
-- [ ] Windows packaged app の接続テスト
-- [ ] ロールバック・データ復旧手順
-- [ ] 既知の制限と残課題一覧
+- [x] Studio/Core の現状調査レポート（§16）
+- [x] Core 配布方式の決定記録（Git submodule commit pin。公開package/artifactは使わない）
+- [x] Core version identity／更新運用ルール（固定SHA、CI、日次／手動のレビューPR）
+- [x] MCP 契約・互換性文書（Studio/Core両リポジトリ）
+- [x] Core CI（Node 22/24、license、test、typecheck）。Core release workflowは選定方式では不要
+- [x] Studio の固定 Core 依存（submodule SHAとworkspace lockfile）
+- [x] Studio の MCP 設定・Core連携（読み取り専用ツール、明示workspace/subject）
+- [x] Core 更新検知・PR 自動作成 workflow（日次／手動、auto-mergeなし）
+- [x] Studio 統合テスト・回帰テスト（Linux/Windows CI）
+- [x] Windows unpacked app の接続テスト
+- [x] Windows NSIS installer のインストール済み接続テスト（Studio PR #41 Checks run `41048216578` で成功。publishなし）
+- [x] ロールバック・データ復旧手順の文書化（実機restore drillは未実施）
+- [ ] branch protectionによる必須チェック強制（repo-wide設定のため変更前に承認が必要）
+- [ ] 対象ユーザーPCでのSmartScreen・既存データ保持・backup/restore drill
+- [x] 既知の制限と残課題一覧
 
 ## 14. 作業報告フォーマット
 
@@ -469,7 +471,7 @@ Phase 0 の調査を完了した。以下はこの Studio checkout と、その 
 
 | 対象 | 確認結果 | 根拠 |
 |---|---|---|
-| Studio checkout | 調査開始時は `main` の `78eabea224bdefb2d48eec12d4827f4791d28e71`。その時点の作業ツリーは clean。ローカル `origin/main` は `9e38948230c1d7d41101b44005231baf261e5a7a` で、checkout は1コミット遅れていた。調査後の変更は本PRに反映する。 | `git status --short --branch`、`git log` |
+| Studio checkout | 調査開始時は `main` の `78eabea224bdefb2d48eec12d4827f4791d28e71`。その後PR #35・#39・#40がmainにmergeされ、現在は `ff31fe575e0ed09d034e6e1f1a2472e687254f85`（Studio `0.469.171`）。 | GitHub main、PR #35/#39/#40 |
 | Core checkout | submodule `vendor/sigma-core` は clean な detached HEAD `7875235d5d9b985e745c24926a244b58c23ba413`。Studio の gitlink と Core checkout 内の `origin/main` が同じ SHA。これは checkout に記録された ref の比較であり、リモートを今回 fetch して最新性を確認した結果ではない。 | `.gitmodules`、`git submodule status`、`git ls-tree HEAD vendor/sigma-core`、Core の `git status` / `git branch -avv` |
 | 依存の固定 | Core は Git submodule として SHA 固定され、root npm workspace にも含まれる。lockfile は npm 公開 tarball ではなく `vendor/sigma-core` を workspace link として記録する。 | `.gitmodules`、root `package.json`、`package-lock.json` |
 | Core の package/CI | `@sigma-studio/core` は `private: true`、`version: 0.1.0`、ESM/TypeScript。package scripts に build/release はなく、Core CI は Node 22/24 の audit・license・test・typecheck と Windows OCR job を定義する。 | `vendor/sigma-core/package.json`、`vendor/sigma-core/.github/workflows/ci.yml` |
@@ -485,21 +487,21 @@ Phase 0 の調査を完了した。以下はこの Studio checkout と、その 
 | フェーズ | 判定 | 根拠・残り |
 |---|---|---|
 | Phase 0 — 現状調査 | 完了 | 本節の checkout、依存、実装、workflow の確認結果と方式選定を記録した。今回の調査では workflow 実行ログや Windows 配布版は検証していない。 |
-| Phase 1 — Core のリリース単位 | 一部あり／未完了 | Core の package version と独立 CI はあるが、package は private で build/release script はなく、固定 SHA を越える互換性・リリース規則や配布成果物は確認できていない。採用方式では Git SHA を成果物の固定識別子とし、npm 公開は前提にしない。 |
-| Phase 2 — Studio の依存固定と手動統合 | 実装あり／CI検証済み | submodule pin、資料サービス、読み取り専用 stdio MCP、Electron バンドルが存在する。PR #40 の Windows CI で unpacked app 内の MCP 起動・読み取り往復・再起動後のデータ保持を確認した。 |
-| Phase 3 — 更新検知と PR 自動化 | 実装あり／計画との差あり | schedule/manual 起点で Core `main` の SHA を検証して PR と Studio Checks を起動する。Core の正式 release/tag 起点ではないため、実装に合わせて本計画の更新トリガー記述を扱う必要がある。 |
-| Phase 4 — Windows 配布と品質ゲート | 一部完了／継続中 | Core MCP bundled entrypoint の initialize・read-only tool list・登録済み Workspace／source の list・search・page・page range・再起動後のデータ保持・cleanupを検証する smoke がLinuxとWindows CIで成功。Windows 向け `win-unpacked` をCIで生成し、`app.asar` 内entrypointを実際のElectron executableから起動した。NSIS installer、Core更新をまたぐデータ保持、対象ユーザー環境での実機検証は未確認。 |
+| Phase 1 — Core の識別と互換性 | 実装方針・契約文書化済み | Core 公開releaseではなく固定SHAを互換性identityとして採用。Core/StudioのCIと契約文書をゲートにし、breaking changeはレビューPRで扱う。 |
+| Phase 2 — Studio の依存固定と手動統合 | 実装・CI検証済み | submodule pin、資料サービス、読み取り専用 stdio MCP、Electron bundle。Windows runnerからunpacked `app.asar` 内のMCPを起動し、read-only往復と再起動後データ保持を確認。 |
+| Phase 3 — 更新検知と PR 自動化 | 実装・CI検証済み | schedule/manual起点でCore `main` SHAを検証、Core CI相当のchecksを行い、submodule/lockfile更新PRを作成し、Studio Checksをdispatch。auto-mergeなし。正式release/tag起点ではないことは選定方式による意図的な差分。 |
+| Phase 4 — Windows 配布と品質ゲート | CI検証完了、対象ユーザー環境は未確認 | run `41038044873` でWindows `win-unpacked` 内MCP起動・読み取り・再起動後保持を確認。Studio PR #41 run `41048216578` でNSIS build/install後、installed executableと`app.asar`からのround-tripも成功。ユーザー環境でのSmartScreen、実データ保持、restore drillは手動未確認。 |
 | Phase 5 — 運用・拡張 | 未着手 | 初期接続・配布検証後の候補として保留する。 |
 
 ### 16.3 追加した最小ゲートと未確認事項
 
-`apps/desktop/tests/electron/sigma-core-mcp.spec.ts` に bundled `sigma-core-mcp-server.cjs` の stdio smoke を追加し、`.github/workflows/checks.yml` の Windows Electron smoke job から既存の文書オープン smoke と一緒に実行する。テストは `testInfo.outputPath` 以下の隔離データを使う。テスト用 Core seeder は `CoreService.createWorkspace` と `registerObject` を Studio subject の認証で実行し、Studio の `SourceMaterialService` と同じ `studio-ai` read grant を Core repository API で付与する。MCP 側は実際の `studio-ai` 認証で同じ DB／blob path を開き、initialize/server identity、read-only tool list、workspace list、sources list、検索、ページ取得、ページ範囲取得を検証する。Seeder は MCP 起動前に repository を閉じ、MCP は graceful shutdown 後に必要なら signal で終了させ、user data の削除と process close を確認する。
+`apps/desktop/tests/electron/sigma-core-mcp.spec.ts` に bundled `sigma-core-mcp-server.cjs` の stdio smoke を追加し、Windows Electron smoke jobで文書オープンとともに実行する。テストは `testInfo.outputPath` 以下の隔離データを使い、明示workspace、`studio-ai` read grant、read-only tool、list/search/page/range、プロセス終了とcleanupを確認する。
 
 さらに既存PR #40 で、`apps/desktop/mcp/source-material-mcp-server-stdio.integration.test.ts` をLinux／Windowsで実行可能にし、Windows CIではelectron-builderの `--win --dir --publish never` で生成した `release/win-unpacked` の Electron executable から `resources/app.asar` 内のCore MCP entrypointを起動するよう拡張した。`check-native-lock-package.cjs` は従来のnative lock検査に加えて、asar内の `dist-electron/sigma-core-mcp-server.cjs` の存在も検査する。Windows runnerはCore更新workflowやリリースworkflowとは独立して、パッケージをpublishせず smoke を実行する。PRのCIで追加テストに起因する `content` の `unknown` 型エラーが見つかったため、MCP結果のcontent/textを実行時検証してからJSON parseする修正を追加した。
 
-Linux上ではbundled MCPのinitialize、read-only tool list、登録済み資料の一覧・検索・ページ・range取得、mutation拒否、MCP再起動後のデータ保持、隔離DB/blobの利用とcleanupを確認した。Windows CIではunpacked appを作成し、`app.asar`内のCore MCP entrypointを実際のWindows Electron executableから起動して同じread-only往復と再起動後の保持を確認した。PR #40 のChecks run `41025838625` では既存package hook test用asar fixtureがCore bundle必須条件を満たさず2 job失敗したが、fixtureへCore MCP entryを追加し解消した。run `41027066836` はPublic package jobの`npm ci`がGitHub runnerのネットワークtimeoutで一度失敗したが、failed-job retry (attempt 2) ですべて成功した。再起動後のデータ保持テストを加えた最新head `5762504` のrun `41028731742` も全4 job成功。NSIS installer、Core更新をまたぐデータ保持、対象ユーザー環境での実機検証は未確認。自動merge・インストーラー公開は行っていない。
+Linux上ではbundled MCPのinitialize、read-only tool list、登録資料のlist/search/page/range、mutation拒否、プロセス再起動後のデータ保持、隔離DB/blob cleanupを確認した。Studio main `ff31fe5` のChecks run [41038044873](https://github.com/nishida0402shun-dev/SIGMA-Studio-main/actions/runs/41038044873) は4/4 jobs成功し、Windows unpacked app内でCore MCP往復と再起動後のデータ保持を確認した。さらにStudio PR #41 のChecks run [41048216578](https://github.com/nishida0402shun-dev/SIGMA-Studio-main/actions/runs/41048216578) も4/4 jobs成功。Windows runnerでNSISをpublishなしでbuild/installし、installed executableと`app.asar`からMCP read-only round-tripに成功した。`v0.469.171` tagとversion bumpは既存Release workflowによって生成されたが、workflowはユーザー判断で公開前にcancelされ、GitHub Release assetは作成されていない。今後も明示的な許可なしにreleaseを再実行しない。
 
-この checkout では focused MCP smoke と desktop typecheck／lint が成功した。既存の stdio 統合テストは Windows runner 上で packaged Electron を使った起動・終了まで確認済み。一方、本PRで追加する Playwright smoke の Windows 実行結果は、この変更を含む CI が完了するまで未確認とする。NSIS installer、Core 更新をまたぐデータ保持、対象ユーザー環境での実機確認も未確認である。
+Windows runnerでのNSIS CI成功は、対象ユーザー環境のSmartScreen、既存データ保持、手動backup/restore drillを代替しない。branch protection は現状無効であり、PR Checks の存在だけでは merge 制約にならない。repository-wide設定はユーザー承認前に変更しない。Studio PR #41 はCI成功後もDraftのままレビュー待ちとし、mainへのmergeやRelease workflowの実行は行っていない。
 
 今回の検証結果:
 
@@ -508,6 +510,8 @@ Linux上ではbundled MCPのinitialize、read-only tool list、登録済み資�
 | `npm --workspace @sigma-studio/desktop run electron:build` | 成功（Core MCP の CJS bundle を生成） |
 | `npm --workspace @sigma-studio/desktop run test:e2e:electron -- tests/electron/sigma-core-mcp.spec.ts` | 成功（1 test passed、Node fallback） |
 | `npm --workspace @sigma-studio/desktop run test -- mcp/source-material-mcp-server-core.test.ts electron/source-material/source-material-service.test.ts` | 成功（2 files、20 tests passed） |
+| `npm --workspace @sigma-studio/desktop run test -- mcp/source-material-mcp-server-stdio.integration.test.ts mcp/source-material-mcp-server-core.test.ts electron/source-material/source-material-service.test.ts`（本変更後） | 成功（3 files、22 tests passed。必須DB path欠落時のstderr/nonzero exitも確認） |
+| `npm exec --workspace @sigma-studio/desktop -- eslint mcp/source-material-mcp-server-stdio.integration.test.ts --max-warnings=0`（本変更後） | 成功 |
 | `npm --workspace @sigma-studio/desktop run typecheck` | 成功 |
 | `npm --workspace @sigma-studio/desktop run lint`（実装時）／`npm exec --workspace @sigma-studio/desktop -- eslint tests/electron/sigma-core-mcp.spec.ts tests/electron/fixtures/seed-sigma-core-mcp.ts --max-warnings=0`（最終変更後） | 成功 |
 | PR #40 `npm run test -- mcp/source-material-mcp-server-stdio.integration.test.ts`（PR worktree） | 成功（1 test passed、Node fallback） |
@@ -519,4 +523,7 @@ Linux上ではbundled MCPのinitialize、read-only tool list、登録済み資�
 | PR #40 Checks run `41027066836` (attempt 2) | 成功（全4 jobs）。初回Public package `npm ci` はrunner network timeout |
 | PR #40 Checks run `41028731742`（Playwright smoke追加前） | 成功（4/4 jobs。Windows unpacked app内のCore MCP起動、読み取り往復、再起動後の資料保持を確認） |
 | `git diff --check` | 成功 |
-| 今回追加する Playwright smoke を含む Windows CI | 未実行（本PR更新後に実行） |
+| branch protection の required checks | 未設定（repository-wide変更は承認待ち） |
+| Studio main Checks run `41038044873`（PR #40 merge後） | 成功（4/4 jobs。Windows unpacked Core MCP round-trip） |
+| Studio PR #41 Checks run `41048216578` | 成功（4/4 jobs。NSIS build/installとinstalled executable/app.asar経由のMCP round-tripを確認。publishなし） |
+| 対象ユーザーPCでのSmartScreen・既存データ・backup/restore確認 | 未実施（実機作業） |
