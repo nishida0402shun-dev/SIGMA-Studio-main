@@ -2,7 +2,7 @@
 
 - 文書種別: 実装計画書
 - 作成日: 2026-10-28
-- ステータス: 計画案（リポジトリの現状確認・実装・CI 検証前）
+- ステータス: Phase 0 調査済み。Windows unpacked app での Core MCP 統合検証は CI 成功。NSIS installer など未確認事項を §16 に記録
 - 主目的: SIGMA Core の更新を安全に SIGMA Studio へ反映できる開発・配布フローを構築する
 - 対象リポジトリ:
   - SIGMA Studio: https://github.com/nishida0402shun-dev/SIGMA-Studio-main
@@ -126,7 +126,7 @@ Core の CI が MCP サーバーと必要な実行時ファイルをアーカイ
 
 ### 選定方針
 
-Phase 0 で実装・依存・パッケージ構成を調査してから選ぶ。複数方式を同時に採用しない。配布方式を決めるまでは、更新自動化を確定実装しない。
+Phase 0 で実装・依存・パッケージ構成を調査してから選ぶ。現 checkout で確認した方式と根拠は §16.1 に記録した。複数方式を同時に採用しない。新たな更新自動化や既存 workflow の意味変更は、採用方式と検証条件を明記してから行う。
 
 ## 5. バージョンと互換性契約
 
@@ -461,8 +461,62 @@ Studio のアプリ実行時には、承認済みの Core バージョンをロ�
 
 ---
 
-## 16. 現時点のステータス
+## 16. 現状調査ステータス（2026-10-30）
 
-本書は実装計画であり、実装完了報告ではない。現状の両リポジトリ、workflow、配布方式、MCP 起動経路については、実装開始時に最新状態を再確認する。
+Phase 0 の調査を完了した。以下はこの Studio checkout と、その submodule に記録されたローカル Git 参照・ファイル設定の確認結果であり、GitHub Actions の今回の実行結果や配布版の動作を示すものではない。
 
-**最初に行う作業は Phase 0 の現状調査。** 調査結果に基づいて Core の配布方式を一つ選定し、その後にバージョン固定・MCP 統合・更新 PR 自動化へ進む。Core の更新を Studio に自動反映する仕組みは、互換性テストとレビューを通す形で実現する。
+### 16.1 確認した現状と採用する方式
+
+| 対象 | 確認結果 | 根拠 |
+|---|---|---|
+| Studio checkout | 調査開始時は `main` の `78eabea224bdefb2d48eec12d4827f4791d28e71`。その時点の作業ツリーは clean。ローカル `origin/main` は `9e38948230c1d7d41101b44005231baf261e5a7a` で、checkout は1コミット遅れていた。調査後の変更は本PRに反映する。 | `git status --short --branch`、`git log` |
+| Core checkout | submodule `vendor/sigma-core` は clean な detached HEAD `7875235d5d9b985e745c24926a244b58c23ba413`。Studio の gitlink と Core checkout 内の `origin/main` が同じ SHA。これは checkout に記録された ref の比較であり、リモートを今回 fetch して最新性を確認した結果ではない。 | `.gitmodules`、`git submodule status`、`git ls-tree HEAD vendor/sigma-core`、Core の `git status` / `git branch -avv` |
+| 依存の固定 | Core は Git submodule として SHA 固定され、root npm workspace にも含まれる。lockfile は npm 公開 tarball ではなく `vendor/sigma-core` を workspace link として記録する。 | `.gitmodules`、root `package.json`、`package-lock.json` |
+| Core の package/CI | `@sigma-studio/core` は `private: true`、`version: 0.1.0`、ESM/TypeScript。package scripts に build/release はなく、Core CI は Node 22/24 の audit・license・test・typecheck と Windows OCR job を定義する。 | `vendor/sigma-core/package.json`、`vendor/sigma-core/.github/workflows/ci.yml` |
+| Studio への実装・同梱 | Studio main は Core の TypeScript を `source-material/core-bridge.ts` 経由で直接利用する。esbuild は main と `sigma-core-mcp-server` を CJS に束ね、electron-builder は `dist-electron/**/*` を対象にする。配布物の実起動確認とは別。 | `apps/desktop/electron/source-material/core-bridge.ts`、`apps/desktop/scripts/build-electron.mjs`、`apps/desktop/electron-builder.config.cjs` |
+| MCP | CLI AI 用に別の読み取り専用 `sigma-core-local` stdio server を Studio 側で実装し、Core のフル MCP entrypoint の代わりに Studio の制限されたツール面を使う。UI の資料機能は Electron main の `SourceMaterialService` が担う。 | `apps/desktop/mcp/source-material-mcp-server.ts`、`source-material-mcp-server-core.ts`、`electron/source-material/source-material-service.ts`、`electron/sigma-studio-mcp-launch.ts` |
+| 更新自動化 | 手動実行と日次 schedule が Core `origin/main` を確認し、候補の audit/license/test/typecheck 後に SHA 固定と lockfile 更新の PR を作成する。続いて Studio Checks を dispatch して完了を待つ。PR は自動 merge しない。リリースイベント起点ではない。 | `.github/workflows/update-sigma-core.yml` |
+| Studio CI | Linux checks に Core test/typecheck/license を含む。調査時点の Windows smoke は Electron での文書オープンのみだったため、本作業で Core MCP smoke を追加した。 | `.github/workflows/checks.yml` |
+
+**この計画で採用する方式:** Core ソースを Git submodule の固定 SHA として保持し、Studio の Electron main と Core MCP server にビルド時バンドルする。更新は Core `main` の新 SHA を日次／手動で検知し、検証後にレビュー用 PR を作成する。これは npm 公開 package やリリース成果物ダウンロードではなく、既存実装に基づく commit-pinned source integration である。自動化は PR までとし、現 workflow のイベントや自動化範囲はこの Phase 0 では変更しない。
+
+### 16.2 フェーズ別の判定
+
+| フェーズ | 判定 | 根拠・残り |
+|---|---|---|
+| Phase 0 — 現状調査 | 完了 | 本節の checkout、依存、実装、workflow の確認結果と方式選定を記録した。今回の調査では workflow 実行ログや Windows 配布版は検証していない。 |
+| Phase 1 — Core のリリース単位 | 一部あり／未完了 | Core の package version と独立 CI はあるが、package は private で build/release script はなく、固定 SHA を越える互換性・リリース規則や配布成果物は確認できていない。採用方式では Git SHA を成果物の固定識別子とし、npm 公開は前提にしない。 |
+| Phase 2 — Studio の依存固定と手動統合 | 実装あり／CI検証済み | submodule pin、資料サービス、読み取り専用 stdio MCP、Electron バンドルが存在する。PR #40 の Windows CI で unpacked app 内の MCP 起動・読み取り往復・再起動後のデータ保持を確認した。 |
+| Phase 3 — 更新検知と PR 自動化 | 実装あり／計画との差あり | schedule/manual 起点で Core `main` の SHA を検証して PR と Studio Checks を起動する。Core の正式 release/tag 起点ではないため、実装に合わせて本計画の更新トリガー記述を扱う必要がある。 |
+| Phase 4 — Windows 配布と品質ゲート | 一部完了／継続中 | Core MCP bundled entrypoint の initialize・read-only tool list・登録済み Workspace／source の list・search・page・page range・再起動後のデータ保持・cleanupを検証する smoke がLinuxとWindows CIで成功。Windows 向け `win-unpacked` をCIで生成し、`app.asar` 内entrypointを実際のElectron executableから起動した。NSIS installer、Core更新をまたぐデータ保持、対象ユーザー環境での実機検証は未確認。 |
+| Phase 5 — 運用・拡張 | 未着手 | 初期接続・配布検証後の候補として保留する。 |
+
+### 16.3 追加した最小ゲートと未確認事項
+
+`apps/desktop/tests/electron/sigma-core-mcp.spec.ts` に bundled `sigma-core-mcp-server.cjs` の stdio smoke を追加し、`.github/workflows/checks.yml` の Windows Electron smoke job から既存の文書オープン smoke と一緒に実行する。テストは `testInfo.outputPath` 以下の隔離データを使う。テスト用 Core seeder は `CoreService.createWorkspace` と `registerObject` を Studio subject の認証で実行し、Studio の `SourceMaterialService` と同じ `studio-ai` read grant を Core repository API で付与する。MCP 側は実際の `studio-ai` 認証で同じ DB／blob path を開き、initialize/server identity、read-only tool list、workspace list、sources list、検索、ページ取得、ページ範囲取得を検証する。Seeder は MCP 起動前に repository を閉じ、MCP は graceful shutdown 後に必要なら signal で終了させ、user data の削除と process close を確認する。
+
+さらに既存PR #40 で、`apps/desktop/mcp/source-material-mcp-server-stdio.integration.test.ts` をLinux／Windowsで実行可能にし、Windows CIではelectron-builderの `--win --dir --publish never` で生成した `release/win-unpacked` の Electron executable から `resources/app.asar` 内のCore MCP entrypointを起動するよう拡張した。`check-native-lock-package.cjs` は従来のnative lock検査に加えて、asar内の `dist-electron/sigma-core-mcp-server.cjs` の存在も検査する。Windows runnerはCore更新workflowやリリースworkflowとは独立して、パッケージをpublishせず smoke を実行する。PRのCIで追加テストに起因する `content` の `unknown` 型エラーが見つかったため、MCP結果のcontent/textを実行時検証してからJSON parseする修正を追加した。
+
+Linux上ではbundled MCPのinitialize、read-only tool list、登録済み資料の一覧・検索・ページ・range取得、mutation拒否、MCP再起動後のデータ保持、隔離DB/blobの利用とcleanupを確認した。Windows CIではunpacked appを作成し、`app.asar`内のCore MCP entrypointを実際のWindows Electron executableから起動して同じread-only往復と再起動後の保持を確認した。PR #40 のChecks run `41025838625` では既存package hook test用asar fixtureがCore bundle必須条件を満たさず2 job失敗したが、fixtureへCore MCP entryを追加し解消した。run `41027066836` はPublic package jobの`npm ci`がGitHub runnerのネットワークtimeoutで一度失敗したが、failed-job retry (attempt 2) ですべて成功した。再起動後のデータ保持テストを加えた最新head `5762504` のrun `41028731742` も全4 job成功。NSIS installer、Core更新をまたぐデータ保持、対象ユーザー環境での実機検証は未確認。自動merge・インストーラー公開は行っていない。
+
+この checkout では focused MCP smoke と desktop typecheck／lint が成功した。既存の stdio 統合テストは Windows runner 上で packaged Electron を使った起動・終了まで確認済み。一方、本PRで追加する Playwright smoke の Windows 実行結果は、この変更を含む CI が完了するまで未確認とする。NSIS installer、Core 更新をまたぐデータ保持、対象ユーザー環境での実機確認も未確認である。
+
+今回の検証結果:
+
+| コマンド | 結果 |
+|---|---|
+| `npm --workspace @sigma-studio/desktop run electron:build` | 成功（Core MCP の CJS bundle を生成） |
+| `npm --workspace @sigma-studio/desktop run test:e2e:electron -- tests/electron/sigma-core-mcp.spec.ts` | 成功（1 test passed、Node fallback） |
+| `npm --workspace @sigma-studio/desktop run test -- mcp/source-material-mcp-server-core.test.ts electron/source-material/source-material-service.test.ts` | 成功（2 files、20 tests passed） |
+| `npm --workspace @sigma-studio/desktop run typecheck` | 成功 |
+| `npm --workspace @sigma-studio/desktop run lint`（実装時）／`npm exec --workspace @sigma-studio/desktop -- eslint tests/electron/sigma-core-mcp.spec.ts tests/electron/fixtures/seed-sigma-core-mcp.ts --max-warnings=0`（最終変更後） | 成功 |
+| PR #40 `npm run test -- mcp/source-material-mcp-server-stdio.integration.test.ts`（PR worktree） | 成功（1 test passed、Node fallback） |
+| PR #40 `NODE_OPTIONS=--max-old-space-size=3000 npm run typecheck`（PR worktree） | 成功 |
+| PR #40 `npm exec -- electron-builder --config electron-builder.config.cjs --win --dir --publish never`（PR worktree） | 成功（Windows unpacked appをcross-buildし、afterPackでCore MCP bundleとnative lockを検査。Windows実行ではない） |
+| PR #40 `npm --workspace @sigma-studio/desktop run test -- electron/file-lock-package.test.ts`（fixture修正後） | 成功（1 test passed） |
+| PR #40 `npm --workspace @sigma-studio/desktop run test -- mcp/source-material-mcp-server-stdio.integration.test.ts electron/file-lock-package.test.ts`（再起動検証追加後） | 成功（2 tests passed、Linux Node fallback） |
+| PR #40 Checks run `41025838625` | Windows desktop packaged MCP smoke 成功。file-lock-package fixtureの契約差分を検出し、修正 |
+| PR #40 Checks run `41027066836` (attempt 2) | 成功（全4 jobs）。初回Public package `npm ci` はrunner network timeout |
+| PR #40 Checks run `41028731742`（Playwright smoke追加前） | 成功（4/4 jobs。Windows unpacked app内のCore MCP起動、読み取り往復、再起動後の資料保持を確認） |
+| `git diff --check` | 成功 |
+| 今回追加する Playwright smoke を含む Windows CI | 未実行（本PR更新後に実行） |

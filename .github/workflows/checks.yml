@@ -66,7 +66,7 @@ jobs:
         env:
           SIGMA_CORE_MCP_PACKAGED: "true"
       - name: Run Electron smoke test on the supported desktop OS
-        run: npm --workspace @sigma-studio/desktop run test:e2e:electron -- tests/electron/open-document.spec.ts
+        run: npm --workspace @sigma-studio/desktop run test:e2e:electron -- tests/electron/open-document.spec.ts tests/electron/sigma-core-mcp.spec.ts
 
   public-packages:
     name: Public package build and contracts
