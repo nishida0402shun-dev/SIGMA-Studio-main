@@ -20,6 +20,8 @@ it("finds a native binary in a real archive using the host path separator", asyn
   const nativeDirectory = path.join(source, "node_modules", "fs-native-extensions", "prebuilds", `${platform}-x64`);
   try {
     await fs.mkdir(nativeDirectory, { recursive: true });
+    await fs.mkdir(path.join(source, "dist-electron"), { recursive: true });
+    await fs.writeFile(path.join(source, "dist-electron", "sigma-core-mcp-server.cjs"), "core-mcp-fixture");
     await fs.mkdir(resources, { recursive: true });
     await fs.writeFile(path.join(nativeDirectory, "fs-native-extensions.node"), "archive-presence-fixture");
     await createPackage(source, path.join(resources, "app.asar"));
