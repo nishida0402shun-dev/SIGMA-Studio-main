@@ -46,10 +46,11 @@ describe("bundled SIGMA Core MCP stdio integration", () => {
   });
 
   it("fails visibly on stderr when a required Core data path is missing", async () => {
-    const env = Object.fromEntries(
-      Object.entries(process.env).filter((entry): entry is [string, string] => entry[1] !== undefined),
-    );
-    env.ELECTRON_RUN_AS_NODE = "1";
+    const env: NodeJS.ProcessEnv = {
+      ...process.env,
+      NODE_ENV: process.env.NODE_ENV ?? "test",
+      ELECTRON_RUN_AS_NODE: "1",
+    };
     delete env.SIGMA_CORE_DB_PATH;
     delete env.SIGMA_CORE_BLOB_DIR;
     delete env.SIGMA_CORE_SUBJECT_ID;
@@ -57,7 +58,7 @@ describe("bundled SIGMA Core MCP stdio integration", () => {
     const child = spawn(serverExecutable, [serverPath], {
       cwd: desktopRoot,
       env,
-      stdio: ["ignore", "pipe", "pipe"],
+      stdio: ["ignore", "pipe", "pipe"] as const,
     });
     let stdout = "";
     let stderr = "";
