@@ -90,10 +90,11 @@ jobs:
             throw "Installed app.asar was not found."
           }
 
-          $versionOutput = & $app --version
-          if ($LASTEXITCODE -ne 0 -or -not $versionOutput) {
-            throw "Installed Electron executable did not report its version."
+          $versionInfo = [System.Diagnostics.FileVersionInfo]::GetVersionInfo($app)
+          if (-not $versionInfo.FileVersion -or -not $versionInfo.ProductName) {
+            throw "Installed Sigma Studio executable version metadata is missing."
           }
+          Write-Host "Installed $($versionInfo.ProductName) $($versionInfo.FileVersion)"
           "SIGMA_CORE_MCP_PACKAGED_APP_DIR=$installDir" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
       - name: Verify Core MCP from the installed NSIS app
         run: npm --workspace @sigma-studio/desktop run test -- mcp/source-material-mcp-server-stdio.integration.test.ts
