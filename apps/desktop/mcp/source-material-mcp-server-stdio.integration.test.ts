@@ -10,24 +10,44 @@ import { afterEach, describe, expect, it } from "vitest";
 
 import { SourceMaterialService } from "../electron/source-material/source-material-service";
 
-const runWindowsOnly = process.platform === "win32" ? describe : describe.skip;
+const desktopRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const electronPath = createRequire(import.meta.url)("electron") as string;
-const serverPath = fileURLToPath(new URL("../dist-electron/sigma-core-mcp-server.cjs", import.meta.url));
+const packaged = process.env.SIGMA_CORE_MCP_PACKAGED === "true";
+const productName = /-beta\./.test((createRequire(import.meta.url)("../package.json") as { version: string }).version)
+  ? "Sigma Studio Beta"
+  : "Sigma Studio";
+const packagedResources = path.join(desktopRoot, "release", "win-unpacked", "resources");
+const serverPath = packaged
+  ? path.join(packagedResources, "app.asar", "dist-electron", "sigma-core-mcp-server.cjs")
+  : fileURLToPath(new URL("../dist-electron/sigma-core-mcp-server.cjs", import.meta.url));
+const serverExecutable = packaged
+  ? path.join(desktopRoot, "release", "win-unpacked", `${productName}.exe`)
+  : process.platform === "win32"
+    ? electronPath
+    : process.execPath;
 
-runWindowsOnly("packaged SIGMA Core MCP stdio integration", () => {
+describe("bundled SIGMA Core MCP stdio integration", () => {
   let userDataDir: string | undefined;
   let client: Client | undefined;
 
   afterEach(async () => {
-    await client?.close().catch(() => undefined);
-    client = undefined;
-    if (userDataDir) {
-      await fs.rm(userDataDir, { recursive: true, force: true });
-      userDataDir = undefined;
+    try {
+      await client?.close();
+    } finally {
+      client = undefined;
+      if (userDataDir) {
+        await fs.rm(userDataDir, { recursive: true, force: true });
+        userDataDir = undefined;
+      }
     }
   });
 
   it("launches the bundled Electron Node entrypoint and completes a read-only round-trip", async () => {
+    if (packaged) {
+      expect((await fs.stat(path.join(packagedResources, "app.asar"))).isFile()).toBe(true);
+      expect((await fs.stat(serverExecutable)).isFile()).toBe(true);
+    }
+
     userDataDir = await fs.mkdtemp(path.join(os.tmpdir(), "sigma-core-stdio-"));
     const dataDir = path.join(userDataDir, "data", "sigma-core");
     const databasePath = path.join(dataDir, "core.sqlite");
@@ -35,15 +55,19 @@ runWindowsOnly("packaged SIGMA Core MCP stdio integration", () => {
 
     // Seed the exact DB/blob directory contract used by SourceMaterialService.
     const sourceService = new SourceMaterialService(userDataDir);
-    sourceService.registerWorkspace("stdio-fixture", "stdio integration fixture");
-    const fixtureBytes = Buffer.from("SIGMA Core MCP stdio round-trip fixture.", "utf8");
-    const imported = await sourceService.importBytes("stdio-fixture", {
-      name: "fixture.txt",
-      bytes: fixtureBytes,
-    });
-    const original = await sourceService.getFileBytes("stdio-fixture", imported.source.id);
-    expect(Buffer.from(original.bytes)).toEqual(fixtureBytes);
-    sourceService.close();
+    let imported: Awaited<ReturnType<SourceMaterialService["importBytes"]>>;
+    try {
+      sourceService.registerWorkspace("stdio-fixture", "stdio integration fixture");
+      const fixtureBytes = Buffer.from("SIGMA Core MCP stdio round-trip fixture.", "utf8");
+      imported = await sourceService.importBytes("stdio-fixture", {
+        name: "fixture.txt",
+        bytes: fixtureBytes,
+      });
+      const original = await sourceService.getFileBytes("stdio-fixture", imported.source.id);
+      expect(Buffer.from(original.bytes)).toEqual(fixtureBytes);
+    } finally {
+      sourceService.close();
+    }
 
     expect(await fs.stat(databasePath)).toBeDefined();
     expect(await fs.readdir(blobDirectory)).not.toHaveLength(0);
@@ -59,7 +83,7 @@ runWindowsOnly("packaged SIGMA Core MCP stdio integration", () => {
     });
 
     const transport = new StdioClientTransport({
-      command: electronPath,
+      command: serverExecutable,
       args: [serverPath],
       env,
     });
@@ -90,7 +114,18 @@ runWindowsOnly("packaged SIGMA Core MCP stdio integration", () => {
       arguments: { workspaceId: "studio:stdio-fixture" },
     });
     expect(listResult.isError).not.toBe(true);
-    const listPayload = JSON.parse(String((listResult.content[0] as { text: string }).text)) as {
+    const listContent: unknown = listResult.content;
+    if (!Array.isArray(listContent)) throw new Error("MCP tool result did not contain a content array");
+    const firstContent: unknown = listContent[0];
+    if (
+      typeof firstContent !== "object" ||
+      firstContent === null ||
+      !("text" in firstContent) ||
+      typeof firstContent.text !== "string"
+    ) {
+      throw new Error("MCP tool result did not contain text content");
+    }
+    const listPayload = JSON.parse(firstContent.text) as {
       sources: Array<{ sourceId: string; name: string }>;
     };
     const source = listPayload.sources.find((item) => item.sourceId === imported.source.id);
@@ -116,10 +151,11 @@ runWindowsOnly("packaged SIGMA Core MCP stdio integration", () => {
     expect(JSON.stringify(searchResult.content)).toContain(imported.source.id);
 
     // There is intentionally no mutation tool in the exposed MCP surface.
-    await expect(client.callTool({
+    const mutationResult = await client.callTool({
       name: "delete_source",
       arguments: { workspaceId: "studio:stdio-fixture", sourceId: imported.source.id },
-    })).rejects.toThrow();
+    });
+    expect(mutationResult.isError).toBe(true);
 
     // Re-check that MCP used the same on-disk DB and blob directory seeded above.
     expect((await fs.stat(databasePath)).isFile()).toBe(true);

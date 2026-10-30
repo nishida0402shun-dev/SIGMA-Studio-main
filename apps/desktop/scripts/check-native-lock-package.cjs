@@ -18,6 +18,8 @@ module.exports = async function checkNativeLockPackage(context) {
   await require("./audit-release-content.cjs").auditReleaseContent(resources);
   const archive = path.join(resources, "app.asar");
   // asar traverses entries using the host's path separator, including on Windows.
+  const coreMcpPath = path.join("dist-electron", "sigma-core-mcp-server.cjs").split(path.sep).join("/");
+  assert.ok(extractFile(archive, coreMcpPath).length > 0, `Missing ${coreMcpPath}`);
   const nativePath = path.join("node_modules", "fs-native-extensions", "prebuilds", `${platform}-${arch}`, "fs-native-extensions.node");
   assert.ok(extractFile(archive, nativePath).length > 0, `Missing ${nativePath}`);
 

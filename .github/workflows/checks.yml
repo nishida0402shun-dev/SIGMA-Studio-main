@@ -59,8 +59,12 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm --workspace @sigma-studio/desktop run electron:prepare
+      - name: Build unpacked Windows app without publishing
+        run: npm exec --workspace @sigma-studio/desktop -- electron-builder --config electron-builder.config.cjs --win --dir --publish never
       - name: Verify bundled SIGMA Core MCP stdio round-trip
         run: npm --workspace @sigma-studio/desktop run test -- mcp/source-material-mcp-server-stdio.integration.test.ts
+        env:
+          SIGMA_CORE_MCP_PACKAGED: "true"
       - name: Run Electron smoke test on the supported desktop OS
         run: npm --workspace @sigma-studio/desktop run test:e2e:electron -- tests/electron/open-document.spec.ts
 
