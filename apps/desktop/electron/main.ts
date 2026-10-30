@@ -77,6 +77,12 @@ import { LocalWebAiBridgeStore, createWebAiBridgeServer, type WebAiBridgeInfo } 
 import { createWebAiMcpGateway, type WebAiMcpGateway } from "./web-ai-mcp-gateway";
 import { createWebAiAgentRuntime } from "./web-ai-agent-runtime";
 import {
+  executeManualWebAiBridgeRequest,
+  filterManualWebAiBridgeTools,
+  MANUAL_WEB_AI_READ_ONLY_TOOLS,
+  type ManualBridgeTool,
+} from "../src/features/webmcp/application/manual-web-ai-bridge";
+import {
   getPageMetrics,
   PAGE_GAP_PX,
   type SigmaDocument,
@@ -130,6 +136,58 @@ ipcMain.handle("web-ai:get-preload-url", (event) => {
     throw new Error("web AI preload URL is only available to the main renderer");
   }
   return pathToFileURL(path.join(__dirname, "web-ai-preload.cjs")).toString();
+});
+
+ipcMain.handle("web-ai:list-manual-mcp-tools", async (event, workspaceIdInput: unknown) => {
+  if (!mainWindow || event.sender !== mainWindow.webContents || event.senderFrame !== mainWindow.webContents.mainFrame) {
+    throw new Error("Manual MCP tool catalog is only available to the main renderer main frame");
+  }
+  if (workspaceIdInput !== null && typeof workspaceIdInput !== "string") {
+    throw new Error("workspaceId must be a string or null");
+  }
+  if (!webAiMcpGateway) throw new Error("SIGMA MCP gateway is unavailable");
+  const workspaceId = typeof workspaceIdInput === "string" && workspaceIdInput.trim()
+    ? workspaceIdInput.trim()
+    : null;
+  const tools = await webAiMcpGateway.listTools(workspaceId);
+  return filterManualWebAiBridgeTools(tools.map((tool) => ({
+    name: tool.name,
+    description: tool.description ?? "",
+    inputSchema: tool.inputSchema as Record<string, unknown>,
+    annotations: { readOnlyHint: tool.annotations?.readOnlyHint === true },
+  })));
+});
+
+ipcMain.handle("web-ai:run-manual-mcp-request", async (event, input: unknown, workspaceIdInput: unknown) => {
+  if (!mainWindow || event.sender !== mainWindow.webContents || event.senderFrame !== mainWindow.webContents.mainFrame) {
+    throw new Error("Manual MCP requests are only available to the main renderer main frame");
+  }
+  if (typeof input !== "string") throw new Error("Manual MCP request must be a string");
+  if (workspaceIdInput !== null && typeof workspaceIdInput !== "string") {
+    throw new Error("workspaceId must be a string or null");
+  }
+  if (!webAiMcpGateway) throw new Error("SIGMA MCP gateway is unavailable");
+  const workspaceId = typeof workspaceIdInput === "string" && workspaceIdInput.trim()
+    ? workspaceIdInput.trim()
+    : null;
+  const registeredTools = await webAiMcpGateway.listTools(workspaceId);
+  const safeCatalog = filterManualWebAiBridgeTools(registeredTools.map((tool) => ({
+    name: tool.name,
+    description: tool.description ?? "",
+    inputSchema: tool.inputSchema as Record<string, unknown>,
+    annotations: { readOnlyHint: tool.annotations?.readOnlyHint === true },
+  })));
+  const safeNames = new Set(safeCatalog.map((tool) => tool.name));
+  const tools: ManualBridgeTool[] = registeredTools
+    .filter((tool) => safeNames.has(tool.name) && MANUAL_WEB_AI_READ_ONLY_TOOLS.includes(tool.name as (typeof MANUAL_WEB_AI_READ_ONLY_TOOLS)[number]))
+    .map((tool) => ({
+      name: tool.name,
+      description: tool.description ?? "",
+      inputSchema: tool.inputSchema as Record<string, unknown>,
+      annotations: { readOnlyHint: tool.annotations?.readOnlyHint === true },
+      execute: (arguments_) => webAiMcpGateway!.callTool(tool.name, arguments_, workspaceId),
+    }));
+  return executeManualWebAiBridgeRequest(input, tools);
 });
 
 ipcMain.handle("web-ai:get-conversation-capture-setting", (event) => {
@@ -452,9 +510,10 @@ const webAiAgentRuntime = createWebAiAgentRuntime({
 
 function resolveSharedWorkspacePath(): string {
   const explicit = process.env.SIGMA_STUDIO_SHARED_WORKSPACE_DIR?.trim();
+  const defaultWorkspaceName = IS_BETA_BUILD ? "Sigma Studio Beta" : "Sigma Studio";
   return explicit
     ? path.resolve(explicit)
-    : path.join(app.getPath("appData"), "Sigma Studio", "Workspace");
+    : path.join(app.getPath("appData"), defaultWorkspaceName, "Workspace");
 }
 
 function resolveUserDataPath(): string {
