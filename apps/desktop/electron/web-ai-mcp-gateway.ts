@@ -30,16 +30,31 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
-function hasExactWorkspaceFileId(result: unknown, fileId: string, workspaceId: string): boolean {
+/**
+ * MCP tool output may be wrapped in an execution envelope. Support both the
+ * direct overview shape and the current { data: { overview: { overview } } }
+ * shape returned by the desktop MCP tool runner.
+ */
+export function hasExactWorkspaceFileId(result: unknown, fileId: string, workspaceId: string): boolean {
   if (!isRecord(result) || !Array.isArray(result.content)) return false;
   for (const item of result.content) {
     if (!isRecord(item) || item.type !== "text" || typeof item.text !== "string") continue;
     try {
       const parsed: unknown = JSON.parse(item.text);
-      if (!isRecord(parsed) || !isRecord(parsed.overview) || !Array.isArray(parsed.overview.files)) continue;
-      return parsed.overview.files.some((file) =>
-        isRecord(file) && file.fileId === fileId && file.workspaceId === workspaceId,
-      );
+      if (!isRecord(parsed)) continue;
+      const roots = [
+        parsed,
+        ...(isRecord(parsed.data) ? [parsed.data] : []),
+        ...(isRecord(parsed.structuredContent) ? [parsed.structuredContent] : []),
+      ];
+      for (const root of roots) {
+        if (!isRecord(root.overview)) continue;
+        const overview = isRecord(root.overview.overview) ? root.overview.overview : root.overview;
+        if (!Array.isArray(overview.files)) continue;
+        if (overview.files.some((file) =>
+          isRecord(file) && file.fileId === fileId && file.workspaceId === workspaceId,
+        )) return true;
+      }
     } catch {
       continue;
     }

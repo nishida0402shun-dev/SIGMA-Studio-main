@@ -1,0 +1,125 @@
+name: Web AI MCP Test Build
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - experiment/webai-mcp-bridge
+
+permissions:
+  contents: read
+
+concurrency:
+  group: webai-mcp-test-build-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  windows-test-build:
+    name: Build isolated Windows test app
+    runs-on: windows-latest
+    timeout-minutes: 45
+    env:
+      NODE_OPTIONS: --max-old-space-size=4096
+    steps:
+      - name: Checkout selected experiment branch
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ github.ref }}
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: "24"
+          cache: npm
+
+      - name: Set up Python for bundled OCR runtime
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Check synchronized source versions
+        run: npm run version:check
+
+      - name: Build bundled Windows OCR runtime
+        working-directory: apps/desktop
+        run: npm run ocr:runtime:build
+        env:
+          SIGMA_OCR_PLATFORM: win
+          SIGMA_OCR_ARCH: x64
+
+      # Only the runner's working copy is changed. The commit, branch, lockfile,
+      # and published versions remain untouched. The beta suffix selects a
+      # separate appId/productName in electron-builder.config.cjs.
+      - name: Mark this runner build as beta
+        shell: pwsh
+        run: |
+          $path = "apps/desktop/package.json"
+          $pkg = Get-Content $path -Raw | ConvertFrom-Json
+          $baseVersion = [string]$pkg.version
+          if ($baseVersion -match "-beta\.") {
+            $baseVersion = $baseVersion -replace "-beta\..*$", ""
+          }
+          $pkg.version = "$baseVersion-beta.$env:GITHUB_RUN_NUMBER"
+          $pkg | ConvertTo-Json -Depth 100 | Set-Content -Path $path -Encoding utf8
+          Write-Host "Temporary test version: $($pkg.version)"
+
+      - name: Build renderer and Electron bundle
+        run: npm --workspace @sigma-studio/desktop run electron:prepare
+
+      - name: Build beta Windows installer without publishing
+        working-directory: apps/desktop
+        run: npx --no-install electron-builder --win nsis --x64 --publish never --config electron-builder.config.cjs
+
+      - name: Prepare installer handoff and checksum
+        shell: pwsh
+        run: |
+          $release = "apps/desktop/release"
+          $handoff = Join-Path $release "sigma-studio-webai-mcp-installer"
+          if (Test-Path $handoff) { Remove-Item -Recurse -Force $handoff }
+          New-Item -ItemType Directory -Force -Path $handoff | Out-Null
+          $installer = Get-ChildItem -Path $release -File -Filter "Sigma-Studio-Beta-*.exe" |
+            Where-Object { $_.Name -notlike "*.exe.blockmap" } |
+            Sort-Object LastWriteTime -Descending |
+            Select-Object -First 1
+          if (-not $installer) {
+            throw "Expected Sigma Studio Beta NSIS installer was not produced."
+          }
+          Copy-Item -LiteralPath $installer.FullName -Destination $handoff
+          $hash = Get-FileHash -LiteralPath (Join-Path $handoff $installer.Name) -Algorithm SHA256
+          "$($hash.Hash)  $($installer.Name)" | Set-Content -Path (Join-Path $handoff "SHA256SUMS.txt") -Encoding ascii
+          $readme = @'
+          SIGMA Studio Web AI MCP Demo / Beta インストーラー
+          ================================================
+
+          これは experiment/webai-mcp-bridge ブランチから作成する検証用ベータ版です。
+          安定版のリリースではありません。
+
+          インストール:
+          1. Sigma-Studio-Beta-*.exe を実行します。
+          2. Windows SmartScreen の警告が出る場合があります。未署名ビルドのためです。
+          3. インストール後、「Sigma Studio Beta」を起動してください。
+
+          データ分離:
+          - ベータ版のユーザーデータは「Sigma Studio Beta」用の場所に保存されます。
+          - ベータ版の共有 Workspace は %APPDATA%\Sigma Studio Beta\Workspace に保存されます。
+          - 通常版の共有 Workspace (%APPDATA%\Sigma Studio\Workspace) とは分離されます。
+          - アンインストール前に必要なベータ版データをバックアップしてください。アンインストール時のデータ保持は保証されません。
+
+          制限:
+          - ChatGPT Web とログイン済みセッションを使った手動コピー＆ペースト往復操作は、CI では検証できていません。
+          - MCP ツール実行は画面上の内容を確認し、ユーザーが明示的に実行してください。
+          - 重要なデータや本番データには使用しないでください。
+          - SHA256SUMS.txt にはインストーラーの SHA-256 ハッシュを記載しています。
+          '@
+          $readme | Set-Content -Path (Join-Path $handoff "README-ベータ版.txt") -Encoding utf8
+
+      - name: Upload beta installer artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: sigma-studio-webai-mcp-installer-windows-${{ github.run_number }}
+          path: apps/desktop/release/sigma-studio-webai-mcp-installer
+          if-no-files-found: error
+          retention-days: 7
